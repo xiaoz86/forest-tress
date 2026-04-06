@@ -26,21 +26,51 @@
   --color-text-light: #8a8a8a;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Noto Sans SC', sans-serif;
+    color: var(--color-text-primary);
+    background: var(--color-warm-cream);
+    overflow-x: hidden;
+  }
 }
 
-html {
-  scroll-behavior: smooth;
-}
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 1s ease both;
+  }
 
-body {
-  font-family: 'Noto Sans SC', sans-serif;
-  color: var(--color-text-primary);
-  background: var(--color-warm-cream);
-  overflow-x: hidden;
+  .animate-fade-in-delay-1 {
+    animation: fadeIn 1s ease 0.3s both;
+  }
+
+  .animate-fade-in-delay-2 {
+    animation: fadeIn 1s ease 0.5s both;
+  }
+
+  .animate-fade-in-delay-3 {
+    animation: fadeIn 1s ease 0.7s both;
+  }
+
+  .animate-fade-in-delay-4 {
+    animation: fadeIn 1s ease 0.9s both;
+  }
+
+  .animate-pulse-heart {
+    animation: pulse-heart 2s ease infinite;
+  }
+
+  .animate-scroll-bounce {
+    animation: scroll-bounce 2s ease infinite;
+  }
+
+  .animate-ring-breathe {
+    animation: ring-breathe 6s ease infinite;
+  }
 }
 
 @keyframes fadeIn {
@@ -61,36 +91,4 @@ body {
 @keyframes ring-breathe {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
-}
-
-.animate-fade-in {
-  animation: fadeIn 1s ease both;
-}
-
-.animate-fade-in-delay-1 {
-  animation: fadeIn 1s ease 0.3s both;
-}
-
-.animate-fade-in-delay-2 {
-  animation: fadeIn 1s ease 0.5s both;
-}
-
-.animate-fade-in-delay-3 {
-  animation: fadeIn 1s ease 0.7s both;
-}
-
-.animate-fade-in-delay-4 {
-  animation: fadeIn 1s ease 0.9s both;
-}
-
-.animate-pulse-heart {
-  animation: pulse-heart 2s ease infinite;
-}
-
-.animate-scroll-bounce {
-  animation: scroll-bounce 2s ease infinite;
-}
-
-.animate-ring-breathe {
-  animation: ring-breathe 6s ease infinite;
 }
