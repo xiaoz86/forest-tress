@@ -36,6 +36,22 @@ function parseItems(content: string): Array<Record<string, string | string[]>> {
   return items;
 }
 
+// Parse origin markdown into structured sections by ## headings
+function parseOriginSections(content: string): Record<string, string[]> {
+  const sections: Record<string, string[]> = {};
+  let currentSection = '';
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('## ')) {
+      currentSection = trimmed.slice(3).trim();
+      sections[currentSection] = [];
+    } else if (currentSection && trimmed) {
+      sections[currentSection].push(trimmed);
+    }
+  }
+  return sections;
+}
+
 const avatarColorMap: Record<string, string> = {
   coral: 'from-coral-soft to-warmth',
   sky: 'from-sky to-[#a5cce0]',
@@ -52,6 +68,7 @@ export default function Home() {
   const nodeCard = getContent('node-card');
   const offline = getContent('offline');
 
+  const originSections = parseOriginSections(origin.content);
   const philItems = parseItems(philosophy.content);
   const voiceItems = parseItems(voices.content);
   const stepItems = parseItems(howItWorks.content);
@@ -62,22 +79,26 @@ export default function Home() {
       <Nav />
 
       {/* Hero */}
-      <section className="relative min-h-screen flex flex-col justify-center items-center text-center bg-gradient-to-br from-forest-deep via-[#243d24] via-30% to-[#3d6b3d] overflow-hidden p-8">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_700px_500px_at_25%_75%,rgba(212,160,160,0.08)_0%,transparent_70%),radial-gradient(ellipse_600px_400px_at_75%_25%,rgba(139,181,115,0.12)_0%,transparent_70%)] pointer-events-none" />
-        <HeroCanvas />
-        <div className="relative z-[2] max-w-[820px]">
-          <div className="inline-flex items-center gap-2 px-5 py-2 bg-white/[0.07] border border-white/10 rounded-full text-sage text-[0.82rem] tracking-[2px] mb-10 backdrop-blur-[10px] animate-fade-in-delay-1">
-            <span className="w-1.5 h-1.5 bg-coral-soft rounded-full animate-pulse-heart" />
-            一个关于爱与连接的生态社区
-          </div>
-          <h1 className="font-serif text-[clamp(2.6rem,6.5vw,5rem)] font-black text-white leading-[1.25] -tracking-[1px] mb-6 animate-fade-in-delay-2">
-            让独立的个体<br />
-            <span className="bg-gradient-to-br from-warmth via-coral-soft to-gold-light bg-clip-text text-transparent">在爱中连接</span><br />
-            让附近重新生长
+      <section className="relative min-h-screen flex flex-col justify-center items-center text-center bg-forest-deep overflow-hidden p-8">
+        {/* Video Background */}
+        <video
+          autoPlay muted loop playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+          poster="/hero-poster.jpg"
+        >
+          <source src="/hero-forest.mp4" type="video/mp4" />
+        </video>
+        {/* Dark overlay for text readability */}
+        <div className="absolute inset-0 bg-black/40" />
+        <div className="relative z-[2] max-w-[680px]">
+          <h1 className="font-sans text-[clamp(1.6rem,3.5vw,2.4rem)] font-light text-white/90 leading-[1.8] tracking-[0.5px] mb-8 animate-fade-in-delay-2">
+            让独立的个体彼此连接，流动，<br />
+            让附近生长，<br />
+            让更多创造者的能量<br />
+            <span className="bg-gradient-to-r from-warmth via-coral-soft to-gold-light bg-clip-text text-transparent font-normal">流到每一个需要的地方。</span>
           </h1>
-          <p className="font-serif text-[clamp(1rem,2.2vw,1.25rem)] text-white/65 leading-[1.9] mb-12 animate-fade-in-delay-3">
-            这个世界有时候会很刻薄。如果可以的话，我希望用温暖和爱去创造一些东西。<br />
-            帮助人们不那么孤独，不那么艰难。慢慢地，把这些人连接起来。
+          <p className="text-[0.92rem] text-white/40 leading-[1.8] tracking-[1px] mb-12 italic animate-fade-in-delay-3">
+            一个关于连接、对话、支持、共创与持续生长的生态社区。
           </p>
           <div className="flex gap-4 justify-center flex-wrap animate-fade-in-delay-4">
             <a href="#join" className="inline-flex items-center gap-2 px-9 py-4 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-bold text-base rounded-full no-underline transition-all shadow-[0_4px_24px_rgba(212,160,160,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(212,160,160,0.45)]">
@@ -102,31 +123,39 @@ export default function Home() {
           <h2 className="font-serif text-[clamp(2rem,4vw,2.8rem)] font-bold text-forest-deep leading-[1.35]">{origin.frontmatter.title}</h2>
         </div>
         <div className="max-w-[760px] mx-auto">
-          <div className="font-serif text-[clamp(1.3rem,3vw,1.8rem)] font-semibold text-forest-deep leading-[1.7] mb-8 pl-7 border-l-[3px] border-coral-soft">
-            这个时代，AI 正在快速改变世界。但越是在这样的时代，我越想回到一个更根本的问题：什么才是不会被替代的？
-          </div>
-          <p className="text-base text-text-secondary leading-[2] mb-6">
-            也许不是某一种工具，而是一个人如何与人相处，如何倾听，如何理解，如何建立信任，如何共情，如何合作，如何在复杂世界里依然保有善意与责任感。
-          </p>
-          <p className="text-base text-text-secondary leading-[2] mb-6">
-            当我想到孩子长大以后真正需要什么时，我想到的，也不是一项具体技能，而是人的特质——与人联结的能力，共情的能力，面对变化时依然保有学习力、判断力与创造力的能力。
-          </p>
-          <div className="font-serif text-lg font-semibold text-forest-deep leading-[1.8] py-7 px-8 bg-gradient-to-br from-love-pink/8 to-warmth/8 rounded-2xl border-l-[3px] border-coral-soft my-8">
-            我的血液和价值愿景里一直相信：一个连接、有爱、可以持续生长的生态，无论现在还是未来，都是极其重要的。我们可以把它变为现实。于是，一个想法在我心里孕育产生了——<strong>去重新种下一片森林。</strong>
-          </div>
-          <p className="text-base text-text-secondary leading-[2] mb-6">
-            今天，很多人的&ldquo;附近&rdquo;正在消失。我们拥有无数联系人，却很少有真正可以靠近、可以对话、可以彼此支持的人。&ldquo;附近&rdquo;的消失，不只是空间的变化，也是关系土壤的流失。
-          </p>
-          <p className="text-base text-text-secondary leading-[2] mb-6">
-            Hannah Arendt 提到过一个意象：桌子。桌子让彼此之间既有距离，也有关系。书店、社区空间、沙龙、一次认真组织的对话——它们都像一张张小桌子。我们想做的，就是在一个越来越难对话的时代，重新创造一些&ldquo;桌子&rdquo;，让人们能够重新相遇、重新交谈、重新建立一点点理解。
-          </p>
-          <div className="flex items-center gap-4 mt-10 pt-8 border-t border-black/[0.06]">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-coral-soft to-warmth flex items-center justify-center text-xl">🌱</div>
-            <div>
-              <div className="font-serif font-semibold text-[0.95rem] text-forest-deep">附近森林发起人</div>
-              <div className="text-[0.82rem] text-text-light mt-0.5">创造价值的背后都是爱的一种表达</div>
+          {/* 引言 - 大字引用样式 */}
+          {originSections['引言']?.map((text, i) => (
+            <div key={`quote-${i}`} className="font-serif text-[clamp(1.3rem,3vw,1.8rem)] font-semibold text-forest-deep leading-[1.7] mb-8 pl-7 border-l-[3px] border-coral-soft">
+              {text}
             </div>
-          </div>
+          ))}
+          {/* 正文 - 普通段落 */}
+          {originSections['正文']?.map((text, i) => (
+            <p key={`text-${i}`} className="text-base text-text-secondary leading-[2] mb-6">{text}</p>
+          ))}
+          {/* 核心信念 - 强调块 */}
+          {originSections['核心信念']?.map((text, i) => (
+            <div key={`belief-${i}`} className="font-serif text-lg font-semibold text-forest-deep leading-[1.8] py-7 px-8 bg-gradient-to-br from-love-pink/8 to-warmth/8 rounded-2xl border-l-[3px] border-coral-soft my-8"
+              dangerouslySetInnerHTML={{ __html: text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') }} />
+          ))}
+          {/* 消失的附近 */}
+          {originSections['消失的附近']?.map((text, i) => (
+            <p key={`nearby-${i}`} className="text-base text-text-secondary leading-[2] mb-6">{text}</p>
+          ))}
+          {/* 重新创造桌子 */}
+          {originSections['重新创造桌子']?.map((text, i) => (
+            <p key={`table-${i}`} className="text-base text-text-secondary leading-[2] mb-6">{text}</p>
+          ))}
+          {/* 署名 */}
+          {originSections['署名'] && (
+            <div className="flex items-center gap-4 mt-10 pt-8 border-t border-black/[0.06]">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-coral-soft to-warmth flex items-center justify-center text-xl">🌱</div>
+              <div>
+                <div className="font-serif font-semibold text-[0.95rem] text-forest-deep">{originSections['署名'][0]}</div>
+                {originSections['署名'][1] && <div className="text-[0.82rem] text-text-light mt-0.5">{originSections['署名'][1]}</div>}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
