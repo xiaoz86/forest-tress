@@ -80,14 +80,12 @@ export default function Home() {
 
       {/* Hero */}
       <section className="relative min-h-screen flex flex-col justify-center items-center text-center bg-forest-deep overflow-hidden p-8">
-        {/* Video Background */}
-        <video
-          autoPlay muted loop playsInline
+        {/* Background Image */}
+        <img
+          src="/hero-forest.jpg"
+          alt=""
           className="absolute inset-0 w-full h-full object-cover"
-          poster="/hero-poster.jpg"
-        >
-          <source src="/hero-forest.mp4" type="video/mp4" />
-        </video>
+        />
         {/* Dark overlay for text readability */}
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative z-[2] max-w-[680px]">
