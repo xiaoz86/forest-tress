@@ -1,9 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import type { MatchedNode } from '@/lib/match';
 
 type Props = { matches: MatchedNode[] };
+
+// 社区主理人微信号 — 如需修改请直接改这里
+const HOST_WECHAT = 'XiaoZ_lifeCoach';
+const HOST_NAME = '小 Z';
 
 const gradients = [
   'from-coral-soft to-warmth',
@@ -25,26 +30,86 @@ const matchTypeStyle: Record<MatchedNode['matchType'], string> = {
   同城: 'bg-sky/15 text-[#4a7c9a] border-sky/30',
 };
 
+function HostContactCard() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(HOST_WECHAT);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // 降级：创建一个临时 input 让用户手动复制
+      const input = document.createElement('input');
+      input.value = HOST_WECHAT;
+      document.body.appendChild(input);
+      input.select();
+      try {
+        document.execCommand('copy');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {}
+      document.body.removeChild(input);
+    }
+  };
+
+  return (
+    <div className="mt-8 p-7 bg-gradient-to-br from-leaf/8 via-sage/8 to-warmth/8 rounded-2xl border border-moss/20 text-center">
+      <div className="text-3xl mb-2">🤝</div>
+      <h4 className="font-serif text-lg font-bold text-forest-deep mb-1.5">
+        添加主理人{HOST_NAME}，进入社区群
+      </h4>
+      <p className="text-sm text-text-secondary leading-relaxed mb-5 max-w-md mx-auto">
+        主理人会把你拉进社区群，让你更快和同频的人连接起来。
+      </p>
+      <div className="flex justify-center">
+        <div className="inline-flex items-center gap-2 px-4 py-3 bg-white rounded-2xl border border-moss/25 shadow-[0_2px_10px_rgba(26,46,26,0.06)]">
+          <span className="font-mono font-semibold text-forest-deep text-sm tracking-wide whitespace-nowrap">
+            {HOST_WECHAT}
+          </span>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className={`text-xs font-semibold rounded-full px-3 py-1 transition-all border cursor-pointer whitespace-nowrap flex-shrink-0 ${
+              copied
+                ? 'bg-leaf/20 text-forest-mid border-leaf/40'
+                : 'bg-coral-soft/20 text-coral border-coral-soft/40 hover:bg-coral-soft/30'
+            }`}
+          >
+            {copied ? '已复制 ✓' : '复制'}
+          </button>
+        </div>
+      </div>
+      <p className="text-[11px] text-text-light mt-3">
+        打开微信 → 添加朋友 → 粘贴微信号
+      </p>
+    </div>
+  );
+}
+
 export default function MatchedNodes({ matches }: Props) {
   if (matches.length === 0) {
     return (
-      <div className="mt-8 text-center py-10 px-6 bg-gradient-to-br from-love-pink/8 to-warmth/8 rounded-2xl border border-coral-soft/20">
-        <div className="text-4xl mb-3">🌱</div>
-        <h3 className="font-serif text-xl font-bold text-forest-deep mb-2">
-          你是这片森林的第一棵树
-        </h3>
-        <p className="text-sm text-text-secondary leading-relaxed max-w-md mx-auto">
-          森林的每一次起始都是如此安静。
-          <br />
-          期待与后来的创造者在这里相遇。
-        </p>
-        <Link
-          href="/creators"
-          className="inline-block mt-5 px-6 py-2.5 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep text-sm font-semibold rounded-full no-underline hover:-translate-y-0.5 transition-transform"
-        >
-          去看看这片森林
-        </Link>
-      </div>
+      <>
+        <div className="mt-8 text-center py-10 px-6 bg-gradient-to-br from-love-pink/8 to-warmth/8 rounded-2xl border border-coral-soft/20">
+          <div className="text-4xl mb-3">🌱</div>
+          <h3 className="font-serif text-xl font-bold text-forest-deep mb-2">
+            你是这片森林的第一棵树
+          </h3>
+          <p className="text-sm text-text-secondary leading-relaxed max-w-md mx-auto">
+            森林的每一次起始都是如此安静。
+            <br />
+            期待与后来的创造者在这里相遇。
+          </p>
+          <Link
+            href="/creators"
+            className="inline-block mt-5 px-6 py-2.5 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep text-sm font-semibold rounded-full no-underline hover:-translate-y-0.5 transition-transform"
+          >
+            去看看这片森林
+          </Link>
+        </div>
+        <HostContactCard />
+      </>
     );
   }
 
@@ -103,6 +168,9 @@ export default function MatchedNodes({ matches }: Props) {
           );
         })}
       </div>
+
+      {/* 添加主理人 CTA */}
+      <HostContactCard />
 
       <div className="text-center mt-8">
         <Link

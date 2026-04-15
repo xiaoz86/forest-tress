@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { matchNodes } from '@/lib/match';
+import { notifyNewNode } from '@/lib/notify';
 import type { NodeCard } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
@@ -51,6 +52,11 @@ export async function POST(request: NextRequest) {
         n => n.id !== newNode.id,
       );
       matches = matchNodes(newNode, others, 3);
+
+      // 通知主理人（fire-and-forget，失败不影响主流程）
+      notifyNewNode(newNode).catch(err => {
+        console.error('[api/join] notify failed', err);
+      });
     }
 
     return NextResponse.json({ success: true, data, matches });
