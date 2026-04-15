@@ -21,10 +21,22 @@ function firstChar(name: string): string {
   return (name || '').trim().charAt(0) || '·';
 }
 
+// 用 hash 生成稳定的"随机"偏移，让每棵树看起来不完全一样
+function hashSeed(key: string): number {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return h;
+}
+function jitter(seed: number, i: number, range: number): number {
+  const n = Math.sin((seed + i * 1234) * 0.01) * 43758.5453;
+  return (n - Math.floor(n) - 0.5) * 2 * range;
+}
+
 export default function CreatorTree({ node }: Props) {
   const name = node.name || '无名之树';
   const initial = firstChar(name);
   const gradient = hashPick(name, gradients);
+  const seed = hashSeed(name);
 
   // 树枝数量 = 核心内容字段数（doing / product / experience 非空）
   const branches = [
@@ -37,73 +49,169 @@ export default function CreatorTree({ node }: Props) {
   const rootCount = Math.min(Math.max((node.topics || []).length, 1), 5);
   const branchCount = Math.max(branches.length, 2);
 
-  // 生成树枝坐标：左右对称分布，高度从 trunk 上半部
-  const branchPoints = Array.from({ length: branchCount }).map((_, i) => {
+  // 弯曲树枝路径：从树干中段延伸出去，末端向上微翘
+  const branchPaths = Array.from({ length: branchCount }).map((_, i) => {
     const side = i % 2 === 0 ? -1 : 1;
-    const t = (i + 1) / (branchCount + 1); // 0..1
-    const y = 110 - t * 70; // from 110 (lower) up to 40
-    const len = 36 + (i % 2) * 10;
+    const t = (i + 0.5) / branchCount;
+    const startY = 150 - t * 40; // 110 → 150 区间，越往下越早
+    const len = 30 + (i % 2) * 8 + jitter(seed, i, 6);
+    const endX = 100 + side * len;
+    const endY = startY - 18 - jitter(seed, i + 7, 4);
+    // 贝塞尔控制点让枝条向下再翘起来
+    const cp1x = 100 + side * len * 0.4;
+    const cp1y = startY - 4;
+    const cp2x = 100 + side * len * 0.8;
+    const cp2y = startY - 10;
     return {
-      x1: 80,
-      y1: y,
-      x2: 80 + side * len,
-      y2: y - 14,
+      d: `M 100 ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`,
+      endX,
+      endY,
+      side,
     };
   });
 
-  // 生成树根坐标
-  const rootPoints = Array.from({ length: rootCount }).map((_, i) => {
-    const spread = (i - (rootCount - 1) / 2) * 14;
-    return {
-      x1: 80,
-      y1: 130,
-      x2: 80 + spread,
-      y2: 148,
-    };
+  // 树根：从底部弯曲向外延伸
+  const roots = Array.from({ length: rootCount }).map((_, i) => {
+    const spread = (i - (rootCount - 1) / 2) * (14 + jitter(seed, i + 11, 2));
+    const endX = 100 + spread;
+    const endY = 206 + Math.abs(spread) * 0.15;
+    const midX = 100 + spread * 0.5;
+    const midY = 200;
+    return `M 100 192 Q ${midX} ${midY} ${endX} ${endY}`;
   });
+
+  // 唯一的 gradient id（避免同页多棵树 id 冲突）
+  const gid = `gid-${seed}`;
 
   return (
     <article className="group relative bg-warm-cream rounded-3xl p-6 border border-moss/15 shadow-[0_4px_24px_rgba(26,46,26,0.04)] hover:shadow-[0_12px_40px_rgba(26,46,26,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col">
       {/* SVG Tree */}
       <div className="relative flex justify-center mb-4">
-        <svg viewBox="0 0 160 160" width="160" height="160" aria-hidden="true">
+        <svg viewBox="0 0 200 220" width="200" height="220" aria-hidden="true">
+          <defs>
+            {/* 树干渐变 */}
+            <linearGradient id={`${gid}-trunk`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#6b4a2b" />
+              <stop offset="50%" stopColor="#8b6f47" />
+              <stop offset="100%" stopColor="#5c4033" />
+            </linearGradient>
+            {/* 叶冠径向渐变 */}
+            <radialGradient id={`${gid}-crown`} cx="0.4" cy="0.4" r="0.7">
+              <stop offset="0%" stopColor="#a8c9a0" />
+              <stop offset="50%" stopColor="#8fb573" />
+              <stop offset="100%" stopColor="#4a7c4a" />
+            </radialGradient>
+            {/* 土地阴影 */}
+            <radialGradient id={`${gid}-ground`} cx="0.5" cy="0.5" r="0.5">
+              <stop offset="0%" stopColor="#5c4033" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="#5c4033" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+
+          {/* 土地阴影 */}
+          <ellipse cx="100" cy="205" rx="55" ry="5" fill={`url(#${gid}-ground)`} />
+
           {/* 树根 */}
-          {rootPoints.map((p, i) => (
+          {roots.map((d, i) => (
             <path
               key={`root-${i}`}
-              d={`M ${p.x1} ${p.y1} Q ${(p.x1 + p.x2) / 2} ${p.y1 + 6} ${p.x2} ${p.y2}`}
-              stroke="#8b6f47"
-              strokeWidth="2"
+              d={d}
+              stroke="#6b4a2b"
+              strokeWidth="2.5"
               strokeLinecap="round"
               fill="none"
-              opacity="0.5"
+              opacity="0.55"
             />
           ))}
-          {/* 树干 */}
-          <rect x="76" y="40" width="8" height="94" rx="4" fill="#5c4033" />
+
+          {/* 树干 — 用 path 画出有弧度、略带锥形的树干 */}
+          <path
+            d="M 92 200
+               C 90 180, 94 160, 92 140
+               C 90 120, 95 100, 98 82
+               L 102 82
+               C 105 100, 110 120, 108 140
+               C 106 160, 110 180, 108 200
+               Z"
+            fill={`url(#${gid}-trunk)`}
+          />
+          {/* 树干高光 */}
+          <path
+            d="M 93 198 C 92 170, 94 130, 97 85"
+            stroke="#c9a784"
+            strokeWidth="1"
+            strokeLinecap="round"
+            fill="none"
+            opacity="0.35"
+          />
+
           {/* 树枝 */}
-          {branchPoints.map((p, i) => (
+          {branchPaths.map((b, i) => (
             <g key={`branch-${i}`}>
-              <line
-                x1={p.x1}
-                y1={p.y1}
-                x2={p.x2}
-                y2={p.y2}
-                stroke="#4a7c4a"
+              <path
+                d={b.d}
+                stroke="#6b4a2b"
                 strokeWidth="3"
                 strokeLinecap="round"
+                fill="none"
               />
-              <circle cx={p.x2} cy={p.y2} r="10" fill="#8fb573" opacity="0.85" />
-              <circle cx={p.x2} cy={p.y2} r="6" fill="#a8c9a0" />
+              {/* 枝条末端的叶丛：3-4 个叠加椭圆 */}
+              <g>
+                <ellipse
+                  cx={b.endX - b.side * 2}
+                  cy={b.endY + 2}
+                  rx="11"
+                  ry="9"
+                  fill="#4a7c4a"
+                  opacity="0.85"
+                />
+                <ellipse
+                  cx={b.endX}
+                  cy={b.endY}
+                  rx="10"
+                  ry="8"
+                  fill="#6b8f5e"
+                />
+                <ellipse
+                  cx={b.endX + b.side * 2}
+                  cy={b.endY - 2}
+                  rx="8"
+                  ry="6"
+                  fill="#8fb573"
+                />
+                <ellipse
+                  cx={b.endX + b.side * 3}
+                  cy={b.endY - 4}
+                  rx="4"
+                  ry="3"
+                  fill="#a8c9a0"
+                />
+              </g>
             </g>
           ))}
-          {/* 顶部叶冠 */}
-          <circle cx="80" cy="38" r="16" fill="#6b8f5e" opacity="0.75" />
-          <circle cx="80" cy="34" r="10" fill="#8fb573" />
+
+          {/* 主叶冠 — 多层椭圆叠加 */}
+          <g>
+            {/* 后排深色 */}
+            <ellipse cx="82" cy="60" rx="22" ry="18" fill="#4a7c4a" opacity="0.85" />
+            <ellipse cx="118" cy="62" rx="22" ry="18" fill="#4a7c4a" opacity="0.85" />
+            <ellipse cx="100" cy="50" rx="26" ry="22" fill="#4a7c4a" opacity="0.9" />
+            {/* 中层 */}
+            <ellipse cx="86" cy="56" rx="18" ry="15" fill="#6b8f5e" />
+            <ellipse cx="114" cy="58" rx="18" ry="15" fill="#6b8f5e" />
+            <ellipse cx="100" cy="46" rx="22" ry="18" fill={`url(#${gid}-crown)`} />
+            {/* 前层高光 */}
+            <ellipse cx="92" cy="50" rx="10" ry="8" fill="#8fb573" />
+            <ellipse cx="108" cy="52" rx="10" ry="8" fill="#8fb573" />
+            <ellipse cx="100" cy="42" rx="12" ry="9" fill="#a8c9a0" />
+            {/* 点缀 */}
+            <circle cx="95" cy="40" r="3" fill="#d4e4cf" opacity="0.7" />
+            <circle cx="106" cy="48" r="2" fill="#d4e4cf" opacity="0.7" />
+          </g>
         </svg>
-        {/* 姓名首字母头像（覆盖在树冠上） */}
+        {/* 姓名首字母头像 — 悬浮在叶冠上方 */}
         <div
-          className={`absolute top-3 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-serif font-bold text-lg shadow-[0_4px_12px_rgba(26,46,26,0.2)] ring-2 ring-warm-cream`}
+          className={`absolute top-0 left-1/2 -translate-x-1/2 w-11 h-11 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-serif font-bold text-lg shadow-[0_4px_14px_rgba(26,46,26,0.25)] ring-[3px] ring-warm-cream`}
         >
           {initial}
         </div>
