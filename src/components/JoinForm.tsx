@@ -1,22 +1,27 @@
 'use client';
 
 import { useState, KeyboardEvent } from 'react';
+import MatchedNodes from './MatchedNodes';
+import type { MatchedNode } from '@/lib/match';
+
+const emptyForm = {
+  name: '',
+  city: '',
+  doing: '',
+  topics: [] as string[],
+  experience: '',
+  offer: '',
+  seeking: '',
+  product: '',
+  wechat: '',
+  email: '',
+};
 
 export default function JoinForm() {
-  const [formData, setFormData] = useState({
-    name: '',
-    city: '',
-    doing: '',
-    topics: [] as string[],
-    experience: '',
-    offer: '',
-    seeking: '',
-    product: '',
-    wechat: '',
-    email: '',
-  });
+  const [formData, setFormData] = useState(emptyForm);
   const [topicInput, setTopicInput] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [matches, setMatches] = useState<MatchedNode[]>([]);
 
   const handleTopicKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && topicInput.trim()) {
@@ -50,15 +55,9 @@ export default function JoinForm() {
       });
 
       if (res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setMatches(Array.isArray(json.matches) ? json.matches : []);
         setStatus('success');
-        setTimeout(() => {
-          setStatus('idle');
-          setFormData({
-            name: '', city: '', doing: '', topics: [],
-            experience: '', offer: '', seeking: '',
-            product: '', wechat: '', email: '',
-          });
-        }, 3000);
       } else {
         setStatus('error');
         setTimeout(() => setStatus('idle'), 3000);
@@ -67,6 +66,12 @@ export default function JoinForm() {
       setStatus('error');
       setTimeout(() => setStatus('idle'), 3000);
     }
+  };
+
+  const handleContinue = () => {
+    setFormData(emptyForm);
+    setMatches([]);
+    setStatus('idle');
   };
 
   const inputClass = "w-full px-4 py-3 border-[1.5px] border-mist rounded-lg font-sans text-[0.93rem] text-text-primary bg-warm-cream outline-none transition-all focus:border-coral-soft focus:shadow-[0_0_0_3px_rgba(212,160,160,0.1)] focus:bg-white";
@@ -163,6 +168,21 @@ export default function JoinForm() {
         {status === 'error' && '提交失败，请稍后重试'}
         {status === 'idle' && '提交节点卡，加入附近森林'}
       </button>
+
+      {status === 'success' && (
+        <>
+          <MatchedNodes matches={matches} />
+          <div className="text-center mt-6">
+            <button
+              type="button"
+              onClick={handleContinue}
+              className="text-sm text-text-light hover:text-forest-deep underline underline-offset-4 transition-colors bg-transparent border-none cursor-pointer"
+            >
+              继续填写新节点
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
