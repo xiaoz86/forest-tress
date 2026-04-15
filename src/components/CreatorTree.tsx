@@ -21,17 +21,41 @@ function firstChar(name: string): string {
   return (name || '').trim().charAt(0) || '·';
 }
 
-// 用 hash 生成稳定的 seed
 function hashSeed(key: string): number {
   let h = 0;
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
   return h;
 }
 
-// 伪随机（稳定版）— 基于 seed 和索引
+// 稳定的伪随机
 function rand(seed: number, i: number): number {
   const n = Math.sin((seed + i * 9301 + 49297) * 0.0001) * 43758.5453;
   return n - Math.floor(n);
+}
+
+type Circle = { x: number; y: number; r: number };
+
+// 在椭圆区域内生成致密叶丛点
+function buildFoliage(
+  seed: number,
+  offset: number,
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  density = 0.18,
+): Circle[] {
+  const count = Math.max(12, Math.round(rx * ry * density));
+  const out: Circle[] = [];
+  for (let i = 0; i < count; i++) {
+    const a = rand(seed, offset + i * 3) * Math.PI * 2;
+    const r = Math.sqrt(rand(seed, offset + i * 3 + 1));
+    const x = cx + Math.cos(a) * r * rx;
+    const y = cy + Math.sin(a) * r * ry;
+    const sz = 5 + rand(seed, offset + i * 3 + 2) * 5;
+    out.push({ x, y, r: sz });
+  }
+  return out;
 }
 
 export default function CreatorTree({ node }: Props) {
@@ -47,247 +71,272 @@ export default function CreatorTree({ node }: Props) {
     { label: '擅长', text: node.experience },
   ].filter(b => b.text && b.text.trim());
 
-  // 花朵密度由内容丰富度决定
-  const contentRichness = branches.length;
-  const blossomCount = 40 + contentRichness * 8 + (node.topics?.length || 0) * 4;
-
-  // 唯一的 gradient id（避免同页多棵树 id 冲突）
   const gid = `gid-${seed}`;
 
-  // 生成散落的花瓣：在一个大的椭圆区域内随机分布
-  // 中心 (100, 60)，区域 rx=70 ry=50
-  const blossoms = Array.from({ length: blossomCount }).map((_, i) => {
-    const r1 = rand(seed, i * 3);
-    const r2 = rand(seed, i * 3 + 1);
-    const r3 = rand(seed, i * 3 + 2);
-    // 极坐标均匀分布到椭圆区域（sqrt 消除中心聚集）
-    const angle = r1 * Math.PI * 2;
-    const radius = Math.sqrt(r2);
-    const x = 100 + Math.cos(angle) * radius * 68;
-    // 上半部密集，下半部稀疏（模拟树冠）
-    const yFactor = Math.sin(angle) > 0 ? 1.3 : 0.75;
-    const y = 62 + Math.sin(angle) * radius * 42 * yFactor;
-    // 花朵大小、颜色随机
-    const size = 3 + r3 * 3.5;
-    const colorRoll = rand(seed, i * 5);
-    const color =
-      colorRoll < 0.35
-        ? '#f4c8d0' // 浅粉
-        : colorRoll < 0.7
-          ? '#e8a88e' // coral-soft
-          : colorRoll < 0.9
-            ? '#d4a0a0' // love-pink
-            : '#f8e4d4'; // 米白花
-    return { x, y, size, color, i };
+  // 生成多个叶丛（主冠 + 左右 + 顶部），让轮廓不规则
+  // 基于 seed 的微小偏移让每棵树不完全一样
+  const seedOffX = (rand(seed, 0) - 0.5) * 16;
+  const seedOffY = (rand(seed, 1) - 0.5) * 8;
+
+  // 整个画布 300×340，主树位于 (150, 140) 附近
+  // 多个叶丛中心
+  const clusters = [
+    { cx: 150 + seedOffX * 0.3, cy: 110 + seedOffY, rx: 100, ry: 80, start: 10 },
+    { cx: 85 + seedOffX, cy: 130, rx: 55, ry: 50, start: 500 },
+    { cx: 215 + seedOffX * -1, cy: 135, rx: 60, ry: 52, start: 1000 },
+    { cx: 150, cy: 55, rx: 55, ry: 35, start: 1500 },
+    { cx: 110, cy: 170 + seedOffY, rx: 45, ry: 40, start: 2000 },
+    { cx: 190, cy: 175, rx: 48, ry: 42, start: 2500 },
+  ];
+
+  // 每个叶丛生成多层（深→浅）
+  const leavesBack: Circle[] = [];
+  const leavesMid: Circle[] = [];
+  const leavesFront: Circle[] = [];
+  const leavesHighlight: Circle[] = [];
+  clusters.forEach(c => {
+    leavesBack.push(...buildFoliage(seed, c.start, c.cx, c.cy + 4, c.rx, c.ry, 0.08));
+    leavesMid.push(...buildFoliage(seed, c.start + 100, c.cx + 2, c.cy, c.rx * 0.92, c.ry * 0.92, 0.12));
+    leavesFront.push(...buildFoliage(seed, c.start + 200, c.cx - 2, c.cy - 3, c.rx * 0.75, c.ry * 0.75, 0.12));
+    leavesHighlight.push(...buildFoliage(seed, c.start + 300, c.cx + 3, c.cy - 6, c.rx * 0.5, c.ry * 0.5, 0.08));
   });
 
   return (
-    <article className="group relative bg-warm-cream rounded-3xl p-6 border border-moss/15 shadow-[0_4px_24px_rgba(26,46,26,0.04)] hover:shadow-[0_12px_40px_rgba(26,46,26,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col">
-      {/* SVG Tree — sakura style */}
-      <div className="relative flex justify-center mb-4">
-        <svg viewBox="0 0 200 240" width="200" height="240" aria-hidden="true">
+    <article className="group relative rounded-3xl overflow-hidden border border-moss/20 shadow-[0_6px_28px_rgba(26,46,26,0.08)] hover:shadow-[0_16px_48px_rgba(26,46,26,0.15)] hover:-translate-y-1 transition-all duration-300 flex flex-col bg-warm-cream">
+      {/* SVG 场景：天空 + 远山 + 树 + 草地 */}
+      <div className="relative">
+        <svg viewBox="0 0 300 340" width="100%" aria-hidden="true" className="block">
           <defs>
+            {/* 天空渐变 */}
+            <linearGradient id={`${gid}-sky`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#b6d8eb" />
+              <stop offset="60%" stopColor="#d6e8ee" />
+              <stop offset="100%" stopColor="#e8efe0" />
+            </linearGradient>
+            {/* 草地渐变 */}
+            <linearGradient id={`${gid}-grass`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#8fb573" />
+              <stop offset="50%" stopColor="#6b8f5e" />
+              <stop offset="100%" stopColor="#4a7c4a" />
+            </linearGradient>
             {/* 树干渐变 */}
             <linearGradient id={`${gid}-trunk`} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#2a1a0f" />
-              <stop offset="45%" stopColor="#4a3220" />
-              <stop offset="100%" stopColor="#1a0e07" />
+              <stop offset="0%" stopColor="#3d2817" />
+              <stop offset="50%" stopColor="#6b4a2b" />
+              <stop offset="100%" stopColor="#2a1a0f" />
             </linearGradient>
-            {/* 地面阴影 */}
-            <radialGradient id={`${gid}-ground`} cx="0.5" cy="0.5" r="0.5">
-              <stop offset="0%" stopColor="#2a1a0f" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#2a1a0f" stopOpacity="0" />
-            </radialGradient>
           </defs>
 
-          {/* 地面阴影 */}
-          <ellipse cx="100" cy="228" rx="55" ry="4" fill={`url(#${gid}-ground)`} />
-
-          {/* 主干 — 弯曲的 S 形曲线，从下往上分叉 */}
+          {/* 天空 */}
+          <rect width="300" height="260" fill={`url(#${gid}-sky)`} />
+          {/* 几朵云 */}
+          <g opacity="0.7">
+            <ellipse cx="50" cy="40" rx="22" ry="6" fill="#ffffff" />
+            <ellipse cx="60" cy="38" rx="18" ry="5" fill="#ffffff" />
+            <ellipse cx="250" cy="55" rx="25" ry="7" fill="#ffffff" />
+            <ellipse cx="260" cy="52" rx="18" ry="5" fill="#ffffff" />
+          </g>
+          {/* 远山 */}
           <path
-            d="M 95 228
-               C 97 210, 100 195, 98 180
-               C 95 165, 105 150, 102 130
-               C 98 110, 108 95, 105 75
-               C 103 60, 112 50, 108 38"
-            stroke={`url(#${gid}-trunk)`}
-            strokeWidth="9"
+            d="M 0 220 Q 50 200 100 210 T 180 205 T 260 215 T 300 210 L 300 260 L 0 260 Z"
+            fill="#8ba8b8"
+            opacity="0.4"
+          />
+          <path
+            d="M 0 230 Q 60 215 120 225 T 220 220 T 300 228 L 300 260 L 0 260 Z"
+            fill="#6b8f5e"
+            opacity="0.5"
+          />
+          {/* 草地 */}
+          <rect y="258" width="300" height="82" fill={`url(#${gid}-grass)`} />
+          {/* 草地上的草叶 */}
+          <g stroke="#3d5a2d" strokeWidth="1" opacity="0.4">
+            {Array.from({ length: 30 }).map((_, i) => {
+              const x = (i * 11 + rand(seed, i + 60) * 5) % 300;
+              const y = 260 + rand(seed, i + 70) * 75;
+              return <line key={i} x1={x} y1={y} x2={x + 0.5} y2={y - 3 - rand(seed, i + 80) * 3} />;
+            })}
+          </g>
+
+          {/* 树干 - 主干从草地伸到叶冠中心 */}
+          <path
+            d="M 144 278
+               C 142 250, 148 220, 145 190
+               C 142 160, 152 130, 150 105
+               L 156 105
+               C 158 130, 168 160, 162 190
+               C 160 220, 166 250, 162 278
+               Z"
+            fill={`url(#${gid}-trunk)`}
+          />
+          {/* 树干高光 */}
+          <path
+            d="M 145 275 C 144 240, 149 180, 151 108"
+            stroke="#8b6f47"
+            strokeWidth="1"
+            strokeLinecap="round"
+            fill="none"
+            opacity="0.5"
+          />
+          {/* 树干纹理暗线 */}
+          <path
+            d="M 156 270 C 157 235, 160 180, 158 115"
+            stroke="#1a0e07"
+            strokeWidth="1"
+            strokeLinecap="round"
+            fill="none"
+            opacity="0.6"
+          />
+
+          {/* 主枝分叉 */}
+          {/* 左大枝 */}
+          <path
+            d="M 150 150 Q 115 135 80 125 Q 60 120 42 118"
+            stroke="#3d2817"
+            strokeWidth="5"
             strokeLinecap="round"
             fill="none"
           />
-          {/* 第二个主干（略细，对称偏右） */}
           <path
-            d="M 102 228
-               C 100 205, 98 195, 101 180
-               C 105 160, 98 150, 103 130
-               C 107 110, 95 95, 100 75
-               C 104 58, 92 48, 96 38"
-            stroke={`url(#${gid}-trunk)`}
-            strokeWidth="6"
-            strokeLinecap="round"
-            fill="none"
-            opacity="0.9"
-          />
-
-          {/* 伸出的枝条 — 细分支 */}
-          {/* 左下粗枝 */}
-          <path
-            d="M 100 165 Q 80 155 55 140 Q 42 135 28 130"
-            stroke="#2a1a0f"
+            d="M 80 125 Q 70 105 62 85"
+            stroke="#3d2817"
             strokeWidth="3"
             strokeLinecap="round"
             fill="none"
           />
+          {/* 右大枝 */}
           <path
-            d="M 55 140 Q 48 128 35 115"
-            stroke="#2a1a0f"
-            strokeWidth="2"
+            d="M 152 140 Q 190 128 225 118 Q 245 112 265 108"
+            stroke="#3d2817"
+            strokeWidth="5"
             strokeLinecap="round"
             fill="none"
           />
-          {/* 右上粗枝 */}
           <path
-            d="M 105 105 Q 130 95 160 82 Q 172 78 182 72"
-            stroke="#2a1a0f"
+            d="M 225 118 Q 235 98 240 80"
+            stroke="#3d2817"
             strokeWidth="3"
             strokeLinecap="round"
             fill="none"
           />
+          {/* 顶部主枝 */}
           <path
-            d="M 160 82 Q 168 70 175 55"
-            stroke="#2a1a0f"
-            strokeWidth="2"
+            d="M 153 110 Q 150 85 153 60 Q 155 40 160 28"
+            stroke="#3d2817"
+            strokeWidth="4"
             strokeLinecap="round"
             fill="none"
           />
-          {/* 左上细枝 */}
           <path
-            d="M 103 70 Q 85 60 65 50"
-            stroke="#2a1a0f"
+            d="M 153 90 Q 135 75 120 65"
+            stroke="#3d2817"
             strokeWidth="2.5"
             strokeLinecap="round"
             fill="none"
           />
-          {/* 右下细枝 */}
           <path
-            d="M 100 195 Q 120 188 140 180"
-            stroke="#2a1a0f"
+            d="M 153 90 Q 170 75 185 65"
+            stroke="#3d2817"
             strokeWidth="2.5"
-            strokeLinecap="round"
-            fill="none"
-          />
-          {/* 顶部细枝 */}
-          <path
-            d="M 102 38 Q 95 28 85 22"
-            stroke="#2a1a0f"
-            strokeWidth="2"
-            strokeLinecap="round"
-            fill="none"
-          />
-          <path
-            d="M 102 38 Q 115 30 125 24"
-            stroke="#2a1a0f"
-            strokeWidth="2"
             strokeLinecap="round"
             fill="none"
           />
 
-          {/* 花朵散落 — 先渲染后排深色，再渲染前排亮色 */}
-          {blossoms
-            .filter((_, i) => i % 3 === 0)
-            .map(b => (
-              <circle
-                key={`b-bg-${b.i}`}
-                cx={b.x}
-                cy={b.y}
-                r={b.size * 1.3}
-                fill="#a86b5e"
-                opacity="0.3"
-              />
+          {/* 叶丛 — 四层堆叠 */}
+          {/* 后排最深 */}
+          <g fill="#2d4a2d">
+            {leavesBack.map((c, i) => (
+              <circle key={`lb-${i}`} cx={c.x} cy={c.y} r={c.r * 1.15} />
             ))}
-          {blossoms.map(b => (
-            <circle
-              key={`b-${b.i}`}
-              cx={b.x}
-              cy={b.y}
-              r={b.size}
-              fill={b.color}
-              opacity="0.95"
-            />
-          ))}
-          {/* 花蕊亮点 */}
-          {blossoms
-            .filter((_, i) => i % 4 === 0)
-            .map(b => (
-              <circle
-                key={`b-hl-${b.i}`}
-                cx={b.x - 0.5}
-                cy={b.y - 0.5}
-                r={b.size * 0.35}
-                fill="#fff4e6"
-                opacity="0.85"
-              />
+          </g>
+          {/* 中层 */}
+          <g fill="#4a7c4a">
+            {leavesMid.map((c, i) => (
+              <circle key={`lm-${i}`} cx={c.x} cy={c.y} r={c.r * 1.05} />
             ))}
+          </g>
+          {/* 前层亮 */}
+          <g fill="#6b8f5e">
+            {leavesFront.map((c, i) => (
+              <circle key={`lf-${i}`} cx={c.x} cy={c.y} r={c.r * 0.95} />
+            ))}
+          </g>
+          {/* 高光点 */}
+          <g fill="#8fb573">
+            {leavesHighlight.map((c, i) => (
+              <circle key={`lh-${i}`} cx={c.x} cy={c.y} r={c.r * 0.55} />
+            ))}
+          </g>
+          <g fill="#a8c9a0" opacity="0.7">
+            {leavesHighlight.slice(0, leavesHighlight.length / 3).map((c, i) => (
+              <circle key={`ls-${i}`} cx={c.x - 1} cy={c.y - 1} r={c.r * 0.3} />
+            ))}
+          </g>
+
+          {/* 树下阴影 */}
+          <ellipse cx="150" cy="285" rx="55" ry="4" fill="#1a0e07" opacity="0.25" />
         </svg>
-        {/* 姓名首字母头像 — 悬浮在左上角，像树上的一颗果实 */}
-        <div
-          className={`absolute top-2 right-6 w-11 h-11 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-serif font-bold text-lg shadow-[0_4px_14px_rgba(26,46,26,0.25)] ring-[3px] ring-warm-cream`}
-        >
-          {initial}
+      </div>
+
+      {/* 信息区 */}
+      <div className="p-6 flex flex-col flex-1">
+        {/* 姓名 + 首字母头像 */}
+        <div className="flex items-center gap-3 mb-5">
+          <div
+            className={`flex-shrink-0 w-11 h-11 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-serif font-bold text-lg shadow-[0_3px_10px_rgba(26,46,26,0.2)]`}
+          >
+            {initial}
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-serif text-xl font-bold text-forest-deep leading-tight truncate">{name}</h3>
+            {node.city && (
+              <p className="text-xs text-text-light tracking-wider mt-0.5">{node.city}</p>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* 人物基础信息 */}
-      <div className="text-center mb-4">
-        <h3 className="font-serif text-xl font-bold text-forest-deep leading-tight">{name}</h3>
-        {node.city && (
-          <p className="text-xs text-text-light tracking-wider mt-1">{node.city}</p>
-        )}
-      </div>
-
-      {/* 在做 / 作品 / 擅长 */}
-      <div className="space-y-3 flex-1">
-        {branches.map(b => (
-          <div key={b.label}>
-            <div className="text-[10px] font-semibold tracking-widest text-moss uppercase mb-1">
-              {b.label}
+        {/* 在做 / 作品 / 擅长 */}
+        <div className="space-y-3 flex-1">
+          {branches.map(b => (
+            <div key={b.label}>
+              <div className="text-[10px] font-semibold tracking-widest text-moss uppercase mb-1">
+                {b.label}
+              </div>
+              <p className="text-sm text-text-secondary leading-relaxed line-clamp-3">{b.text}</p>
             </div>
-            <p className="text-sm text-text-secondary leading-relaxed line-clamp-3">{b.text}</p>
-          </div>
-        ))}
-        {/* 可以提供 */}
-        {node.offer && node.offer.trim() && (
-          <div>
-            <div className="text-[10px] font-semibold tracking-widest text-moss uppercase mb-1">
-              可以提供
-            </div>
-            <p className="text-sm text-text-secondary leading-relaxed line-clamp-2">{node.offer}</p>
-          </div>
-        )}
-        {/* 寻找 */}
-        {node.seeking && node.seeking.trim() && (
-          <div>
-            <div className="text-[10px] font-semibold tracking-widest text-coral uppercase mb-1">
-              寻找
-            </div>
-            <p className="text-sm text-text-secondary leading-relaxed line-clamp-2">{node.seeking}</p>
-          </div>
-        )}
-      </div>
-
-      {/* 关注议题 chip */}
-      {(node.topics || []).length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-4 pt-4 border-t border-mist/60">
-          {(node.topics || []).map(topic => (
-            <span
-              key={topic}
-              className="inline-block px-2.5 py-0.5 bg-love-pink/10 border border-love-pink/20 rounded-full text-[11px] text-coral font-medium"
-            >
-              {topic}
-            </span>
           ))}
+          {node.offer && node.offer.trim() && (
+            <div>
+              <div className="text-[10px] font-semibold tracking-widest text-moss uppercase mb-1">
+                可以提供
+              </div>
+              <p className="text-sm text-text-secondary leading-relaxed line-clamp-2">{node.offer}</p>
+            </div>
+          )}
+          {node.seeking && node.seeking.trim() && (
+            <div>
+              <div className="text-[10px] font-semibold tracking-widest text-coral uppercase mb-1">
+                寻找
+              </div>
+              <p className="text-sm text-text-secondary leading-relaxed line-clamp-2">{node.seeking}</p>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* 关注议题 chip */}
+        {(node.topics || []).length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-4 pt-4 border-t border-mist/60">
+            {(node.topics || []).map(topic => (
+              <span
+                key={topic}
+                className="inline-block px-2.5 py-0.5 bg-love-pink/10 border border-love-pink/20 rounded-full text-[11px] text-coral font-medium"
+              >
+                {topic}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
     </article>
   );
 }
