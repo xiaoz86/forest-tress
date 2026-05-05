@@ -6,9 +6,11 @@ import Nav from '@/components/Nav';
 import Avatar from '@/components/Avatar';
 import AvatarUploader from '@/components/AvatarUploader';
 import RelationNetwork from '@/components/RelationNetwork';
+import WorksCarousel from '@/components/WorksCarousel';
+import WorksEditor from '@/components/WorksEditor';
 import { buildRelationGraph } from '@/lib/network';
 import { isAdminId } from '@/lib/admin';
-import type { NodeCard } from '@/lib/supabase';
+import type { NodeCard, Work } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +53,8 @@ export default async function CreatorDetail({ params }: Props) {
   const isOwner = memberId === me.id;
   const isAdmin = isAdminId(memberId);
   const canEditAvatar = isOwner || isAdmin;
+  const canEditWorks = isOwner || isAdmin;
+  const works: Work[] = Array.isArray(me.works) ? me.works : [];
 
   const tags = (me.keywords && me.keywords.length > 0)
     ? me.keywords.slice(0, 8)
@@ -125,7 +129,13 @@ export default async function CreatorDetail({ params }: Props) {
         <div className="max-w-[680px] mx-auto px-6 py-16 max-md:py-10 max-md:px-5">
           <div className="space-y-12 max-md:space-y-9">
             <Section label="正在做" body={me.doing} />
-            <Section label="作品 / 项目" body={me.product} />
+            <WorksSection
+              nodeId={me.id!}
+              works={works}
+              legacyText={me.product}
+              canEdit={canEditWorks}
+              isOwner={isOwner}
+            />
             <Section label="经验与独特性" body={me.experience} />
             <Section label="可以提供" body={me.offer} />
             <Section label="正在寻找" body={me.seeking} tone="coral" />
@@ -227,6 +237,53 @@ function Section({
       <p className="text-[15.5px] leading-[1.85] text-text-secondary whitespace-pre-wrap">
         {body}
       </p>
+    </section>
+  );
+}
+
+function WorksSection({
+  nodeId,
+  works,
+  legacyText,
+  canEdit,
+  isOwner,
+}: {
+  nodeId: string;
+  works: Work[];
+  legacyText?: string | null;
+  canEdit: boolean;
+  isOwner: boolean;
+}) {
+  const hasWorks = works.length > 0;
+  const hasLegacy = !!(legacyText && legacyText.trim());
+  // 完全没有作品、也没有遗留文本、且当前访客不能编辑 → 整段隐藏
+  if (!hasWorks && !hasLegacy && !canEdit) return null;
+
+  return (
+    <section>
+      <div className="text-[11px] font-semibold tracking-[0.18em] uppercase mb-3 text-moss">
+        作品 / 项目
+      </div>
+
+      {hasWorks ? (
+        <WorksCarousel works={works} />
+      ) : hasLegacy ? (
+        <p className="text-[15.5px] leading-[1.85] text-text-secondary whitespace-pre-wrap">
+          {legacyText}
+        </p>
+      ) : canEdit ? (
+        <p className="text-[13px] text-text-light">
+          还没有作品。点下方 <span className="font-medium text-forest-deep">+ 添加作品</span>，让访客一眼看到你的公众号、播客、产品或服务。
+        </p>
+      ) : null}
+
+      {canEdit && (
+        <WorksEditor
+          nodeId={nodeId}
+          works={works}
+          mode={isOwner ? 'owner' : 'admin'}
+        />
+      )}
     </section>
   );
 }

@@ -23,5 +23,20 @@ export type NodeCard = {
   avatar_url?: string;
   /** 兴趣爱好（可选）— 自由文本，例如：徒步、烘焙、摄影、爵士乐 */
   interests?: string;
+  /** 作品 / 项目集（可选）— 书架式横向滚动展示 */
+  works?: Work[];
   created_at?: string;
+};
+
+export type Work = {
+  /** 客户端生成的 stable id（用于删除/排序） */
+  id: string;
+  title: string;
+  /** 一两句话描述（可选） */
+  desc?: string;
+  /** 封面图公开 URL（可选）。来自 Supabase Storage 'works' bucket */
+  image_url?: string;
+  /** 点击跳转的链接（公众号 / 播客 / 商品页 等） */
+  url?: string;
+  created_at: string;
 };

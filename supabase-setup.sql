@@ -16,6 +16,7 @@ create table if not exists node_cards (
   keywords text[] default '{}',
   avatar_url text default '',
   interests text default '',
+  works jsonb default '[]'::jsonb,
   created_at timestamptz default now()
 );
 
@@ -23,6 +24,9 @@ create table if not exists node_cards (
 alter table node_cards add column if not exists keywords text[] default '{}';
 alter table node_cards add column if not exists avatar_url text default '';
 alter table node_cards add column if not exists interests text default '';
+alter table node_cards add column if not exists works jsonb default '[]'::jsonb;
+-- works 单条结构（jsonb 数组里的对象）：
+--   { id: string, title: string, desc?: string, image_url?: string, url?: string, created_at: string }
 
 -- Enable Row Level Security
 alter table node_cards enable row level security;
