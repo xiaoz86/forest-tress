@@ -6,6 +6,10 @@ import type { MatchedNode } from '@/lib/match';
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const AVATAR_MIME_LIST = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
+const MAX_WORKS = 12;
+
+type WorkDraft = { title: string; desc: string; url: string };
+const emptyWork = (): WorkDraft => ({ title: '', desc: '', url: '' });
 
 const emptyForm = {
   name: '',
@@ -29,7 +33,19 @@ export default function JoinForm() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [works, setWorks] = useState<WorkDraft[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const addWork = () => {
+    if (works.length >= MAX_WORKS) return;
+    setWorks(prev => [...prev, emptyWork()]);
+  };
+  const updateWork = (i: number, patch: Partial<WorkDraft>) => {
+    setWorks(prev => prev.map((w, idx) => (idx === i ? { ...w, ...patch } : w)));
+  };
+  const removeWork = (i: number) => {
+    setWorks(prev => prev.filter((_, idx) => idx !== i));
+  };
 
   const handlePhotoPick = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] || null;
@@ -84,11 +100,20 @@ export default function JoinForm() {
     if (!formData.name.trim()) return;
     setStatus('submitting');
 
+    // 过滤掉标题为空的作品行（用户可以留空跳过）
+    const cleanWorks = works
+      .map(w => ({
+        title: w.title.trim(),
+        desc: w.desc.trim(),
+        url: w.url.trim(),
+      }))
+      .filter(w => w.title.length > 0);
+
     try {
       const res = await fetch('/api/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, works: cleanWorks }),
       });
 
       if (res.ok) {
@@ -124,6 +149,7 @@ export default function JoinForm() {
     setFormData(emptyForm);
     setMatches([]);
     setStatus('idle');
+    setWorks([]);
     clearPhoto();
   };
 
@@ -241,6 +267,78 @@ export default function JoinForm() {
         <label className={labelClass}>你是否有产品、服务或项目希望被看见</label>
         <textarea className={textareaClass} rows={2} placeholder="如果有，简单介绍一下"
           value={formData.product} onChange={e => setFormData(p => ({ ...p, product: e.target.value }))} />
+      </div>
+
+      {/* 作品 / 项目（结构化） — 直接生成个人页书架，无需管理员介入 */}
+      <div className="mt-6">
+        <label className={labelClass}>你的作品 / 项目集（可选）</label>
+        <p className="text-xs text-text-light mb-2">
+          公众号、播客、产品、服务都可以 · 加入后会显示在你的个人页书架上 · 封面图可在加入后到个人页上传
+        </p>
+
+        {works.length > 0 && (
+          <ul className="space-y-3 mb-3">
+            {works.map((w, i) => (
+              <li
+                key={i}
+                className="rounded-xl border-[1.5px] border-mist bg-warm-cream p-4 max-md:p-3"
+              >
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <span className="text-[11px] font-semibold tracking-wider text-text-light uppercase pt-2">
+                    作品 #{i + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeWork(i)}
+                    aria-label={`删除作品 ${i + 1}`}
+                    className="w-7 h-7 rounded-full inline-flex items-center justify-center text-text-light hover:text-coral hover:bg-coral/10 bg-transparent border-none cursor-pointer text-base leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="grid gap-2.5">
+                  <input
+                    className={inputClass}
+                    type="text"
+                    placeholder="标题（如：1on1 教练服务 / 播客《随机漫步的进化》）"
+                    maxLength={80}
+                    value={w.title}
+                    onChange={e => updateWork(i, { title: e.target.value })}
+                  />
+                  <textarea
+                    className={`${inputClass} min-h-[60px] resize-y`}
+                    rows={2}
+                    placeholder="一句话描述（可选）"
+                    maxLength={240}
+                    value={w.desc}
+                    onChange={e => updateWork(i, { desc: e.target.value })}
+                  />
+                  <input
+                    className={inputClass}
+                    type="url"
+                    placeholder="跳转链接（可选，https://...）"
+                    value={w.url}
+                    onChange={e => updateWork(i, { url: e.target.value })}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {works.length < MAX_WORKS ? (
+          <button
+            type="button"
+            onClick={addWork}
+            className="w-full py-3 rounded-lg border-[1.5px] border-dashed border-mist text-sm text-text-light hover:text-forest-deep hover:border-coral-soft hover:bg-warm-cream/40 transition-colors bg-transparent cursor-pointer"
+          >
+            {works.length === 0 ? '+ 添加你的第一个作品' : '+ 再加一条'}
+          </button>
+        ) : (
+          <p className="text-xs text-text-light text-center py-2">
+            最多 {MAX_WORKS} 条 · 加入后还可以在个人页继续添加
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-5 mt-6 max-md:grid-cols-1">

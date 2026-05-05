@@ -3,7 +3,40 @@ import { NextRequest, NextResponse } from 'next/server';
 import { matchNodesAI } from '@/lib/match';
 import { generateKeywordsAI } from '@/lib/keywords';
 import { notifyNewNode } from '@/lib/notify';
-import type { NodeCard } from '@/lib/supabase';
+import type { NodeCard, Work } from '@/lib/supabase';
+
+const MAX_WORKS_AT_JOIN = 12;
+
+function makeWorkId(): string {
+  return `w_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * 把表单里的 works 数组清洗成存库的 Work[]：
+ * - title 必填，过滤掉空标题的行（让用户可以留空跳过）
+ * - 长度 / URL scheme 限制
+ * - 服务端生成 id 和 created_at
+ */
+function sanitizeWorks(input: unknown): Work[] {
+  if (!Array.isArray(input)) return [];
+  const out: Work[] = [];
+  const now = new Date().toISOString();
+  for (const raw of input) {
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const title = typeof r.title === 'string' ? r.title.trim().slice(0, 80) : '';
+    if (!title) continue;
+    const desc = typeof r.desc === 'string' ? r.desc.trim().slice(0, 240) : '';
+    const urlRaw = typeof r.url === 'string' ? r.url.trim().slice(0, 500) : '';
+    const url = urlRaw && /^https?:\/\//i.test(urlRaw) ? urlRaw : '';
+    const w: Work = { id: makeWorkId(), title, created_at: now };
+    if (desc) w.desc = desc;
+    if (url) w.url = url;
+    out.push(w);
+    if (out.length >= MAX_WORKS_AT_JOIN) break;
+  }
+  return out;
+}
 
 export async function POST(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -33,12 +66,24 @@ export async function POST(request: NextRequest) {
       email: body.email,
     };
     const rowWithInterests = { ...baseRow, interests: body.interests || '' };
+    const cleanedWorks = sanitizeWorks(body.works);
+    const rowWithWorks = cleanedWorks.length > 0
+      ? { ...rowWithInterests, works: cleanedWorks }
+      : rowWithInterests;
 
     let { data, error } = await supabase
       .from('node_cards')
-      .insert([rowWithInterests])
+      .insert([rowWithWorks])
       .select();
 
+    // 兼容尚未升级的库：works 列缺失时去掉再试
+    if (error && /works/i.test(error.message) && /column/i.test(error.message)) {
+      console.warn('[api/join] works column missing, retrying without it');
+      ({ data, error } = await supabase
+        .from('node_cards')
+        .insert([rowWithInterests])
+        .select());
+    }
     // 兼容尚未执行 ALTER TABLE 的库：interests 列缺失时回退
     if (error && /interests/i.test(error.message)) {
       console.warn('[api/join] interests column missing, retrying without it');
