@@ -86,7 +86,13 @@ export default async function CreatorsPage() {
               </div>
               <div className="grid grid-cols-3 gap-7 max-lg:grid-cols-2 max-md:grid-cols-1 max-md:gap-5">
                 {creators.map(node => (
-                  <CreatorTree key={node.id} node={node} />
+                  <Link
+                    key={node.id}
+                    href={node.id ? `/creators/${node.id}` : '/creators'}
+                    className="no-underline block"
+                  >
+                    <CreatorTree node={node} />
+                  </Link>
                 ))}
               </div>
             </>

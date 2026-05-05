@@ -1,14 +1,18 @@
 'use client';
 
-import { useState, KeyboardEvent } from 'react';
+import { useRef, useState, KeyboardEvent, ChangeEvent } from 'react';
 import MatchedNodes from './MatchedNodes';
 import type { MatchedNode } from '@/lib/match';
+
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+const AVATAR_MIME_LIST = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
 
 const emptyForm = {
   name: '',
   city: '',
   doing: '',
   topics: [] as string[],
+  interests: '',
   experience: '',
   offer: '',
   seeking: '',
@@ -22,6 +26,39 @@ export default function JoinForm() {
   const [topicInput, setTopicInput] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [matches, setMatches] = useState<MatchedNode[]>([]);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoPick = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] || null;
+    setPhotoError(null);
+    if (!f) {
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      return;
+    }
+    if (!AVATAR_MIME_LIST.split(',').includes(f.type)) {
+      setPhotoError('请上传 JPG / PNG / WebP / HEIC 图片');
+      return;
+    }
+    if (f.size > MAX_AVATAR_BYTES) {
+      setPhotoError('图片过大，请压缩到 5MB 以内');
+      return;
+    }
+    setPhotoFile(f);
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoPreview(URL.createObjectURL(f));
+  };
+
+  const clearPhoto = () => {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setPhotoError(null);
+    if (photoInputRef.current) photoInputRef.current.value = '';
+  };
 
   const handleTopicKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && topicInput.trim()) {
@@ -58,6 +95,21 @@ export default function JoinForm() {
         const json = await res.json().catch(() => ({}));
         setMatches(Array.isArray(json.matches) ? json.matches : []);
         setStatus('success');
+
+        // 加入成功后立刻上传形象照（cookie 已由 /api/join 设置好）
+        if (photoFile && json.memberId) {
+          try {
+            const fd = new FormData();
+            fd.set('id', json.memberId);
+            fd.set('file', photoFile);
+            const upRes = await fetch('/api/avatar', { method: 'POST', body: fd });
+            if (!upRes.ok) {
+              setPhotoError('节点创建成功，但形象照上传失败，可在个人页重新上传');
+            }
+          } catch {
+            setPhotoError('节点创建成功，但形象照上传失败，可在个人页重新上传');
+          }
+        }
       } else {
         setStatus('error');
         setTimeout(() => setStatus('idle'), 3000);
@@ -72,6 +124,7 @@ export default function JoinForm() {
     setFormData(emptyForm);
     setMatches([]);
     setStatus('idle');
+    clearPhoto();
   };
 
   const inputClass = "w-full px-4 py-3 border-[1.5px] border-mist rounded-lg font-sans text-[0.93rem] text-text-primary bg-warm-cream outline-none transition-all focus:border-coral-soft focus:shadow-[0_0_0_3px_rgba(212,160,160,0.1)] focus:bg-white";
@@ -90,6 +143,50 @@ export default function JoinForm() {
           <label className={labelClass}>你在哪里</label>
           <input className={inputClass} type="text" placeholder="城市 / 地区"
             value={formData.city} onChange={e => setFormData(p => ({ ...p, city: e.target.value }))} />
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <label className={labelClass}>形象照（可选）</label>
+        <p className="text-xs text-text-light mb-2">上传一张你愿意被看见的照片 · JPG / PNG / WebP / HEIC · ≤ 5MB</p>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            className="relative w-20 h-20 rounded-full overflow-hidden border-[1.5px] border-dashed border-mist hover:border-coral-soft bg-warm-cream flex items-center justify-center text-text-light hover:text-coral transition-colors cursor-pointer"
+            aria-label={photoPreview ? '更换形象照' : '上传形象照'}
+          >
+            {photoPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photoPreview} alt="预览" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-2xl leading-none">＋</span>
+            )}
+          </button>
+          <div className="flex-1 min-w-0">
+            {photoFile ? (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-text-secondary truncate">{photoFile.name}</span>
+                <button
+                  type="button"
+                  onClick={clearPhoto}
+                  className="text-xs text-text-light hover:text-coral underline underline-offset-2 bg-transparent border-none cursor-pointer"
+                >
+                  移除
+                </button>
+              </div>
+            ) : (
+              <span className="text-sm text-text-light">还没有选择 · 提交时会一并上传</span>
+            )}
+            {photoError && <p className="mt-1 text-xs text-coral">{photoError}</p>}
+          </div>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept={AVATAR_MIME_LIST}
+            className="hidden"
+            onChange={handlePhotoPick}
+          />
         </div>
       </div>
 
@@ -114,6 +211,12 @@ export default function JoinForm() {
             value={topicInput} onChange={e => setTopicInput(e.target.value)}
             onKeyDown={handleTopicKeyDown} />
         </div>
+      </div>
+
+      <div className="mt-6">
+        <label className={labelClass}>兴趣爱好</label>
+        <textarea className={textareaClass} rows={2} placeholder="工作之外让你心动的事，如：徒步、烘焙、爵士乐、独立电影..."
+          value={formData.interests} onChange={e => setFormData(p => ({ ...p, interests: e.target.value }))} />
       </div>
 
       <div className="mt-6">

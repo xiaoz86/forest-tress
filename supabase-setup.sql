@@ -13,8 +13,16 @@ create table if not exists node_cards (
   product text,
   wechat text,
   email text,
+  keywords text[] default '{}',
+  avatar_url text default '',
+  interests text default '',
   created_at timestamptz default now()
 );
+
+-- 已部署的库单独执行（幂等）
+alter table node_cards add column if not exists keywords text[] default '{}';
+alter table node_cards add column if not exists avatar_url text default '';
+alter table node_cards add column if not exists interests text default '';
 
 -- Enable Row Level Security
 alter table node_cards enable row level security;

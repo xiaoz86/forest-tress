@@ -153,6 +153,26 @@ export default function MatchedNodes({ matches }: Props) {
                     {m.doing}
                   </p>
                 )}
+                {m.aiSummary && (
+                  <div className="mb-2 p-3 rounded-xl bg-leaf/8 border border-leaf/20">
+                    <div className="text-[10px] font-semibold tracking-widest text-forest-mid uppercase mb-1">
+                      为何匹配
+                    </div>
+                    <p className="text-[13px] text-text-secondary leading-relaxed">
+                      {m.aiSummary}
+                    </p>
+                  </div>
+                )}
+                {m.aiCoCreate && (
+                  <div className="mb-2 p-3 rounded-xl bg-warmth/15 border border-coral-soft/30">
+                    <div className="text-[10px] font-semibold tracking-widest text-coral uppercase mb-1">
+                      可能共创
+                    </div>
+                    <p className="text-[13px] text-text-secondary leading-relaxed">
+                      {m.aiCoCreate}
+                    </p>
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-1.5">
                   {m.reasons.map((r, idx) => (
                     <span

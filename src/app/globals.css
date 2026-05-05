@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-serif: 'Noto Serif SC', serif;
-  --font-sans: 'Noto Sans SC', sans-serif;
+  --font-serif: 'Noto Serif SC', ui-serif, Georgia, serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
   --color-forest-deep: #1a2e1a;
   --color-forest-mid: #2d4a2d;
   --color-forest-light: #4a7c4a;
@@ -32,10 +33,13 @@
   }
 
   body {
-    font-family: 'Noto Sans SC', sans-serif;
+    font-family: var(--font-sans);
     color: var(--color-text-primary);
     background: var(--color-warm-cream);
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
 }
 
