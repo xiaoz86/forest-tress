@@ -59,6 +59,48 @@ export default async function CreatorsPage() {
       {/* Forest Grid */}
       <section className="relative py-20 px-10 bg-warm-cream max-md:py-14 max-md:px-5">
         <div className="max-w-[1200px] mx-auto">
+          {/* 新功能横幅 — 跳到 /launch 完整发布说明 */}
+          {creators.length > 0 && (
+            <Link
+              href="/launch"
+              className="group block no-underline mb-12 max-md:mb-8"
+              aria-label="查看新功能介绍：创造者书架"
+            >
+              <article className="flex items-stretch gap-5 p-3 max-md:flex-col max-md:gap-3 bg-white rounded-2xl border border-black/[0.06] shadow-[0_2px_24px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_36px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all">
+                {/* GIF 缩略 */}
+                <div className="shrink-0 w-[180px] max-md:w-full max-md:h-40 rounded-xl overflow-hidden bg-[#fafaf7] ring-1 ring-black/[0.04]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/launch-screenshots/feature-tour.gif"
+                    alt="附近森林 · 功能巡览"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+                {/* 文案 */}
+                <div className="flex-1 flex flex-col justify-center py-2 pr-3 max-md:px-2 max-md:pb-3">
+                  <div className="text-[11px] font-semibold tracking-[0.18em] text-moss uppercase mb-2">
+                    新功能 · 2026.05
+                  </div>
+                  <h3
+                    className="text-[20px] font-semibold tracking-[-0.005em] text-forest-deep mb-1.5 max-md:text-[18px]"
+                    style={{ fontFamily: 'var(--font-display)' }}
+                  >
+                    创造者书架已上线
+                  </h3>
+                  <p className="text-[14px] leading-relaxed text-text-secondary mb-3 max-md:text-[13.5px]">
+                    每位创造者现在都有自己的作品 / 项目书架 ——
+                    公众号、播客、产品、长文，都能一眼被看见。
+                  </p>
+                  <span className="inline-flex items-center gap-1 text-[13px] font-medium text-forest-deep group-hover:text-forest-mid transition-colors">
+                    查看完整发布说明
+                    <span className="transition-transform group-hover:translate-x-0.5">→</span>
+                  </span>
+                </div>
+              </article>
+            </Link>
+          )}
+
           {creators.length === 0 ? (
             <div className="text-center py-20">
               <div className="text-6xl mb-6">🌱</div>
