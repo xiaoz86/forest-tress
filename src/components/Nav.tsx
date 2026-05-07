@@ -15,6 +15,7 @@ const navLinks: NavLink[] = [
   { href: '#how-it-works', label: '运作方式', type: 'anchor' },
   { href: '/creators', label: '创造者森林', type: 'route' },
   { href: '#join', label: '加入', type: 'anchor' },
+  { href: '/login', label: '登录', type: 'route' },
 ];
 
 export default function Nav() {

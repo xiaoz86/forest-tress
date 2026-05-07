@@ -12,6 +12,13 @@ function getRecipients(): string[] {
     .filter(Boolean);
 }
 
+/** 站点根 URL，用于在邮件里生成绝对链接。 */
+export function getSiteOrigin(): string {
+  const env = process.env.SITE_ORIGIN?.trim() || process.env.NEXT_PUBLIC_SITE_ORIGIN?.trim();
+  if (env) return env.replace(/\/+$/, '');
+  return 'https://nearby-forest.club';
+}
+
 function escape(s: string | null | undefined): string {
   if (!s) return '';
   return s
@@ -129,5 +136,160 @@ export async function notifyNewNode(node: NodeCard): Promise<void> {
     }
   } catch (err) {
     console.error('[notify] send failed', err);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// 给新成员本人发的「欢迎 + 登录入口」邮件
+// ──────────────────────────────────────────────────────────────────
+
+function buildWelcomeHtml(node: NodeCard, profileUrl: string, magicLink: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>欢迎加入附近森林</title></head>
+<body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(26,46,26,0.08);">
+    <div style="padding:32px 32px 20px;background:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#fff;">
+      <div style="font-size:13px;opacity:0.75;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · Welcome</div>
+      <h1 style="margin:0;font-size:22px;font-weight:700;">🌱 ${escape(node.name)}，你已成为森林的一棵树</h1>
+    </div>
+    <div style="padding:24px 32px 8px;color:#2a2a2a;font-size:14px;line-height:1.8;">
+      <p style="margin:0 0 12px;">这是你专属的个人页：</p>
+      <p style="margin:0 0 18px;"><a href="${profileUrl}" style="color:#2d4a2d;font-weight:600;text-decoration:underline;">${profileUrl}</a></p>
+      <p style="margin:0 0 12px;">下面这条「登录链接」可以让你随时回到个人页编辑信息、查看 AI 为你生成的连接推荐：</p>
+      <p style="margin:18px 0;text-align:center;">
+        <a href="${magicLink}"
+           style="display:inline-block;padding:12px 28px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">
+          点击登录我的节点
+        </a>
+      </p>
+      <p style="margin:0 0 6px;font-size:12px;color:#8a8a8a;">链接 7 天内有效。如未点击就过期，可随时回到 nearby-forest.club/login 重新获取。</p>
+    </div>
+    <div style="padding:18px 32px 24px;background:#faf8f2;font-size:12px;color:#8a8a8a;text-align:center;">
+      这封邮件由 nearby-forest.club 自动发送。
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function buildWelcomeText(node: NodeCard, profileUrl: string, magicLink: string): string {
+  return [
+    `欢迎加入附近森林，${node.name || ''}。`,
+    `─────────────────────`,
+    `你的个人页：${profileUrl}`,
+    `登录链接（7 天内有效）：${magicLink}`,
+    ``,
+    `点击登录链接即可回到个人页继续编辑信息、查看 AI 推荐。`,
+    `如链接过期，可在 nearby-forest.club/login 重新获取。`,
+  ].join('\n');
+}
+
+/**
+ * 给新成员本人发欢迎邮件 + 登录链接（magic link）。
+ * 未配置 RESEND_API_KEY 或 email 为空时静默跳过。
+ */
+export async function notifyWelcome(
+  node: NodeCard,
+  magicLink: string,
+): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('[notify] RESEND_API_KEY not set, skipping welcome email');
+    return;
+  }
+  const to = (node.email || '').trim();
+  if (!to) {
+    console.log('[notify] new member has no email, skipping welcome');
+    return;
+  }
+  if (!node.id) return;
+
+  const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
+  const profileUrl = `${getSiteOrigin()}/creators/${node.id}`;
+  const subject = `🌱 欢迎加入附近森林`;
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject,
+        html: buildWelcomeHtml(node, profileUrl, magicLink),
+        text: buildWelcomeText(node, profileUrl, magicLink),
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error('[notify] welcome Resend non-200', res.status, body);
+    }
+  } catch (err) {
+    console.error('[notify] welcome send failed', err);
+  }
+}
+
+/**
+ * 用户在 /login 页面输入邮箱重新申请登录链接时调用。
+ * `node` 是按邮箱查到的成员节点。
+ */
+export async function notifyLoginLink(
+  node: NodeCard,
+  magicLink: string,
+): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('[notify] RESEND_API_KEY not set, skipping login link');
+    return;
+  }
+  const to = (node.email || '').trim();
+  if (!to) return;
+  if (!node.id) return;
+
+  const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
+  const profileUrl = `${getSiteOrigin()}/creators/${node.id}`;
+  const subject = `🔐 你的附近森林登录链接`;
+
+  const html = `<!DOCTYPE html>
+<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:28px 32px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
+    <h2 style="margin:0 0 12px;font-size:18px;color:#2d4a2d;">登录到你的节点</h2>
+    <p style="font-size:14px;color:#2a2a2a;line-height:1.8;margin:0 0 18px;">点击下方按钮，即可登录到 ${escape(node.name)} 的个人页。</p>
+    <p style="text-align:center;margin:18px 0;">
+      <a href="${magicLink}" style="display:inline-block;padding:12px 28px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">点击登录</a>
+    </p>
+    <p style="font-size:12px;color:#8a8a8a;margin:0 0 4px;">链接 7 天内有效。如果不是你本人申请，请忽略。</p>
+    <p style="font-size:12px;color:#8a8a8a;margin:0;">个人页：<a href="${profileUrl}" style="color:#2d4a2d;">${profileUrl}</a></p>
+  </div>
+</body></html>`;
+
+  const text = [
+    `登录到你的节点（附近森林）`,
+    `点击下方链接即可登录（7 天内有效）：`,
+    magicLink,
+    ``,
+    `如果不是你本人申请，请忽略此邮件。`,
+    `个人页：${profileUrl}`,
+  ].join('\n');
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from, to: [to], subject, html, text }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error('[notify] login Resend non-200', res.status, body);
+    }
+  } catch (err) {
+    console.error('[notify] login send failed', err);
   }
 }

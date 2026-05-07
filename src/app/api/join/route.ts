@@ -1,22 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
-import { matchNodesAI } from '@/lib/match';
+import { matchNodesAI, type MatchedNode } from '@/lib/match';
 import { generateKeywordsAI } from '@/lib/keywords';
-import { notifyNewNode } from '@/lib/notify';
-import type { NodeCard, Work } from '@/lib/supabase';
+import { notifyNewNode, notifyWelcome, getSiteOrigin } from '@/lib/notify';
+import { signLoginToken, MEMBER_COOKIE, MEMBER_COOKIE_MAX_AGE } from '@/lib/auth';
+import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
 
 const MAX_WORKS_AT_JOIN = 12;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function makeWorkId(): string {
   return `w_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/**
- * 把表单里的 works 数组清洗成存库的 Work[]：
- * - title 必填，过滤掉空标题的行（让用户可以留空跳过）
- * - 长度 / URL scheme 限制
- * - 服务端生成 id 和 created_at
- */
 function sanitizeWorks(input: unknown): Work[] {
   if (!Array.isArray(input)) return [];
   const out: Work[] = [];
@@ -38,6 +34,21 @@ function sanitizeWorks(input: unknown): Work[] {
   return out;
 }
 
+/** 将匹配结果裁剪成可持久化的快照（不含被推荐成员的私密字段）。 */
+export function toRecommendationSnapshot(m: MatchedNode): AIRecommendation {
+  return {
+    id: m.id || '',
+    name: m.name || '',
+    ...(m.city ? { city: m.city } : {}),
+    ...(m.doing ? { doing: m.doing } : {}),
+    ...(m.avatar_url ? { avatar_url: m.avatar_url } : {}),
+    matchType: m.matchType,
+    reasons: Array.isArray(m.reasons) ? m.reasons.slice(0, 5) : [],
+    ...(m.aiSummary ? { aiSummary: m.aiSummary } : {}),
+    ...(m.aiCoCreate ? { aiCoCreate: m.aiCoCreate } : {}),
+  };
+}
+
 export async function POST(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -53,6 +64,27 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
+    const rawEmail = typeof body.email === 'string' ? body.email.trim() : '';
+    if (!rawEmail) {
+      return NextResponse.json({ error: 'email-required' }, { status: 400 });
+    }
+    if (!EMAIL_RE.test(rawEmail)) {
+      return NextResponse.json({ error: 'email-invalid' }, { status: 400 });
+    }
+    const email = rawEmail.toLowerCase();
+
+    // 同邮箱已注册 → 引导去登录
+    {
+      const { data: existing } = await supabase
+        .from('node_cards')
+        .select('id')
+        .ilike('email', email)
+        .limit(1);
+      if (existing && existing.length > 0) {
+        return NextResponse.json({ error: 'email-taken' }, { status: 409 });
+      }
+    }
+
     const baseRow: Record<string, unknown> = {
       name: body.name,
       city: body.city,
@@ -63,7 +95,7 @@ export async function POST(request: NextRequest) {
       seeking: body.seeking,
       product: body.product,
       wechat: body.wechat,
-      email: body.email,
+      email,
     };
     const rowWithInterests = { ...baseRow, interests: body.interests || '' };
     const cleanedWorks = sanitizeWorks(body.works);
@@ -76,7 +108,6 @@ export async function POST(request: NextRequest) {
       .insert([rowWithWorks])
       .select();
 
-    // 兼容尚未升级的库：works 列缺失时去掉再试
     if (error && /works/i.test(error.message) && /column/i.test(error.message)) {
       console.warn('[api/join] works column missing, retrying without it');
       ({ data, error } = await supabase
@@ -84,7 +115,6 @@ export async function POST(request: NextRequest) {
         .insert([rowWithInterests])
         .select());
     }
-    // 兼容尚未执行 ALTER TABLE 的库：interests 列缺失时回退
     if (error && /interests/i.test(error.message)) {
       console.warn('[api/join] interests column missing, retrying without it');
       ({ data, error } = await supabase
@@ -97,9 +127,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    // 插入成功后，读取其他节点做匹配（优先 AI，失败回落到规则）
     const newNode = (data?.[0] || null) as NodeCard | null;
-    let matches: Awaited<ReturnType<typeof matchNodesAI>> = [];
+    let matches: MatchedNode[] = [];
     if (newNode) {
       const { data: allNodes } = await supabase
         .from('node_cards')
@@ -108,14 +137,13 @@ export async function POST(request: NextRequest) {
         n => n.id !== newNode.id,
       );
 
-      // 并行：AI 匹配 + AI 关键词生成
       const [aiMatches, aiKeywords] = await Promise.all([
         matchNodesAI(newNode, others, 3),
         generateKeywordsAI(newNode, 6),
       ]);
       matches = aiMatches;
 
-      // 关键词写回当前行（keywords 列若不存在则静默忽略，不影响其余流程）
+      // 关键词写回
       if (aiKeywords.length > 0 && newNode.id) {
         const { error: updateErr } = await supabase
           .from('node_cards')
@@ -126,10 +154,36 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // 通知主理人（fire-and-forget，失败不影响主流程）
+      // AI 推荐快照写回（让本人/管理员日后能在个人页看到）
+      if (newNode.id && matches.length > 0) {
+        const snapshot = matches.map(toRecommendationSnapshot);
+        const { error: recErr } = await supabase
+          .from('node_cards')
+          .update({
+            ai_recommendations: snapshot,
+            ai_recommendations_at: new Date().toISOString(),
+          })
+          .eq('id', newNode.id);
+        if (recErr && !/ai_recommendations/i.test(recErr.message)) {
+          console.error('[api/join] recommendations save failed', recErr.message);
+        }
+      }
+
+      // 通知主理人（fire-and-forget）
       notifyNewNode(newNode).catch(err => {
-        console.error('[api/join] notify failed', err);
+        console.error('[api/join] notify host failed', err);
       });
+
+      // 给本人发欢迎邮件 + 登录链接（fire-and-forget）
+      const signed = signLoginToken(newNode.id || '');
+      if (signed.ok) {
+        const magicLink = `${getSiteOrigin()}/api/login/verify?token=${encodeURIComponent(signed.token)}`;
+        notifyWelcome(newNode, magicLink).catch(err => {
+          console.error('[api/join] welcome failed', err);
+        });
+      } else {
+        console.warn('[api/join] AUTH_SECRET not set, skipping welcome magic link');
+      }
     }
 
     const res = NextResponse.json({
@@ -139,18 +193,18 @@ export async function POST(request: NextRequest) {
       memberId: newNode?.id,
     });
 
-    // 提交成功 → 标记为社区成员，让 /creators/[id] 详情页能看到联系方式 / 跳转链接
     if (newNode?.id) {
-      res.cookies.set('nf_member', newNode.id, {
+      res.cookies.set(MEMBER_COOKIE, newNode.id, {
         httpOnly: false,
         sameSite: 'lax',
         path: '/',
-        maxAge: 60 * 60 * 24 * 365, // 1 年
+        maxAge: MEMBER_COOKIE_MAX_AGE,
       });
     }
 
     return res;
-  } catch {
+  } catch (err) {
+    console.error('[api/join] unexpected error', err);
     return NextResponse.json(
       { error: 'Failed to submit' },
       { status: 500 }

@@ -25,7 +25,35 @@ export type NodeCard = {
   interests?: string;
   /** 作品 / 项目集（可选）— 书架式横向滚动展示 */
   works?: Work[];
+  /**
+   * AI 为 TA 生成的「连接推荐」结果。仅本人 + 管理员可见。
+   * 结构对应 lib/match.ts 的 MatchedNode（不含被推荐成员的隐私字段，存的是裁剪后的快照）。
+   */
+  ai_recommendations?: AIRecommendation[];
+  /** AI 推荐生成时间（ISO） — 让用户知道现在看到的是什么时候的快照 */
+  ai_recommendations_at?: string;
   created_at?: string;
+};
+
+/**
+ * 持久化存储的 AI 推荐快照。
+ * 不直接复用 MatchedNode，是为了：
+ * 1) 避免存到对方的私密字段（联系方式之类）
+ * 2) 让本表行不依赖被推荐成员的最新状态（被删除/改名也不影响展示）
+ */
+export type AIRecommendation = {
+  /** 被推荐成员的节点 id */
+  id: string;
+  name: string;
+  city?: string;
+  doing?: string;
+  avatar_url?: string;
+  matchType: '同频' | '互补' | '同城';
+  reasons: string[];
+  /** AI 给出的「为何匹配」一句话 */
+  aiSummary?: string;
+  /** AI 给出的「可能共创什么」一句话 */
+  aiCoCreate?: string;
 };
 
 export type Work = {

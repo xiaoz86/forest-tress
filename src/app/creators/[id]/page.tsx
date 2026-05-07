@@ -8,9 +8,11 @@ import AvatarUploader from '@/components/AvatarUploader';
 import RelationNetwork from '@/components/RelationNetwork';
 import WorksCarousel from '@/components/WorksCarousel';
 import WorksEditor from '@/components/WorksEditor';
+import AIRecommendations from '@/components/AIRecommendations';
+import ProfileEditor from '@/components/ProfileEditor';
 import { buildRelationGraph } from '@/lib/network';
 import { isAdminId } from '@/lib/admin';
-import type { NodeCard, Work } from '@/lib/supabase';
+import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,7 +56,12 @@ export default async function CreatorDetail({ params }: Props) {
   const isAdmin = isAdminId(memberId);
   const canEditAvatar = isOwner || isAdmin;
   const canEditWorks = isOwner || isAdmin;
+  const canEditProfile = isOwner || isAdmin;
+  const canSeeRecommendations = isOwner || isAdmin;
   const works: Work[] = Array.isArray(me.works) ? me.works : [];
+  const recommendations: AIRecommendation[] = Array.isArray(me.ai_recommendations)
+    ? me.ai_recommendations
+    : [];
 
   const tags = (me.keywords && me.keywords.length > 0)
     ? me.keywords.slice(0, 8)
@@ -75,6 +82,26 @@ export default async function CreatorDetail({ params }: Props) {
             <span>←</span>
             <span>创造者森林</span>
           </Link>
+        </div>
+        {/* 已登录提示（自己的页面） / 游客可登录入口 */}
+        <div className="absolute top-24 right-6 max-md:top-20 max-md:right-4 text-[12.5px]">
+          {isOwner ? (
+            <a
+              href={`/api/logout?back=/creators/${me.id}`}
+              className="text-text-light hover:text-forest-mid transition-colors"
+            >
+              退出登录
+            </a>
+          ) : isAdmin ? (
+            <span className="text-moss font-medium">管理员视角 · 小 Z</span>
+          ) : isMember ? null : (
+            <Link
+              href="/login"
+              className="text-text-light hover:text-forest-mid transition-colors"
+            >
+              登录
+            </Link>
+          )}
         </div>
 
         <div className="max-w-[680px] mx-auto">
@@ -127,6 +154,11 @@ export default async function CreatorDetail({ params }: Props) {
       {/* 主体 — 干净的白底 */}
       <main className="bg-white">
         <div className="max-w-[680px] mx-auto px-6 py-16 max-md:py-10 max-md:px-5">
+          {canEditProfile && (
+            <div className="mb-10 max-md:mb-7">
+              <ProfileEditor node={me} mode={isOwner ? 'owner' : 'admin'} />
+            </div>
+          )}
           <div className="space-y-12 max-md:space-y-9">
             <Section label="正在做" body={me.doing} />
             <WorksSection
@@ -142,6 +174,19 @@ export default async function CreatorDetail({ params }: Props) {
             <Section label="兴趣爱好" body={me.interests} />
           </div>
         </div>
+
+        {canSeeRecommendations && (
+          <div className="max-w-[680px] mx-auto px-6 pb-12 max-md:px-5 max-md:pb-8">
+            <div className="rounded-2xl bg-gradient-to-br from-love-pink/8 via-warmth/8 to-leaf/6 border border-coral-soft/25 p-6 max-md:p-5">
+              <AIRecommendations
+                nodeId={me.id!}
+                initial={recommendations}
+                generatedAt={me.ai_recommendations_at}
+                mode={isOwner ? 'owner' : 'admin'}
+              />
+            </div>
+          </div>
+        )}
 
         {/* 联系方式 — 卡片化 */}
         <div className="max-w-[680px] mx-auto px-6 pb-16 max-md:px-5 max-md:pb-10">

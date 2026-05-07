@@ -17,6 +17,8 @@ create table if not exists node_cards (
   avatar_url text default '',
   interests text default '',
   works jsonb default '[]'::jsonb,
+  ai_recommendations jsonb default '[]'::jsonb,
+  ai_recommendations_at timestamptz,
   created_at timestamptz default now()
 );
 
@@ -25,8 +27,16 @@ alter table node_cards add column if not exists keywords text[] default '{}';
 alter table node_cards add column if not exists avatar_url text default '';
 alter table node_cards add column if not exists interests text default '';
 alter table node_cards add column if not exists works jsonb default '[]'::jsonb;
+alter table node_cards add column if not exists ai_recommendations jsonb default '[]'::jsonb;
+alter table node_cards add column if not exists ai_recommendations_at timestamptz;
 -- works 单条结构（jsonb 数组里的对象）：
 --   { id: string, title: string, desc?: string, image_url?: string, url?: string, created_at: string }
+-- ai_recommendations 单条结构：
+--   { id, name, city?, doing?, avatar_url?, matchType, reasons[], aiSummary?, aiCoCreate? }
+-- 邮箱大小写不敏感唯一索引（ilike 查询配合用）：
+create unique index if not exists node_cards_email_unique
+  on node_cards (lower(email))
+  where email is not null and email <> '';
 
 -- Enable Row Level Security
 alter table node_cards enable row level security;

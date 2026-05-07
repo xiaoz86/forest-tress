@@ -1,0 +1,79 @@
+import { createHmac, timingSafeEqual } from 'crypto';
+
+/**
+ * 简易 HMAC 登录 token：用 AUTH_SECRET 签名，返回 `${memberId}.${expiry}.${sig}`。
+ * 不存数据库，验证完全靠签名 + 过期时间。
+ *
+ * 流程：
+ *   1. 用户在 /login 输入注册邮箱
+ *   2. 服务端按邮箱查节点，签发 token，发邮件含 magic link
+ *   3. 用户点 link → /api/login/verify 校验签名 → 设置 nf_member cookie
+ */
+
+const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 天，足够邮件抵达后多次重试
+
+function getSecret(): string | null {
+  const s = process.env.AUTH_SECRET?.trim();
+  if (s && s.length >= 16) return s;
+  // 回落：只要 supabase service role key 存在，就拿它做派生 secret —— 至少不会泄露给前端。
+  // 部署时强烈建议显式设置 AUTH_SECRET。
+  const fallback = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (fallback && fallback.length >= 16) return `nf:${fallback}`;
+  return null;
+}
+
+function b64url(buf: Buffer | string): string {
+  return Buffer.from(buf)
+    .toString('base64')
+    .replace(/=+$/, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+}
+
+function sign(payload: string, secret: string): string {
+  return b64url(createHmac('sha256', secret).update(payload).digest());
+}
+
+export type SignResult =
+  | { ok: true; token: string; expiresAt: number }
+  | { ok: false; reason: 'no-secret' };
+
+export function signLoginToken(memberId: string): SignResult {
+  const secret = getSecret();
+  if (!secret) return { ok: false, reason: 'no-secret' };
+  const expiresAt = Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS;
+  const payload = `${memberId}.${expiresAt}`;
+  const sig = sign(payload, secret);
+  return { ok: true, token: `${payload}.${sig}`, expiresAt };
+}
+
+export type VerifyResult =
+  | { ok: true; memberId: string }
+  | { ok: false; reason: 'no-secret' | 'malformed' | 'bad-sig' | 'expired' };
+
+export function verifyLoginToken(token: string): VerifyResult {
+  const secret = getSecret();
+  if (!secret) return { ok: false, reason: 'no-secret' };
+
+  const parts = token.split('.');
+  if (parts.length !== 3) return { ok: false, reason: 'malformed' };
+  const [memberId, expStr, sig] = parts;
+  if (!memberId || !expStr || !sig) return { ok: false, reason: 'malformed' };
+
+  const expected = sign(`${memberId}.${expStr}`, secret);
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return { ok: false, reason: 'bad-sig' };
+  }
+
+  const exp = Number(expStr);
+  if (!Number.isFinite(exp) || exp * 1000 < Date.now()) {
+    return { ok: false, reason: 'expired' };
+  }
+
+  return { ok: true, memberId };
+}
+
+export const MEMBER_COOKIE = 'nf_member';
+export const MEMBER_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 年

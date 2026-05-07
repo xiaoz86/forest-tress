@@ -25,11 +25,15 @@ const emptyForm = {
   email: '',
 };
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function JoinForm() {
   const [formData, setFormData] = useState(emptyForm);
   const [topicInput, setTopicInput] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [matches, setMatches] = useState<MatchedNode[]>([]);
+  const [memberId, setMemberId] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
@@ -97,7 +101,19 @@ export default function JoinForm() {
   };
 
   const handleSubmit = async () => {
-    if (!formData.name.trim()) return;
+    setErrorMsg(null);
+    if (!formData.name.trim()) {
+      setErrorMsg('请填写你的名字或昵称');
+      setStatus('error');
+      setTimeout(() => setStatus('idle'), 3000);
+      return;
+    }
+    if (!EMAIL_RE.test(formData.email.trim())) {
+      setErrorMsg('请填写有效的邮箱 — 我们会发送登录链接到这里');
+      setStatus('error');
+      setTimeout(() => setStatus('idle'), 3000);
+      return;
+    }
     setStatus('submitting');
 
     // 过滤掉标题为空的作品行（用户可以留空跳过）
@@ -119,6 +135,7 @@ export default function JoinForm() {
       if (res.ok) {
         const json = await res.json().catch(() => ({}));
         setMatches(Array.isArray(json.matches) ? json.matches : []);
+        setMemberId(typeof json.memberId === 'string' ? json.memberId : null);
         setStatus('success');
 
         // 加入成功后立刻上传形象照（cookie 已由 /api/join 设置好）
@@ -136,8 +153,14 @@ export default function JoinForm() {
           }
         }
       } else {
+        const j = await res.json().catch(() => null);
+        if (j?.error === 'email-required' || j?.error === 'email-invalid') {
+          setErrorMsg('请填写有效的邮箱 — 我们会发送登录链接到这里');
+        } else if (j?.error === 'email-taken') {
+          setErrorMsg('这个邮箱已经登记过节点了，可以前往登录页找回');
+        }
         setStatus('error');
-        setTimeout(() => setStatus('idle'), 3000);
+        setTimeout(() => setStatus('idle'), 5000);
       }
     } catch {
       setStatus('error');
@@ -148,7 +171,9 @@ export default function JoinForm() {
   const handleContinue = () => {
     setFormData(emptyForm);
     setMatches([]);
+    setMemberId(null);
     setStatus('idle');
+    setErrorMsg(null);
     setWorks([]);
     clearPhoto();
   };
@@ -348,9 +373,18 @@ export default function JoinForm() {
             value={formData.wechat} onChange={e => setFormData(p => ({ ...p, wechat: e.target.value }))} />
         </div>
         <div>
-          <label className={labelClass}>邮箱</label>
-          <input className={inputClass} type="email" placeholder="可选"
-            value={formData.email} onChange={e => setFormData(p => ({ ...p, email: e.target.value }))} />
+          <label className={labelClass}>
+            邮箱 <span className="text-coral">*</span>
+          </label>
+          <input
+            className={inputClass}
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="登录链接 / 通知会发到这里"
+            value={formData.email}
+            onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
+          />
         </div>
       </div>
 
@@ -366,12 +400,33 @@ export default function JoinForm() {
       >
         {status === 'submitting' && '提交中...'}
         {status === 'success' && '欢迎加入！你已成为森林的一棵树'}
-        {status === 'error' && '提交失败，请稍后重试'}
+        {status === 'error' && (errorMsg || '提交失败，请稍后重试')}
         {status === 'idle' && '提交节点卡，加入附近森林'}
       </button>
 
+      {status === 'error' && errorMsg && (
+        <p className="mt-3 text-center text-[13px] text-coral">{errorMsg}</p>
+      )}
+
       {status === 'success' && (
         <>
+          {memberId && (
+            <div className="mt-6 p-4 rounded-2xl bg-leaf/8 border border-leaf/25 text-[13px] leading-relaxed text-forest-deep">
+              <div className="font-semibold mb-1">已为你创建节点 ✨</div>
+              <p className="text-text-secondary">
+                我们已把登录链接发到 <span className="font-mono text-forest-deep">{formData.email}</span>。
+                下次直接到 <a href="/login" className="underline underline-offset-2 text-forest-deep">/login</a> 填邮箱即可重新登录。
+              </p>
+              <p className="mt-2">
+                <a
+                  href={`/creators/${memberId}`}
+                  className="inline-block px-4 py-2 rounded-full bg-forest-deep text-white text-[13px] font-medium hover:bg-forest-mid transition-colors no-underline"
+                >
+                  现在去看我的个人页 →
+                </a>
+              </p>
+            </div>
+          )}
           <MatchedNodes matches={matches} />
           <div className="text-center mt-6">
             <button
