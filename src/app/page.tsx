@@ -116,6 +116,55 @@ const TRIBES: {
   },
 ];
 
+// 连接故事 — 3 段示意连接（来自 content/voices.md，inline 化避免运行时解析）
+const VOICES: {
+  avatars: [string, string];
+  colors: [string, string];
+  label: string;
+  text: string;
+  names: string;
+  tag: string;
+}[] = [
+  {
+    avatars: ['林', '张'],
+    colors: ['coral', 'sky'],
+    label: 'AI 匹配相遇',
+    text:
+      '我们因为都关注社区营造被 AI 推荐认识。第一次线上聊了两个小时，发现彼此在做的事情竟然可以互补。后来一起发起了一个城市空间改造项目。这种不是刻意社交、而是自然生长出来的合作，特别珍贵。',
+    names: '林小溪 × 张远山',
+    tag: '共创伙伴',
+  },
+  {
+    avatars: ['陈', '王'],
+    colors: ['leaf', 'purple'],
+    label: '小桌子对话',
+    text:
+      "在一次 '此刻你在重新思考什么' 的小桌子对话里，我说出了自己正在转型的迷茫。没想到对面的人也经历过类似的阶段。她没有给建议，只是认真地听完，然后说 '我理解'。那三个字比任何方法论都温暖。",
+    names: '陈思源 × 王晓晴',
+    tag: '彼此支持',
+  },
+  {
+    avatars: ['李', '赵'],
+    colors: ['gold', 'coral'],
+    label: '共读小组',
+    text:
+      '我们在共读小组里一起读了一个月的书。每周三晚上的讨论，从书里聊到生活，从观点聊到经历。读完那本书的时候，我发现自己不知不觉多了几个真正可以聊天的朋友。这就是附近吧。',
+    names: '李明朗 × 赵一舟 等 5 人',
+    tag: '共读共学',
+  },
+];
+
+const VOICE_AVATAR_GRADIENTS: Record<string, string> = {
+  coral: 'from-coral-soft to-warmth',
+  sky: 'from-sky to-[#a5cce0]',
+  leaf: 'from-leaf to-sage',
+  purple: 'from-[#b088c9] to-[#d4b4e8]',
+  gold: 'from-gold to-gold-light',
+};
+function voiceAvatarColor(key: string): string {
+  return VOICE_AVATAR_GRADIENTS[key] || VOICE_AVATAR_GRADIENTS.coral;
+}
+
 // 想象：你会在森林里变成什么样
 const IMAGINE = [
   { lead: '不再孤独地', tail: '做你想做的事' },
@@ -309,41 +358,99 @@ export default async function Home() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════
-          [4] 真实关系网 — 它真的在发生
+          [4] 连接故事 + 真实关系网 — 深绿夜空里看连接如何发生
       ════════════════════════════════════════════════════════════════ */}
-      {showcaseGraph && showcaseGraph.neighbors.length > 0 && showcaseCenter && (
-        <section className="py-24 px-8 bg-[#fafaf7] max-md:py-16 max-md:px-5">
-          <div className="max-w-[860px] mx-auto">
-            <div className="text-center mb-10">
-              <div className="inline-block text-[11px] tracking-[3px] text-moss uppercase mb-3 font-medium">
-                正在发生
-              </div>
-              <h2
-                className="text-[clamp(1.5rem,3.5vw,2.2rem)] font-semibold text-forest-deep leading-[1.4] tracking-[-0.01em] max-w-[600px] mx-auto"
-                style={{ fontFamily: 'var(--font-display)' }}
-              >
-                你做的事，<br className="md:hidden" />
-                需要被同它共振的人看见。
-              </h2>
-            </div>
+      <section className="relative py-28 px-8 bg-gradient-to-br from-forest-deep via-[#1f3a1f] to-forest-mid overflow-hidden max-md:py-20 max-md:px-5">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_500px_at_20%_80%,rgba(212,160,160,0.06),transparent),radial-gradient(circle_400px_at_80%_20%,rgba(232,201,160,0.05),transparent)] pointer-events-none" />
 
-            <div className="bg-white rounded-3xl border border-black/[0.06] p-6 max-md:p-3 shadow-[0_4px_28px_rgba(0,0,0,0.04)]">
-              <RelationNetwork graph={showcaseGraph} isMember={false} />
+        <div className="relative max-w-[1100px] mx-auto">
+          <div className="text-center mb-14">
+            <div className="inline-block text-[11px] tracking-[3px] text-coral-soft uppercase mb-4 font-medium">
+              连接故事
             </div>
-
-            <p className="mt-7 text-center text-[13px] text-text-light leading-[1.9] max-w-[520px] mx-auto">
-              这是 <span className="font-medium text-forest-deep">{showcaseCenter.name}</span> 加入森林后，被 AI 替 ta 找到的 {showcaseGraph.neighbors.length} 棵相遇的树。
-              <br />
-              <Link
-                href="/creators"
-                className="inline-block mt-3 text-forest-mid hover:text-forest-deep underline-offset-4 hover:underline"
-              >
-                看看整片森林 →
-              </Link>
+            <h2
+              className="text-[clamp(1.7rem,3.6vw,2.4rem)] font-semibold text-white leading-[1.4] tracking-[-0.01em] max-w-[640px] mx-auto"
+              style={{ fontFamily: 'var(--font-display)' }}
+            >
+              在这片森林里，<br className="md:hidden" />连接正在发生
+            </h2>
+            <p className="mt-5 text-[14px] text-white/55 leading-[1.95] max-w-[560px] mx-auto">
+              每一段真实的连接，都是一种爱的表达。<br className="md:hidden" />
+              这些是我们设想中森林里会发生的故事。
             </p>
           </div>
-        </section>
-      )}
+
+          {/* 3 张证言卡 */}
+          <div className="grid grid-cols-3 gap-5 mb-16 max-lg:grid-cols-1 max-lg:max-w-[560px] max-lg:mx-auto max-md:gap-4">
+            {VOICES.map((v, i) => (
+              <article
+                key={i}
+                className="bg-white/[0.045] border border-white/[0.07] rounded-3xl py-8 px-7 backdrop-blur-[10px] transition-all hover:bg-white/[0.08] hover:border-white/15"
+              >
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="flex items-center">
+                    {v.avatars.map((a, j) => (
+                      <div
+                        key={j}
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white border-2 border-forest-deep/80 bg-gradient-to-br ${voiceAvatarColor(v.colors[j])} ${j > 0 ? '-ml-3' : ''}`}
+                      >
+                        {a}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="w-6 h-6 rounded-full bg-love-pink/20 flex items-center justify-center text-[0.65rem]">
+                    💛
+                  </div>
+                  <div className="text-[11px] text-coral-soft font-medium tracking-[1px]">
+                    {v.label}
+                  </div>
+                </div>
+                <div className="font-serif text-[0.94rem] text-white/85 leading-[1.85] mb-5 italic">
+                  {v.text}
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="text-[0.78rem] text-white/50">{v.names}</div>
+                  <div className="px-2.5 py-0.5 rounded-full text-[0.68rem] font-medium bg-love-pink/[0.12] text-coral-soft border border-love-pink/20">
+                    {v.tag}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          {/* 真实关系网 — 同屏跟在证言卡下方，白卡在深绿底色上视觉很跳 */}
+          {showcaseGraph && showcaseGraph.neighbors.length > 0 && showcaseCenter && (
+            <div className="max-w-[860px] mx-auto">
+              <div className="text-center mb-7">
+                <div className="inline-block text-[11px] tracking-[3px] text-coral-soft/80 uppercase mb-3 font-medium">
+                  正在发生
+                </div>
+                <h3
+                  className="text-[clamp(1.2rem,2.8vw,1.65rem)] font-semibold text-white leading-[1.5] tracking-[-0.005em] max-w-[560px] mx-auto"
+                  style={{ fontFamily: 'var(--font-display)' }}
+                >
+                  你做的事，<br className="md:hidden" />需要被同它共振的人看见。
+                </h3>
+              </div>
+
+              <div className="bg-white rounded-3xl border border-white/10 p-6 max-md:p-3 shadow-[0_8px_36px_rgba(0,0,0,0.25)]">
+                <RelationNetwork graph={showcaseGraph} isMember={false} />
+              </div>
+
+              <p className="mt-6 text-center text-[13px] text-white/60 leading-[1.9] max-w-[520px] mx-auto">
+                这是 <span className="font-medium text-white">{showcaseCenter.name}</span> 加入森林后，被 AI 替 ta 找到的 {showcaseGraph.neighbors.length} 棵相遇的树。
+                <br />
+                <Link
+                  href="/creators"
+                  className="inline-block mt-3 text-coral-soft hover:text-white underline-offset-4 hover:underline"
+                >
+                  看看整片森林 →
+                </Link>
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* ════════════════════════════════════════════════════════════════
           [5] 行动 — 种下你的种子
