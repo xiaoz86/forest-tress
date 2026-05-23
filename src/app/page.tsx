@@ -433,8 +433,8 @@ export default async function Home() {
                 </h3>
               </div>
 
-              <div className="bg-white rounded-3xl border border-white/10 p-6 max-md:p-3 shadow-[0_8px_36px_rgba(0,0,0,0.25)]">
-                <RelationNetwork graph={showcaseGraph} isMember={false} />
+              <div className="px-2 max-md:px-0">
+                <RelationNetwork graph={showcaseGraph} isMember={false} darkBg />
               </div>
 
               <p className="mt-6 text-center text-[13px] text-white/60 leading-[1.9] max-w-[520px] mx-auto">
