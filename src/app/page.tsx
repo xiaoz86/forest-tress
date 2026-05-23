@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
-import JoinForm from '@/components/JoinForm';
+import JoinSection from '@/components/JoinSection';
 import RelationNetwork from '@/components/RelationNetwork';
 import { buildRelationGraph } from '@/lib/network';
 import type { NodeCard } from '@/lib/supabase';
@@ -464,24 +464,7 @@ export default async function Home() {
         <div className="absolute -bottom-40 -right-40 w-[520px] h-[520px] rounded-full bg-coral-soft/[0.06] blur-3xl pointer-events-none" />
 
         <div className="relative">
-          <div className="text-center max-w-[640px] mx-auto mb-14">
-            <div className="inline-flex items-center gap-2 text-[11px] tracking-[3px] text-moss uppercase mb-4 font-medium">
-              <span>🌱</span>
-              <span>种下一颗种子</span>
-              <span>🌱</span>
-            </div>
-            <h2
-              className="text-[clamp(1.7rem,3.8vw,2.5rem)] font-semibold text-forest-deep leading-[1.35] tracking-[-0.01em]"
-              style={{ fontFamily: 'var(--font-display)' }}
-            >
-              你的种子，<br className="md:hidden" />
-              <span className="bg-gradient-to-r from-coral to-coral-soft bg-clip-text text-transparent">
-                值得一片土壤
-              </span>
-            </h2>
-          </div>
-
-          <JoinForm />
+          <JoinSection />
         </div>
       </section>
 
