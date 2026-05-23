@@ -9,10 +9,11 @@ type NavLink =
   | { href: string; label: string; type: 'route' };
 
 const navLinks: NavLink[] = [
-  { href: '/about', label: '来处', type: 'route' },
+  { href: '/', label: '首页', type: 'route' },
   { href: '/creators', label: '创造者森林', type: 'route' },
   { href: '#join', label: '加入', type: 'anchor' },
   { href: '/login', label: '登录', type: 'route' },
+  { href: '/about', label: '来处', type: 'route' },
 ];
 
 export default function Nav() {
