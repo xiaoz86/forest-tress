@@ -103,12 +103,8 @@ export default async function Home() {
         <div className="absolute inset-0 bg-black/45" />
 
         <div className="relative z-[2] max-w-[760px]">
-          <div className="inline-block text-[11px] tracking-[3px] text-coral-soft/90 uppercase mb-7 font-medium animate-fade-in">
-            附近森林 · OPC 时代的有氧链接
-          </div>
-
           <h1
-            className="font-serif text-[clamp(2.2rem,5.5vw,4rem)] font-bold text-white leading-[1.25] tracking-[-0.01em] mb-7 animate-fade-in-delay-2"
+            className="font-serif text-[clamp(2.2rem,5.5vw,4rem)] font-bold text-white leading-[1.25] tracking-[-0.01em] mb-7 animate-fade-in"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             连接万千<br />
@@ -155,18 +151,12 @@ export default async function Home() {
       <section id="tribes" className="py-24 px-8 bg-[#faf8f2] max-md:py-16 max-md:px-5">
         <div className="max-w-[1080px] mx-auto">
           <div className="text-center mb-14">
-            <div className="inline-block text-[11px] tracking-[3px] text-moss uppercase mb-3 font-medium">
-              辨认
-            </div>
             <h2
               className="text-[clamp(1.6rem,3.6vw,2.4rem)] font-semibold text-forest-deep leading-[1.4] tracking-[-0.01em] max-w-[640px] mx-auto"
               style={{ fontFamily: 'var(--font-display)' }}
             >
               在这片森林里，<br className="md:hidden" />你会遇见……
             </h2>
-            <p className="mt-4 text-[14px] text-text-light leading-[1.85] max-w-[440px] mx-auto">
-              扫一眼就知道：这里有和你一样的人。
-            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1 max-md:gap-4">
@@ -305,10 +295,6 @@ export default async function Home() {
                 值得一片土壤
               </span>
             </h2>
-            <p className="mt-5 text-[14.5px] text-text-secondary leading-[1.9] max-w-[440px] mx-auto">
-              这不是注册表单 —— 是把你最完整的样子种下来。<br />
-              森林会替你寻路。
-            </p>
           </div>
 
           <JoinForm />
