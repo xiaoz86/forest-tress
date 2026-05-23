@@ -10,43 +10,109 @@ export const dynamic = 'force-dynamic';
 
 const CHIPS = ['呼吸', '看见', '同频', '相遇', '共创', '生长'];
 
-// 4 大土壤：让访客 3 秒内辨认出自己
-const TRIBES = [
+// 4 大土壤：让访客 3 秒内辨认出自己 —— 线条图标 + 统一森林绿
+type TribeIcon = (props: { className?: string }) => React.ReactElement;
+
+const IconHealth: TribeIcon = ({ className }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <rect x="2.75" y="4.25" width="18.5" height="13.5" rx="2" />
+    <path d="M6.5 11h2.2L10.3 8l2.4 6 1.4-3h3.4" />
+    <path d="M8 21h8" />
+    <path d="M12 17.75V21" />
+  </svg>
+);
+
+const IconEducation: TribeIcon = ({ className }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M2.5 9.5 12 5l9.5 4.5L12 14 2.5 9.5z" />
+    <path d="M6.5 11.4v4.1c0 1.4 2.46 2.5 5.5 2.5s5.5-1.1 5.5-2.5v-4.1" />
+    <path d="M21.5 9.5v5" />
+    <path d="M21 14.5l-.5 1.5h1l-.5-1.5z" />
+  </svg>
+);
+
+const IconLeaf: TribeIcon = ({ className }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M20.5 3.5c-7 0-15 4-15 12.5 0 2 .5 3.5 1 4.5 1-0.5 2-1 2.5-2 3-5.5 8-7 11.5-7-3.5 1-7 3-10 8.5 0 0 .5 1 1.5 1 7 0 11-7 11-15.5 0-0.5 0-1.5-1.5-2z" />
+    <path d="M5.5 20.5C7 17 10 13 16 11" />
+  </svg>
+);
+
+const IconRocket: TribeIcon = ({ className }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M4.5 19.5C3 21 2.5 22 2.5 22s1-.5 2.5-2c.85-.85.85-2.15 0-3a2.12 2.12 0 0 0-3 0c-.85.85-.85 2.15 0 3z" />
+    <path d="M14 6c-2 1.5-3.5 3.5-4.5 6L7 15l2 2 3-2.5c2.5-1 4.5-2.5 6-4.5 3.5-4.5 3-9 3-9s-4.5-.5-7 2z" />
+    <path d="M9 9.5H6L4 13l3 .5" />
+    <path d="M14.5 15v3l-3.5 2 .5-3" />
+    <circle cx="14.5" cy="9.5" r="1" />
+  </svg>
+);
+
+const TRIBES: {
+  eyebrow: string;
+  Icon: TribeIcon;
+  roles: string;
+  tail: string;
+}[] = [
   {
     eyebrow: '健康 · 生命',
-    icon: '🌿',
-    roles: '疗愈师 · 瑜伽教练 · 正念引导师 · 营养咨询师',
+    Icon: IconHealth,
+    roles: '疗愈师、瑜伽教练、正念引导师、营养咨询师……',
     tail: '以及所有相信身心可以被温柔疗愈的你',
-    gradient: 'from-leaf/15 via-leaf/8 to-transparent',
-    accent: 'text-forest-mid',
-    ring: 'border-leaf/25',
   },
   {
     eyebrow: '教育 · 成长',
-    icon: '🌱',
-    roles: '生命教育者 · 读书会主理人 · 家庭教练 · 独立讲师',
+    Icon: IconEducation,
+    roles: '生命教育者、读书会主理人、家庭教练、独立讲师……',
     tail: '以及所有相信成长力量的你',
-    gradient: 'from-sky/15 via-sky/8 to-transparent',
-    accent: 'text-[#4a7c9a]',
-    ring: 'border-sky/25',
   },
   {
     eyebrow: '美 · 生命里的真切体验',
-    icon: '🌸',
-    roles: '手作人 · 摄影师 · 花艺师 · 策展人 · 茶人',
+    Icon: IconLeaf,
+    roles: '手作人、摄影师、花艺师、策展人、茶人……',
     tail: '以及所有用直觉感受生活的你',
-    gradient: 'from-warmth/15 via-warmth/8 to-transparent',
-    accent: 'text-coral',
-    ring: 'border-coral-soft/30',
   },
   {
     eyebrow: '向善商业 · OPC',
-    icon: '🌳',
-    roles: '想独立做事的人 — 有经验，有梦想',
+    Icon: IconRocket,
+    roles: '想独立做事的人——有经验，有梦想……',
     tail: '以及所有正在寻找同路人的你',
-    gradient: 'from-gold/15 via-gold-light/8 to-transparent',
-    accent: 'text-earth',
-    ring: 'border-gold/25',
   },
 ];
 
@@ -160,25 +226,21 @@ export default async function Home() {
           </div>
 
           <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1 max-md:gap-4">
-            {TRIBES.map((t, i) => (
+            {TRIBES.map(({ eyebrow, Icon, roles, tail }, i) => (
               <div
                 key={i}
-                className={`relative p-8 max-md:p-6 rounded-3xl bg-white border ${t.ring} bg-gradient-to-br ${t.gradient} transition-transform hover:-translate-y-0.5`}
+                className="group relative p-9 max-md:p-7 rounded-3xl bg-[#f0f5ec] border border-leaf/15 transition-all hover:-translate-y-0.5 hover:bg-[#ecf3e6] hover:border-leaf/30 hover:shadow-[0_10px_36px_rgba(45,74,45,0.06)]"
               >
-                <div className="flex items-start gap-4">
-                  <div className="text-[2rem] leading-none shrink-0">{t.icon}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-[12px] font-semibold tracking-[0.15em] uppercase ${t.accent} mb-2`}>
-                      {t.eyebrow}
-                    </div>
-                    <p className="text-[14px] text-forest-deep leading-[1.7] font-medium">
-                      {t.roles}
-                    </p>
-                    <p className="mt-3 text-[13px] text-text-secondary leading-[1.7] italic">
-                      {t.tail}
-                    </p>
-                  </div>
+                <Icon className="w-7 h-7 text-forest-mid mb-6" />
+                <div className="text-[13.5px] font-semibold tracking-[0.06em] text-forest-mid mb-3">
+                  {eyebrow}
                 </div>
+                <p className="text-[15px] text-forest-deep leading-[1.75] font-medium">
+                  {roles}
+                </p>
+                <p className="mt-4 text-[13px] text-text-light leading-[1.75] italic">
+                  {tail}
+                </p>
               </div>
             ))}
           </div>
