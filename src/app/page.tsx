@@ -168,33 +168,48 @@ export default async function Home() {
         />
         <div className="absolute inset-0 bg-black/45" />
 
-        <div className="relative z-[2] max-w-[760px]">
+        <div className="relative z-[2] max-w-[820px]">
+          {/* 品牌名 — 极窄字距 */}
+          <div className="text-[11.5px] tracking-[0.7em] text-white/50 mb-8 pl-[0.7em] animate-fade-in">
+            附 近 森 林
+          </div>
+
+          {/* 主 slogan — 单行，"有温度" 单点高亮，淡色分隔线 */}
           <h1
-            className="font-serif text-[clamp(2.2rem,5.5vw,4rem)] font-bold text-white leading-[1.25] tracking-[-0.01em] mb-7 animate-fade-in"
+            className="font-serif text-[clamp(2rem,5vw,3.4rem)] font-bold text-white leading-[1.4] tracking-wide mb-6 animate-fade-in"
             style={{ fontFamily: 'var(--font-display)' }}
           >
-            连接万千<br />
-            <span className="bg-gradient-to-r from-warmth via-coral-soft to-gold-light bg-clip-text text-transparent">
-              有温度的超级个体
-            </span>
+            连接万千
+            <span className="mx-1 text-leaf">有温度</span>
+            的超级个体
           </h1>
 
-          <p className="text-[clamp(0.95rem,1.6vw,1.15rem)] text-white/75 leading-[1.95] mb-12 animate-fade-in-delay-3 max-w-[620px] mx-auto">
-            我们既发现自己的无限可能，<br />
-            也被看见，在相遇中共同创造与成长。
+          <div className="w-12 h-px bg-white/35 mx-auto mb-7 animate-fade-in-delay-2" />
+
+          {/* 副标 — 两行，无标点收尾 */}
+          <p className="text-[clamp(0.95rem,1.6vw,1.1rem)] text-white/70 leading-[2] mb-16 animate-fade-in-delay-2 max-w-[620px] mx-auto">
+            我们既发现自己的无限可能，也被看见<br />
+            在相遇中共同创造与成长
           </p>
 
-          <div className="flex flex-wrap justify-center gap-2 mb-12 animate-fade-in-delay-3">
-            {CHIPS.map(c => (
+          {/* 关键词 — 宽字距浮动文字（流动感） */}
+          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 mb-14 animate-fade-in-delay-3">
+            {CHIPS.map((c, i) => (
               <span
                 key={c}
-                className="px-4 py-1.5 bg-white/8 backdrop-blur-sm border border-white/12 rounded-full text-[12.5px] text-white/85 font-medium tracking-wide"
+                className="animate-drift text-[13.5px] text-white/55 font-light"
+                style={{
+                  animationDelay: `${i * 0.9}s`,
+                  letterSpacing: '0.4em',
+                  paddingLeft: '0.4em', // 配平最后一字字距
+                }}
               >
                 {c}
               </span>
             ))}
           </div>
 
+          {/* CTA */}
           <div className="animate-fade-in-delay-4">
             <a
               href="#join"

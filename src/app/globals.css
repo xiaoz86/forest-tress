@@ -75,6 +75,11 @@
   .animate-ring-breathe {
     animation: ring-breathe 6s ease infinite;
   }
+
+  /* Hero 关键词「流动感」：每个词慢呼吸 + 错峰，营造一片漂浮的森林词云 */
+  .animate-drift {
+    animation: drift 6s ease-in-out infinite;
+  }
 }
 
 @keyframes fadeIn {
@@ -95,6 +100,19 @@
 @keyframes ring-breathe {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
+}
+
+@keyframes drift {
+  0%, 100% {
+    opacity: 0.35;
+    transform: translateY(0) translateZ(0);
+    letter-spacing: 0.4em;
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateY(-2px) translateZ(0);
+    letter-spacing: 0.55em;
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────
