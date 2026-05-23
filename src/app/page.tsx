@@ -209,11 +209,30 @@ export default async function Home() {
           [1] 触动 — Hero
       ════════════════════════════════════════════════════════════════ */}
       <section className="relative min-h-screen flex flex-col justify-center items-center text-center bg-forest-deep overflow-hidden p-8">
+        {/*
+          Hero 背景视频 — autoplay 必须 muted；jpg 作 poster，浏览器在 mp4
+          下载完成前先显示静态图，等同于无 mp4 时优雅降级。
+          移动端用户尊重 prefers-reduced-motion → 用 CSS 关掉动画但保留 poster。
+        */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          poster="/hero-forest.jpg"
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover motion-reduce:hidden"
+        >
+          <source src="/hero-forest.mp4" type="video/mp4" />
+        </video>
+        {/* prefers-reduced-motion 用户看到的兜底静态图 */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/hero-forest.jpg"
           alt=""
-          className="absolute inset-0 w-full h-full object-cover"
+          aria-hidden="true"
+          className="hidden motion-reduce:block absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-black/45" />
 
