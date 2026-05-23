@@ -98,10 +98,16 @@ export async function POST(request: NextRequest) {
       email,
     };
     const rowWithInterests = { ...baseRow, interests: body.interests || '' };
+    // wizard 新加：beauty（生命里的美）+ seed（心里的那颗种子）
+    const rowWithBeautySeed = {
+      ...rowWithInterests,
+      beauty: typeof body.beauty === 'string' ? body.beauty.trim() : '',
+      seed: typeof body.seed === 'string' ? body.seed.trim() : '',
+    };
     const cleanedWorks = sanitizeWorks(body.works);
     const rowWithWorks = cleanedWorks.length > 0
-      ? { ...rowWithInterests, works: cleanedWorks }
-      : rowWithInterests;
+      ? { ...rowWithBeautySeed, works: cleanedWorks }
+      : rowWithBeautySeed;
 
     let { data, error } = await supabase
       .from('node_cards')
@@ -110,6 +116,13 @@ export async function POST(request: NextRequest) {
 
     if (error && /works/i.test(error.message) && /column/i.test(error.message)) {
       console.warn('[api/join] works column missing, retrying without it');
+      ({ data, error } = await supabase
+        .from('node_cards')
+        .insert([rowWithBeautySeed])
+        .select());
+    }
+    if (error && /(beauty|seed)/i.test(error.message) && /column/i.test(error.message)) {
+      console.warn('[api/join] beauty/seed column missing, retrying without it');
       ({ data, error } = await supabase
         .from('node_cards')
         .insert([rowWithInterests])

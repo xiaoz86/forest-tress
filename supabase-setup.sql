@@ -19,6 +19,9 @@ create table if not exists node_cards (
   works jsonb default '[]'::jsonb,
   ai_recommendations jsonb default '[]'::jsonb,
   ai_recommendations_at timestamptz,
+  -- 2026-05-08 wizard 表单新加：你生命里的「美」 + 你心里的那颗种子
+  beauty text default '',
+  seed text default '',
   created_at timestamptz default now()
 );
 
@@ -29,6 +32,8 @@ alter table node_cards add column if not exists interests text default '';
 alter table node_cards add column if not exists works jsonb default '[]'::jsonb;
 alter table node_cards add column if not exists ai_recommendations jsonb default '[]'::jsonb;
 alter table node_cards add column if not exists ai_recommendations_at timestamptz;
+alter table node_cards add column if not exists beauty text default '';
+alter table node_cards add column if not exists seed text default '';
 -- works 单条结构（jsonb 数组里的对象）：
 --   { id: string, title: string, desc?: string, image_url?: string, url?: string, created_at: string }
 -- ai_recommendations 单条结构：

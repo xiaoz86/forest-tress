@@ -23,6 +23,10 @@ export type NodeCard = {
   avatar_url?: string;
   /** 兴趣爱好（可选）— 自由文本，例如：徒步、烘焙、摄影、爵士乐 */
   interests?: string;
+  /** 你生命里的「美」（可选）— wizard step 4 收集，融合「时刻」与「想创造/守护的美」 */
+  beauty?: string;
+  /** 你心里的那颗种子（可选）— wizard step 5 收集，一个梦想 / 念头 / 还没开始的计划 */
+  seed?: string;
   /** 作品 / 项目集（可选）— 书架式横向滚动展示 */
   works?: Work[];
   /**

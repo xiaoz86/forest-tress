@@ -18,6 +18,8 @@ const TEXT_FIELDS = [
   'product',
   'wechat',
   'interests',
+  'beauty',
+  'seed',
 ] as const;
 
 const LIMITS: Record<string, number> = {
@@ -30,6 +32,8 @@ const LIMITS: Record<string, number> = {
   product: 600,
   wechat: 80,
   interests: 240,
+  beauty: 800,
+  seed: 800,
   email: 200,
 };
 
