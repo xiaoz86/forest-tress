@@ -196,10 +196,10 @@ export default async function Home() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════
-          [3] 想象 — 你在这里会变成什么样
+          [3] 想象 — 你在这里会变成什么样（配真实示例）
       ════════════════════════════════════════════════════════════════ */}
       <section className="py-24 px-8 bg-white max-md:py-16 max-md:px-5">
-        <div className="max-w-[760px] mx-auto">
+        <div className="max-w-[1100px] mx-auto">
           <div className="text-center mb-14">
             <div className="inline-block text-[11px] tracking-[3px] text-coral uppercase mb-3 font-medium">
               想象
@@ -210,25 +210,34 @@ export default async function Home() {
             >
               在这片森林里……
             </h2>
+            <p className="mt-4 text-[13.5px] text-text-light max-w-[440px] mx-auto leading-[1.85]">
+              下面是一棵示意的树「林小溪」 —— 你的节点卡会被这样看见。
+            </p>
           </div>
 
-          <ul className="space-y-5 max-w-[620px] mx-auto">
-            {IMAGINE.map((line, i) => (
-              <li
-                key={i}
-                className="group flex items-start gap-4 px-4 py-3"
-              >
-                <span className="shrink-0 mt-2 w-1.5 h-1.5 rounded-full bg-coral-soft" />
-                <p className="text-[clamp(1.05rem,2.2vw,1.25rem)] font-serif text-forest-deep leading-[1.7]">
-                  {line.lead}
-                  <span className="bg-gradient-to-r from-coral to-coral-soft bg-clip-text text-transparent font-semibold">
-                    {line.tail}
-                  </span>
-                  。
-                </p>
-              </li>
-            ))}
-          </ul>
+          <div className="grid grid-cols-[1.05fr_1fr] gap-12 items-center max-md:grid-cols-1 max-md:gap-10">
+            {/* 左：5 句未来画面 */}
+            <ul className="space-y-5 max-md:space-y-4">
+              {IMAGINE.map((line, i) => (
+                <li
+                  key={i}
+                  className="group flex items-start gap-4 px-2 py-2"
+                >
+                  <span className="shrink-0 mt-2 w-1.5 h-1.5 rounded-full bg-coral-soft" />
+                  <p className="text-[clamp(1.05rem,2.2vw,1.25rem)] font-serif text-forest-deep leading-[1.7]">
+                    {line.lead}
+                    <span className="bg-gradient-to-r from-coral to-coral-soft bg-clip-text text-transparent font-semibold">
+                      {line.tail}
+                    </span>
+                    。
+                  </p>
+                </li>
+              ))}
+            </ul>
+
+            {/* 右：示意节点卡 + AI 推荐 */}
+            <SampleNodeCard />
+          </div>
         </div>
       </section>
 
@@ -334,5 +343,144 @@ export default async function Home() {
         </div>
       </footer>
     </>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// 想象屏右侧：示意节点卡 + AI 推荐
+// ──────────────────────────────────────────────────────────────────
+
+const SAMPLE_TOPICS: { label: string; cls: string }[] = [
+  { label: '社区营造', cls: 'bg-leaf/[0.10] text-moss border-leaf/20' },
+  { label: '空间设计', cls: 'bg-leaf/[0.10] text-moss border-leaf/20' },
+  { label: '可持续生活', cls: 'bg-gold/[0.10] text-earth border-gold/20' },
+  { label: '爱与连接', cls: 'bg-love-pink/[0.10] text-coral border-love-pink/20' },
+  { label: '人与 AI', cls: 'bg-sky/[0.10] text-[#4a7c9a] border-sky/20' },
+];
+
+const SAMPLE_MATCHES = [
+  {
+    avatar: '张',
+    color: 'from-sky to-[#a5cce0]',
+    name: '张远山',
+    reason: '同关注社区营造 · 正在寻找设计合作伙伴',
+    score: '92%',
+  },
+  {
+    avatar: '陈',
+    color: 'from-leaf to-sage',
+    name: '陈思源',
+    reason: '可持续生活实践者 · 想参与共创工作坊',
+    score: '87%',
+  },
+  {
+    avatar: '王',
+    color: 'from-[#b088c9] to-[#d4b4e8]',
+    name: '王晓晴',
+    reason: 'AI 产品设计师 · 也关注爱与连接的议题',
+    score: '81%',
+  },
+];
+
+function SampleNodeCard() {
+  return (
+    <div className="bg-white border border-moss/10 rounded-3xl p-8 max-md:p-6 shadow-[0_12px_48px_rgba(26,46,26,0.06)] relative overflow-hidden">
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-coral-soft via-leaf to-sky" />
+
+      {/* 头像 + 名字 */}
+      <div className="flex items-center gap-4 mb-7">
+        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-coral-soft to-warmth flex items-center justify-center font-serif text-2xl font-bold text-white shrink-0">
+          林
+        </div>
+        <div className="min-w-0">
+          <div className="font-serif text-[1.35rem] font-bold text-forest-deep truncate">
+            林小溪
+          </div>
+          <div className="text-[0.82rem] text-text-light mt-0.5 truncate">
+            独立设计师 · 社区营造者 · 台北
+          </div>
+        </div>
+      </div>
+
+      {/* 正在做 */}
+      <SectionRow label="正在做的事">
+        运营一个关注社区空间设计的工作室，探索如何用设计激活社区关系。
+      </SectionRow>
+
+      {/* 关心议题 */}
+      <div className="mb-4">
+        <div className="text-[0.72rem] text-moss tracking-[1.5px] uppercase mb-1.5 font-semibold">
+          关心的议题
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {SAMPLE_TOPICS.map(t => (
+            <span
+              key={t.label}
+              className={`px-3 py-1 rounded-full text-[11px] font-medium border ${t.cls}`}
+            >
+              {t.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <SectionRow label="可以提供">
+        社区空间策划经验、品牌视觉设计、工作坊组织
+      </SectionRow>
+      <SectionRow label="正在寻找">
+        关注社会创新的伙伴，想一起做有温度的事的人
+      </SectionRow>
+
+      <div className="w-full h-px bg-black/5 my-4" />
+
+      {/* AI 推荐 */}
+      <div className="flex items-center gap-2 text-[12px] text-coral mb-3 font-semibold tracking-wide">
+        💛 AI 推荐 · 有温度的匹配
+      </div>
+      <div className="space-y-2">
+        {SAMPLE_MATCHES.map((m, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-3 p-2.5 bg-cream rounded-lg border border-mist transition-colors hover:bg-white"
+          >
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 bg-gradient-to-br ${m.color}`}
+            >
+              {m.avatar}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[13.5px] font-semibold text-forest-deep">
+                {m.name}
+              </div>
+              <div className="text-[11px] text-text-light mt-0.5 truncate">
+                {m.reason}
+              </div>
+            </div>
+            <div className="text-[11.5px] text-coral font-semibold shrink-0">
+              {m.score}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SectionRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-4">
+      <div className="text-[0.72rem] text-moss tracking-[1.5px] uppercase mb-1 font-semibold">
+        {label}
+      </div>
+      <div className="text-[0.92rem] text-text-secondary leading-[1.65]">
+        {children}
+      </div>
+    </div>
   );
 }
