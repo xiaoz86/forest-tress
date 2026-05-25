@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import HeroVideo from '@/components/HeroVideo';
 import JoinSection from '@/components/JoinSection';
 import RelationNetwork from '@/components/RelationNetwork';
 import { buildRelationGraph } from '@/lib/network';
@@ -214,18 +215,7 @@ export default async function Home() {
           下载完成前先显示静态图，等同于无 mp4 时优雅降级。
           移动端用户尊重 prefers-reduced-motion → 用 CSS 关掉动画但保留 poster。
         */}
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="auto"
-          poster="/hero-forest.jpg"
-          aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover motion-reduce:hidden"
-        >
-          <source src="/hero-forest.mp4" type="video/mp4" />
-        </video>
+        <HeroVideo />
         {/* prefers-reduced-motion 用户看到的兜底静态图 */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
