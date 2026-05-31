@@ -1,10 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import HeroVideo from '@/components/HeroVideo';
+import MeditationSection from '@/components/MeditationSection';
+import CoreExperienceSection from '@/components/CoreExperienceSection';
 import JoinSection from '@/components/JoinSection';
 import RelationNetwork from '@/components/RelationNetwork';
+import { isAdminId } from '@/lib/admin';
+import { fetchMeditationContent } from '@/lib/meditations';
 import { buildRelationGraph } from '@/lib/network';
+import { fetchShareContent } from '@/lib/shares';
 import type { NodeCard } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -189,7 +195,14 @@ async function fetchCreators(): Promise<NodeCard[]> {
 }
 
 export default async function Home() {
-  const creators = await fetchCreators();
+  const [creators, meditationContent, shareContent] = await Promise.all([
+    fetchCreators(),
+    fetchMeditationContent(),
+    fetchShareContent(),
+  ]);
+  const cookieStore = await cookies();
+  const memberId = cookieStore.get('nf_member')?.value || '';
+  const isAdmin = isAdminId(memberId);
   const visible = creators.filter(n => !n.name?.startsWith('___'));
 
   const showcaseCenter =
@@ -270,10 +283,10 @@ export default async function Home() {
           {/* CTA */}
           <div className="animate-fade-in-delay-4">
             <a
-              href="#join"
+              href="#meditations"
               className="inline-flex items-center gap-2 px-9 py-4 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-bold text-base rounded-full no-underline transition-all shadow-[0_4px_24px_rgba(212,160,160,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(212,160,160,0.45)]"
             >
-              在森林里种下一棵树
+              走进这片森林
             </a>
           </div>
         </div>
@@ -285,7 +298,17 @@ export default async function Home() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════
-          [2] 辨认 — 在 3 秒内找到自己
+          [2] 安顿 — 主题冥想
+      ════════════════════════════════════════════════════════════════ */}
+      <MeditationSection content={meditationContent} isAdmin={isAdmin} />
+
+      {/* ════════════════════════════════════════════════════════════════
+          [3] 体验 — 核心体验
+      ════════════════════════════════════════════════════════════════ */}
+      <CoreExperienceSection content={shareContent} isAdmin={isAdmin} />
+
+      {/* ════════════════════════════════════════════════════════════════
+          [4] 辨认 — 在 3 秒内找到自己
       ════════════════════════════════════════════════════════════════ */}
       <section id="tribes" className="py-24 px-8 bg-[#faf8f2] max-md:py-16 max-md:px-5">
         <div className="max-w-[1080px] mx-auto">
@@ -302,7 +325,7 @@ export default async function Home() {
             {TRIBES.map(({ eyebrow, Icon, roles, tail }, i) => (
               <div
                 key={i}
-                className="group relative p-9 max-md:p-7 rounded-3xl bg-[#f0f5ec] border border-leaf/15 transition-all hover:-translate-y-0.5 hover:bg-[#ecf3e6] hover:border-leaf/30 hover:shadow-[0_10px_36px_rgba(45,74,45,0.06)]"
+                className="group relative p-9 max-md:p-7 rounded-lg bg-[#f0f5ec] border border-leaf/15 transition-all hover:-translate-y-0.5 hover:bg-[#ecf3e6] hover:border-leaf/30 hover:shadow-[0_10px_36px_rgba(45,74,45,0.06)]"
               >
                 <Icon className="w-7 h-7 text-forest-mid mb-6" />
                 <div className="text-[13.5px] font-semibold tracking-[0.06em] text-forest-mid mb-3">
@@ -321,22 +344,22 @@ export default async function Home() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════
-          [3] 想象 — 你在这里会变成什么样（配真实示例）
+          [5] 想象 — 你在这里会变成什么样（配真实示例）
       ════════════════════════════════════════════════════════════════ */}
       <section className="py-24 px-8 bg-white max-md:py-16 max-md:px-5">
         <div className="max-w-[1100px] mx-auto">
           <div className="text-center mb-14">
             <div className="inline-block text-[11px] tracking-[3px] text-coral uppercase mb-3 font-medium">
-              想象
+              一棵树
             </div>
             <h2
               className="text-[clamp(1.6rem,3.6vw,2.4rem)] font-semibold text-forest-deep leading-[1.4] tracking-[-0.01em]"
               style={{ fontFamily: 'var(--font-display)' }}
             >
-              在这片森林里……
+              一棵树，会慢慢显影
             </h2>
             <p className="mt-4 text-[13.5px] text-text-light max-w-[440px] mx-auto leading-[1.85]">
-              下面是一棵示意的树「林小溪」 —— 你的节点卡会被这样看见。
+              名字、正在做的事、关心的议题，会在这里被轻轻放下。连接不急着发生，但可以先被看见。
             </p>
           </div>
 
@@ -367,10 +390,10 @@ export default async function Home() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════
-          [4] 连接故事 + 真实关系网 — 深绿夜空里看连接如何发生
+          [6] 连接故事 + 真实关系网 — 深绿夜空里看连接如何发生
       ════════════════════════════════════════════════════════════════ */}
       <section className="relative py-28 px-8 bg-gradient-to-br from-forest-deep via-[#1f3a1f] to-forest-mid overflow-hidden max-md:py-20 max-md:px-5">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_500px_at_20%_80%,rgba(212,160,160,0.06),transparent),radial-gradient(circle_400px_at_80%_20%,rgba(232,201,160,0.05),transparent)] pointer-events-none" />
+        <div className="absolute inset-0 bg-[linear-gradient(160deg,rgba(255,255,255,0.045),transparent_42%,rgba(232,201,160,0.045))] pointer-events-none" />
 
         <div className="relative max-w-[1100px] mx-auto">
           <div className="text-center mb-14">
@@ -384,8 +407,7 @@ export default async function Home() {
               在这片森林里，<br className="md:hidden" />连接正在发生
             </h2>
             <p className="mt-5 text-[14px] text-white/55 leading-[1.95] max-w-[560px] mx-auto">
-              每一段真实的连接，都是一种爱的表达。<br className="md:hidden" />
-              这些是我们设想中森林里会发生的故事。
+              有些连接先从一句认真听见开始，然后慢慢长成合作、陪伴，或一段新的小路。
             </p>
           </div>
 
@@ -394,7 +416,7 @@ export default async function Home() {
             {VOICES.map((v, i) => (
               <article
                 key={i}
-                className="bg-white/[0.045] border border-white/[0.07] rounded-3xl py-8 px-7 backdrop-blur-[10px] transition-all hover:bg-white/[0.08] hover:border-white/15"
+                className="bg-white/[0.045] border border-white/[0.07] rounded-lg py-8 px-7 backdrop-blur-[10px] transition-all hover:bg-white/[0.08] hover:border-white/15"
               >
                 <div className="flex items-center gap-3 mb-5">
                   <div className="flex items-center">
@@ -407,9 +429,7 @@ export default async function Home() {
                       </div>
                     ))}
                   </div>
-                  <div className="w-6 h-6 rounded-full bg-love-pink/20 flex items-center justify-center text-[0.65rem]">
-                    💛
-                  </div>
+                  <div className="h-px w-7 bg-coral-soft/35" />
                   <div className="text-[11px] text-coral-soft font-medium tracking-[1px]">
                     {v.label}
                   </div>
@@ -447,7 +467,7 @@ export default async function Home() {
               </div>
 
               <p className="mt-6 text-center text-[13px] text-white/60 leading-[1.9] max-w-[520px] mx-auto">
-                这是 <span className="font-medium text-white">{showcaseCenter.name}</span> 加入森林后，被 AI 替 ta 找到的 {showcaseGraph.neighbors.length} 棵相遇的树。
+                这是 <span className="font-medium text-white">{showcaseCenter.name}</span> 加入后，森林里浮现出的 {showcaseGraph.neighbors.length} 棵可能相遇的树。
                 <br />
                 <Link
                   href="/creators"
@@ -462,15 +482,13 @@ export default async function Home() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════
-          [5] 行动 — 种下你的种子
+          [7] 行动 — 种下你的种子
       ════════════════════════════════════════════════════════════════ */}
       <section
         id="join"
         className="relative py-28 px-8 bg-gradient-to-b from-[#faf8f2] via-[#f5f5ee] to-[#f0ede4] overflow-hidden max-md:py-20 max-md:px-5"
       >
-        {/* 装饰光晕 */}
-        <div className="absolute -top-40 -left-40 w-[480px] h-[480px] rounded-full bg-leaf/[0.06] blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-40 -right-40 w-[520px] h-[520px] rounded-full bg-coral-soft/[0.06] blur-3xl pointer-events-none" />
+        <div className="absolute top-0 left-1/2 h-px w-[min(760px,78vw)] -translate-x-1/2 bg-gradient-to-r from-transparent via-forest-deep/10 to-transparent pointer-events-none" />
 
         <div className="relative">
           <JoinSection />
@@ -526,27 +544,27 @@ const SAMPLE_MATCHES = [
     color: 'from-sky to-[#a5cce0]',
     name: '张远山',
     reason: '同关注社区营造 · 正在寻找设计合作伙伴',
-    score: '92%',
+    signal: '高共振',
   },
   {
     avatar: '陈',
     color: 'from-leaf to-sage',
     name: '陈思源',
     reason: '可持续生活实践者 · 想参与共创工作坊',
-    score: '87%',
+    signal: '可共创',
   },
   {
     avatar: '王',
     color: 'from-[#b088c9] to-[#d4b4e8]',
     name: '王晓晴',
     reason: 'AI 产品设计师 · 也关注爱与连接的议题',
-    score: '81%',
+    signal: '适合聊聊',
   },
 ];
 
 function SampleNodeCard() {
   return (
-    <div className="bg-white border border-moss/10 rounded-3xl p-8 max-md:p-6 shadow-[0_12px_48px_rgba(26,46,26,0.06)] relative overflow-hidden">
+    <div className="bg-white border border-moss/10 rounded-lg p-8 max-md:p-6 shadow-[0_12px_48px_rgba(26,46,26,0.06)] relative overflow-hidden">
       <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-coral-soft via-leaf to-sky" />
 
       {/* 头像 + 名字 */}
@@ -597,7 +615,8 @@ function SampleNodeCard() {
 
       {/* AI 推荐 */}
       <div className="flex items-center gap-2 text-[12px] text-coral mb-3 font-semibold tracking-wide">
-        💛 AI 推荐 · 有温度的匹配
+        <span className="h-px w-6 bg-coral-soft/60" />
+        AI 推荐 · 可能共振的人
       </div>
       <div className="space-y-2">
         {SAMPLE_MATCHES.map((m, i) => (
@@ -619,7 +638,7 @@ function SampleNodeCard() {
               </div>
             </div>
             <div className="text-[11.5px] text-coral font-semibold shrink-0">
-              {m.score}
+              {m.signal}
             </div>
           </div>
         ))}

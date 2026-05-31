@@ -48,7 +48,7 @@ export default function JoinSection() {
           每一棵树，都从一颗种子开始
         </h2>
         <p className="mt-4 text-[14.5px] text-text-light leading-[1.85]">
-          填写你的节点卡，让森林看见你
+          把正在发芽的自己，轻轻放进森林
         </p>
         <button
           type="button"

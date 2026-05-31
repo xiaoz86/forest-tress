@@ -19,17 +19,17 @@ description: 每一位加入者，都会形成一张属于自己的节点卡。�
 - name: 张远山
   avatar: 张
   reason: 同关注社区营造 · 正在寻找设计合作伙伴
-  score: 92%
+  signal: 高共振
 
 - name: 陈思源
   avatar: 陈
   reason: 可持续生活实践者 · 想参与共创工作坊
-  score: 87%
+  signal: 可共创
 
 - name: 王晓晴
   avatar: 王
   reason: AI产品设计师 · 也关注爱与连接的议题
-  score: 81%
+  signal: 适合聊聊
 
 ## 节点卡特点
 

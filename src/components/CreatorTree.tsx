@@ -13,36 +13,21 @@ export default function CreatorTree({ node }: Props) {
   const positions = layoutOrbit(tags);
 
   return (
-    <article className="group relative h-full rounded-2xl bg-white border border-moss/15 hover:border-moss/35 shadow-[0_2px_12px_rgba(26,46,26,0.04)] hover:shadow-[0_10px_32px_rgba(26,46,26,0.10)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden flex flex-col">
-      {/* 极简装饰带 + 微型小树 */}
-      <div className="relative h-12 bg-gradient-to-br from-warm-cream via-white to-mist/40 border-b border-moss/8">
-        <svg
-          viewBox="0 0 60 60"
-          width="36"
-          height="36"
-          aria-hidden="true"
-          className="absolute right-4 top-2 opacity-70 group-hover:opacity-100 transition-opacity"
-        >
-          <path d="M30 50 L30 32" stroke="#3d2817" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="30" cy="22" r="14" fill="#a8c9a0" opacity="0.55" />
-          <circle cx="22" cy="26" r="10" fill="#8fb573" opacity="0.7" />
-          <circle cx="36" cy="26" r="10" fill="#8fb573" opacity="0.7" />
-          <circle cx="30" cy="14" r="9" fill="#6b8f5e" opacity="0.85" />
-        </svg>
-      </div>
+    <article className="group relative h-full rounded-lg bg-white/82 border border-moss/15 hover:border-moss/30 shadow-[0_2px_12px_rgba(26,46,26,0.04)] hover:shadow-[0_10px_32px_rgba(26,46,26,0.08)] hover:-translate-y-0.5 transition-all duration-300 overflow-hidden flex flex-col">
+      <div className="h-px w-full bg-gradient-to-r from-transparent via-leaf/45 to-transparent" />
 
       {/* 轨道区 */}
-      <div className="relative px-2 pt-3 pb-1">
+      <div className="relative px-2 pt-5 pb-1">
         <OrbitNetwork name={name} city={node.city} positions={positions} />
       </div>
 
-      {/* 底栏：在做 + 展开 */}
+      {/* 底栏：在做 + 走近 */}
       <div className="px-5 pb-4 flex items-end justify-between gap-3 mt-auto">
         <p className="text-[12px] text-text-secondary leading-snug line-clamp-2 flex-1">
           {firstSentence(node.doing, 36)}
         </p>
         <span className="text-[11px] text-text-light group-hover:text-forest-mid transition-colors whitespace-nowrap">
-          展开 <span className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
+          走近 <span className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
         </span>
       </div>
     </article>
@@ -176,7 +161,7 @@ function OrbitNetwork({
         return (
           <span
             key={p.kw}
-            className="absolute -translate-x-1/2 -translate-y-1/2 px-2.5 py-0.5 rounded-full text-[11px] font-medium border whitespace-nowrap shadow-[0_2px_8px_rgba(26,46,26,0.06)]"
+            className="absolute -translate-x-1/2 -translate-y-1/2 px-2.5 py-0.5 rounded-full text-[11px] font-medium border whitespace-nowrap shadow-[0_2px_8px_rgba(26,46,26,0.04)]"
             style={{
               left: `${(p.x / W) * 100}%`,
               top: `${(p.y / H) * 100}%`,

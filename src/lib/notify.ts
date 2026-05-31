@@ -1,4 +1,5 @@
 import type { NodeCard } from './supabase';
+import type { ShareEntry } from './shares';
 
 // 默认收件人（主理人）。可通过 NOTIFY_EMAILS 环境变量覆盖，逗号分隔支持多个。
 const DEFAULT_RECIPIENTS = ['1826741794@qq.com'];
@@ -291,5 +292,98 @@ export async function notifyLoginLink(
     }
   } catch (err) {
     console.error('[notify] login send failed', err);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// 有温度的超级个体上传林间分享后，通知创始人团队审核
+// ──────────────────────────────────────────────────────────────────
+
+function buildShareSubmissionHtml(node: NodeCard, share: ShareEntry, reviewUrl: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>新的林间分享待审核</title></head>
+<body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(26,46,26,0.08);">
+    <div style="padding:28px 32px;background:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#fff;">
+      <div style="font-size:13px;opacity:0.75;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · 林间分享</div>
+      <h1 style="margin:0;font-size:22px;font-weight:700;">有新的分享待审核</h1>
+      <div style="margin-top:8px;font-size:14px;opacity:0.85;">${escape(node.name)} 上传了「${escape(share.title)}」</div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;">
+      ${row('分享者', node.name)}
+      ${row('标题', share.title)}
+      ${row('问题', share.question)}
+      ${row('简述', share.summary)}
+      ${row('补充', share.note)}
+      ${row('标签', share.tags.join('、'))}
+      ${row('格式', share.mediaKind)}
+    </table>
+    <div style="padding:22px 32px;background:#faf8f2;font-size:13px;color:#5a5a5a;line-height:1.8;">
+      <p style="margin:0 0 14px;">请进入后台审核，确认是否发布到林间分享页。</p>
+      <p style="margin:0;"><a href="${reviewUrl}" style="color:#2d4a2d;font-weight:600;text-decoration:underline;">${reviewUrl}</a></p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function buildShareSubmissionText(node: NodeCard, share: ShareEntry, reviewUrl: string): string {
+  return [
+    `附近森林 · 新的林间分享待审核`,
+    `─────────────────────`,
+    `分享者：${node.name || ''}`,
+    `标题：${share.title}`,
+    share.question ? `问题：${share.question}` : '',
+    share.summary ? `简述：${share.summary}` : '',
+    share.note ? `补充：${share.note}` : '',
+    share.tags.length ? `标签：${share.tags.join('、')}` : '',
+    `格式：${share.mediaKind}`,
+    ``,
+    `审核入口：${reviewUrl}`,
+  ].filter(Boolean).join('\n');
+}
+
+export async function notifyShareSubmission(
+  node: NodeCard,
+  share: ShareEntry,
+): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('[notify] RESEND_API_KEY not set, skipping share submission notification');
+    return;
+  }
+
+  const recipients = getRecipients();
+  if (recipients.length === 0) {
+    console.log('[notify] no recipients configured, skipping share submission notification');
+    return;
+  }
+
+  const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
+  const reviewUrl = `${getSiteOrigin()}/shares/admin`;
+  const subject = `新的林间分享待审核 · ${share.title}`;
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: recipients,
+        subject,
+        html: buildShareSubmissionHtml(node, share, reviewUrl),
+        text: buildShareSubmissionText(node, share, reviewUrl),
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error('[notify] share submission Resend non-200', res.status, body);
+    }
+  } catch (err) {
+    console.error('[notify] share submission send failed', err);
   }
 }

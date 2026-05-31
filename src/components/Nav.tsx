@@ -10,6 +10,9 @@ type NavLink =
 
 const navLinks: NavLink[] = [
   { href: '/', label: '首页', type: 'route' },
+  { href: '#experience', label: '体验', type: 'anchor' },
+  { href: '/meditations', label: '冥想', type: 'route' },
+  { href: '/shares', label: '分享', type: 'route' },
   { href: '/creators', label: '创造者森林', type: 'route' },
   { href: '#join', label: '加入', type: 'anchor' },
   { href: '/about', label: '来处', type: 'route' },
@@ -57,7 +60,7 @@ export default function Nav() {
       </button>
 
       {/* Desktop nav */}
-      <ul className="flex gap-7 list-none max-md:hidden">
+      <ul className="flex gap-6 list-none max-md:hidden">
         {navLinks.map(link => {
           const href = resolveHref(link);
           const cls = 'text-white/70 no-underline text-sm transition-colors hover:text-white';
