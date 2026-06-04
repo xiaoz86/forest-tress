@@ -56,42 +56,87 @@ values (
   $$
   {
     "eyebrow": "林间呼吸",
-    "title": "好状态，\n从一段呼吸开始",
-    "description": "一段呼吸，一次停顿，一个还不急着回答的问题。声音会慢慢放在这里，像夜色里一条安静的小径。",
-    "note": "慢慢听见",
+    "title": "走入正念，\n把注意力带回当下",
+    "description": "从走入正念开始，正念生活、情绪、自我关怀和内在自由，会成为几条慢慢展开的小径。每一段声音，都带人回到此刻。",
+    "note": "五条小径",
     "categories": [
-      { "id": "recommended", "label": "推荐" },
-      { "id": "breath", "label": "呼吸" },
-      { "id": "self", "label": "看见" },
-      { "id": "transition", "label": "转场" }
+      {
+        "id": "walk-in",
+        "label": "走入正念",
+        "description": "从暂停、放松和感官唤醒开始，先把注意力轻轻带回当下。",
+        "heroTitle": "走入正念",
+        "heroSubtitle": "从一段暂停，回到身心的现场",
+        "mood": "forest"
+      },
+      {
+        "id": "mindful-life",
+        "label": "正念生活",
+        "description": "把日常里的片刻，变成可以练习觉察的小路。",
+        "heroTitle": "正念生活",
+        "heroSubtitle": "在普通一天里，慢慢醒来",
+        "mood": "daily"
+      },
+      {
+        "id": "emotion",
+        "label": "正念与情绪",
+        "description": "在焦虑、压力和波动里，学习先看见情绪，再温柔地安放它。",
+        "heroTitle": "正念与情绪",
+        "heroSubtitle": "让情绪被看见，也被放下",
+        "mood": "emotion"
+      },
+      {
+        "id": "self-care",
+        "label": "自我关怀",
+        "description": "用更柔软的方式陪伴自己，在身体与心里建立一点安全感。",
+        "heroTitle": "自我关怀",
+        "heroSubtitle": "把温柔，也留给自己",
+        "mood": "care"
+      },
+      {
+        "id": "inner-freedom",
+        "label": "疗愈和内在自由",
+        "description": "让压抑、紧绷和旧有模式慢慢松动，给内在多一点空间。",
+        "heroTitle": "疗愈和内在自由",
+        "heroSubtitle": "在松动里，重新获得空间",
+        "mood": "healing"
+      }
     ],
     "tracks": [
       {
-        "id": "settle-breath",
-        "title": "安顿呼吸",
-        "intention": "从外面的节奏回到身体，让呼吸重新变得清晰。",
-        "duration": "8 分钟",
-        "stage": "初入林间",
-        "categoryId": "breath",
-        "mood": "settle"
+        "id": "pause-into-now",
+        "title": "暂停进入当下",
+        "intention": "给自己一次短暂停靠，先把呼吸、身体和眼前的环境听见。",
+        "duration": "13 分钟",
+        "stage": "走入正念",
+        "categoryId": "walk-in",
+        "mood": "forest"
       },
       {
-        "id": "see-yourself",
-        "title": "看见此刻的自己",
-        "intention": "带着一个温柔的问题，听见内在真正关心的事。",
-        "duration": "12 分钟",
-        "stage": "自我探索",
-        "categoryId": "self",
-        "mood": "listen"
+        "id": "mindful-senses",
+        "title": "活在当下的感官唤醒",
+        "intention": "透过感官回到此刻，让看见、听见和触碰重新变得清晰。",
+        "duration": "11 分钟",
+        "stage": "走入正念",
+        "categoryId": "walk-in",
+        "mood": "daily"
       },
       {
-        "id": "transition-anxiety",
-        "title": "转型期的焦虑",
-        "intention": "给正在变化中的自己一点空间，重新感到脚下有地。",
-        "duration": "10 分钟",
-        "stage": "职业与生命转场",
-        "categoryId": "transition",
-        "mood": "ground"
+        "id": "conscious-relaxation",
+        "title": "有意识放松",
+        "intention": "从身体的松开进入正念，把紧绷一点点放下。",
+        "duration": "13 分钟",
+        "stage": "走入正念",
+        "categoryId": "walk-in",
+        "mood": "healing"
+      },
+      {
+        "id": "self-compassion-10",
+        "title": "10 分钟自我关怀",
+        "intention": "以更温柔的语气靠近自己，给内在一个可以停留的位置。",
+        "duration": "11 分钟",
+        "stage": "走入正念",
+        "categoryId": "walk-in",
+        "mood": "care"
       }
     ]
   }

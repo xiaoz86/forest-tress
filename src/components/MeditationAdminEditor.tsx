@@ -9,9 +9,11 @@ type Props = {
 };
 
 const MOOD_OPTIONS: { value: TrackMood; label: string }[] = [
-  { value: 'settle', label: '安顿' },
-  { value: 'listen', label: '看见' },
-  { value: 'ground', label: '转场' },
+  { value: 'forest', label: '森林 / 入门' },
+  { value: 'daily', label: '日常 / 呼吸' },
+  { value: 'emotion', label: '情绪 / 流动' },
+  { value: 'care', label: '自我关怀' },
+  { value: 'healing', label: '疗愈 / 自由' },
 ];
 
 function makeId(prefix: string): string {
@@ -43,7 +45,17 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
     const id = makeId('category');
     setContent(prev => ({
       ...prev,
-      categories: [...prev.categories, { id, label: '新的分类' }],
+      categories: [
+        ...prev.categories,
+        {
+          id,
+          label: '新的专题',
+          description: '写下一句这个专题会带人去往哪里。',
+          heroTitle: '新的专题',
+          heroSubtitle: '从这里，慢慢进入一段声音。',
+          mood: 'forest',
+        },
+      ],
     }));
   };
 
@@ -83,7 +95,7 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
           duration: '8 分钟',
           stage: prev.categories[0]?.label || '林间呼吸',
           categoryId: prev.categories[0]?.id || 'recommended',
-          mood: 'settle',
+          mood: 'forest',
         },
       ],
     }));
@@ -203,11 +215,47 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
           {content.categories.map(category => (
             <div key={category.id} className="rounded-lg border border-white/10 bg-black/10 p-4">
               <div className="mb-3 text-[11px] text-white/32">{category.id}</div>
-              <input
-                value={category.label}
-                onChange={e => updateCategory(category.id, { label: e.target.value })}
-                className={inputCls}
-              />
+              <div className="grid gap-3">
+                <Field label="专题名称">
+                  <input
+                    value={category.label}
+                    onChange={e => updateCategory(category.id, { label: e.target.value })}
+                    className={inputCls}
+                  />
+                </Field>
+                <Field label="封面标题">
+                  <input
+                    value={category.heroTitle || ''}
+                    onChange={e => updateCategory(category.id, { heroTitle: e.target.value })}
+                    className={inputCls}
+                  />
+                </Field>
+                <Field label="封面副标题">
+                  <input
+                    value={category.heroSubtitle || ''}
+                    onChange={e => updateCategory(category.id, { heroSubtitle: e.target.value })}
+                    className={inputCls}
+                  />
+                </Field>
+                <Field label="封面气质">
+                  <select
+                    value={category.mood || 'forest'}
+                    onChange={e => updateCategory(category.id, { mood: e.target.value as TrackMood })}
+                    className={inputCls}
+                  >
+                    {MOOD_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="专题说明">
+                  <textarea
+                    value={category.description || ''}
+                    onChange={e => updateCategory(category.id, { description: e.target.value })}
+                    className={`${inputCls} min-h-24 resize-y leading-relaxed`}
+                  />
+                </Field>
+              </div>
               <button
                 type="button"
                 onClick={() => removeCategory(category.id)}

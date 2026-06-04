@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import MeditationTrackCard from '@/components/MeditationTrackCard';
-import type { MeditationContent } from '@/lib/meditations';
+import type { MeditationCategory, MeditationContent, TrackMood } from '@/lib/meditations';
 
 type Props = {
   content: MeditationContent;
@@ -8,6 +8,12 @@ type Props = {
 };
 
 export default function MeditationSection({ content, isAdmin = false }: Props) {
+  const featuredCategory = content.categories[0];
+  const featuredTracks = featuredCategory
+    ? content.tracks.filter(track => track.categoryId === featuredCategory.id)
+    : content.tracks;
+  const otherCategories = content.categories.slice(1);
+
   return (
     <section
       id="meditations"
@@ -68,8 +74,57 @@ export default function MeditationSection({ content, isAdmin = false }: Props) {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-8 max-lg:grid-cols-2 max-md:grid-cols-2 max-[420px]:gap-5 max-[360px]:grid-cols-1">
-          {content.tracks.map(track => (
+        {featuredCategory && (
+          <div className="grid grid-cols-[1.08fr_0.92fr] gap-6 max-lg:grid-cols-1">
+            <Link
+              href={`/meditations?category=${encodeURIComponent(featuredCategory.id)}`}
+              className="relative min-h-[330px] overflow-hidden rounded-lg border border-white/12 bg-[linear-gradient(135deg,rgba(8,18,13,0.22),rgba(8,18,13,0.34)),url('/hero-forest.jpg')] bg-cover bg-center p-7 no-underline shadow-[0_26px_80px_rgba(0,0,0,0.18)] max-md:min-h-[280px] max-md:p-6"
+            >
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,18,12,0.08)_0%,rgba(6,18,12,0.66)_100%)]" />
+              <div className="relative flex h-full flex-col justify-between">
+                <div className="text-[10px] font-medium uppercase tracking-[0.34em] text-white/58">
+                  Mindfulness
+                </div>
+                <div>
+                  <div className="mb-5 h-px w-12 bg-coral-soft/65" />
+                  <h3
+                    className="text-[clamp(1.7rem,3.6vw,2.55rem)] font-semibold leading-[1.25] text-white"
+                    style={{ fontFamily: 'var(--font-display)' }}
+                  >
+                    {featuredCategory.heroTitle || featuredCategory.label}
+                  </h3>
+                  <p className="mt-4 max-w-[420px] text-[14px] leading-[1.9] text-white/70">
+                    {featuredCategory.heroSubtitle || featuredCategory.description}
+                  </p>
+                  <div className="mt-7 inline-flex rounded-full border border-white/18 bg-white/10 px-4 py-2 text-[12px] text-white/72 backdrop-blur-sm">
+                    {featuredTracks.length} 段声音
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1">
+              {otherCategories.map(category => (
+                <CategoryCard key={category.id} category={category} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-14 mb-8 flex items-end justify-between gap-6 max-md:block">
+          <div>
+            <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.22em] text-white/30">
+              {featuredCategory?.label || content.eyebrow}
+            </div>
+            <h3 className="text-2xl font-semibold text-white">先放入的声音</h3>
+          </div>
+          <p className="max-w-[420px] text-sm leading-relaxed text-white/42 max-md:mt-4">
+            先把几段走入正念的声音放下，其他小径会慢慢长出来。
+          </p>
+        </div>
+
+        <div className="grid grid-cols-4 gap-6 max-lg:grid-cols-2 max-md:grid-cols-2 max-[420px]:gap-5 max-[360px]:grid-cols-1">
+          {featuredTracks.map(track => (
             <MeditationTrackCard
               key={track.id}
               track={track}
@@ -79,5 +134,74 @@ export default function MeditationSection({ content, isAdmin = false }: Props) {
         </div>
       </div>
     </section>
+  );
+}
+
+const CATEGORY_VISUALS: Record<TrackMood, string> = {
+  forest: 'bg-[linear-gradient(135deg,#243f35_0%,#68877b_58%,#d4c5aa_100%)]',
+  daily: 'bg-[linear-gradient(135deg,#6ba9c1_0%,#b5d1db_55%,#e8deca_100%)]',
+  emotion: 'bg-[linear-gradient(135deg,#718da8_0%,#b8c8d4_56%,#e5d6d2_100%)]',
+  care: 'bg-[linear-gradient(135deg,#dcae94_0%,#ead7c4_48%,#c5d6cb_100%)]',
+  healing: 'bg-[linear-gradient(135deg,#718b68_0%,#b9c9ad_54%,#e6dac4_100%)]',
+};
+
+function CategoryCard({ category }: { category: MeditationCategory }) {
+  const mood = category.mood || 'forest';
+  return (
+    <Link
+      href={`/meditations?category=${encodeURIComponent(category.id)}`}
+      className={`group relative min-h-[157px] overflow-hidden rounded-lg border border-white/12 p-5 no-underline ${CATEGORY_VISUALS[mood]}`}
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_18%,rgba(255,255,255,0.22),transparent_34%),linear-gradient(180deg,transparent_0%,rgba(7,18,12,0.36)_100%)]" />
+      <div className="relative flex h-full flex-col justify-between">
+        <div className="flex justify-end text-white/82">
+          <SmallGlyph mood={mood} />
+        </div>
+        <div>
+          <div className="text-[1.05rem] font-semibold leading-snug text-white">
+            {category.label}
+          </div>
+          <p className="mt-2 line-clamp-2 text-[12.5px] leading-[1.7] text-white/66">
+            {category.description}
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function SmallGlyph({ mood }: { mood: TrackMood }) {
+  if (mood === 'care') {
+    return (
+      <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none" aria-hidden="true">
+        <path d="M20 8v24M8 20h24M12 12c5 3 11 3 16 0M12 28c5-3 11-3 16 0" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (mood === 'emotion') {
+    return (
+      <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none" aria-hidden="true">
+        <path d="M8 18c5-6 10-6 15 0s8 6 12 0M8 27c5-6 10-6 15 0s8 6 12 0" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (mood === 'daily') {
+    return (
+      <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none" aria-hidden="true">
+        <path d="M8 22h20c7 0 8 9 2 11-4 1-7-1-7-5M8 14h14c5 0 6-7 2-9-4-2-7 1-7 4" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (mood === 'healing') {
+    return (
+      <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none" aria-hidden="true">
+        <path d="M20 7v26M7 20h26M11 11l18 18M29 11 11 29" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none" aria-hidden="true">
+      <path d="M28 27c-6 8-20 4-19-7C10 9 25 7 29 17c3 8-7 15-13 9-4-5 2-11 7-7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
   );
 }
