@@ -34,6 +34,16 @@ const TRACK_VISUALS: Record<TrackMood, { cover: string; dot: string; shade: stri
     dot: 'bg-leaf',
     shade: 'bg-[radial-gradient(circle_at_70%_20%,rgba(255,255,255,0.22),transparent_30%),linear-gradient(180deg,transparent_0%,rgba(19,43,22,0.25)_100%)]',
   },
+  body: {
+    cover: 'bg-[linear-gradient(135deg,#70847e_0%,#aebdaf_50%,#ded8c7_100%)]',
+    dot: 'bg-mist',
+    shade: 'bg-[radial-gradient(circle_at_50%_28%,rgba(255,255,255,0.24),transparent_30%),linear-gradient(180deg,transparent_0%,rgba(22,36,30,0.26)_100%)]',
+  },
+  kindness: {
+    cover: 'bg-[linear-gradient(135deg,#d79a8f_0%,#ead1c1_48%,#c6d7ca_100%)]',
+    dot: 'bg-coral-soft',
+    shade: 'bg-[radial-gradient(circle_at_40%_24%,rgba(255,255,255,0.28),transparent_31%),linear-gradient(180deg,transparent_0%,rgba(60,28,18,0.2)_100%)]',
+  },
 };
 
 export default function MeditationTrackCard({
@@ -140,12 +150,40 @@ function TrackGlyph({ mood }: { mood: TrackMood }) {
     );
   }
 
+  if (mood === 'kindness') {
+    return (
+      <svg viewBox="0 0 120 120" className="h-[43%] w-[43%]" fill="none" aria-hidden="true">
+        <path
+          d="M60 88s-30-17-30-40c0-11 8-19 18-19 6 0 10 3 12 8 2-5 6-8 12-8 10 0 18 8 18 19 0 23-30 40-30 40Z"
+          stroke="currentColor"
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path d="M45 58c8 6 22 6 30 0" stroke="currentColor" strokeWidth="6" strokeLinecap="round" opacity="0.46" />
+        <path d="M38 35c-5 3-9 8-11 14M82 35c5 3 9 8 11 14" stroke="currentColor" strokeWidth="6" strokeLinecap="round" opacity="0.34" />
+      </svg>
+    );
+  }
+
   if (mood === 'emotion') {
     return (
       <svg viewBox="0 0 120 120" className="h-[43%] w-[43%]" fill="none" aria-hidden="true">
         <path d="M30 67c10-12 20-12 30 0s20 12 30 0" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
         <path d="M30 48c10-12 20-12 30 0s20 12 30 0" stroke="currentColor" strokeWidth="6" strokeLinecap="round" opacity="0.62" />
         <path d="M30 86c10-12 20-12 30 0s20 12 30 0" stroke="currentColor" strokeWidth="6" strokeLinecap="round" opacity="0.62" />
+      </svg>
+    );
+  }
+
+  if (mood === 'body') {
+    return (
+      <svg viewBox="0 0 120 120" className="h-[43%] w-[43%]" fill="none" aria-hidden="true">
+        <circle cx="60" cy="27" r="10" fill="currentColor" opacity="0.75" />
+        <path d="M60 43v45" stroke="currentColor" strokeWidth="6" strokeLinecap="round" />
+        <path d="M33 54c16 13 38 13 54 0" stroke="currentColor" strokeWidth="6" strokeLinecap="round" opacity="0.86" />
+        <path d="M39 76c12 10 30 10 42 0" stroke="currentColor" strokeWidth="6" strokeLinecap="round" opacity="0.62" />
+        <path d="M48 94c7 5 17 5 24 0" stroke="currentColor" strokeWidth="6" strokeLinecap="round" opacity="0.42" />
       </svg>
     );
   }

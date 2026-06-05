@@ -116,10 +116,10 @@ export default function MeditationSection({ content, isAdmin = false }: Props) {
             <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.22em] text-white/30">
               {featuredCategory?.label || content.eyebrow}
             </div>
-            <h3 className="text-2xl font-semibold text-white">先放入的声音</h3>
+            <h3 className="text-2xl font-semibold text-white">推荐</h3>
           </div>
           <p className="max-w-[420px] text-sm leading-relaxed text-white/42 max-md:mt-4">
-            先把几段走入正念的声音放下，其他小径会慢慢长出来。
+            从几段适合开始的声音进入，按自己的节奏慢慢听。
           </p>
         </div>
 
@@ -143,6 +143,8 @@ const CATEGORY_VISUALS: Record<TrackMood, string> = {
   emotion: 'bg-[linear-gradient(135deg,#718da8_0%,#b8c8d4_56%,#e5d6d2_100%)]',
   care: 'bg-[linear-gradient(135deg,#dcae94_0%,#ead7c4_48%,#c5d6cb_100%)]',
   healing: 'bg-[linear-gradient(135deg,#718b68_0%,#b9c9ad_54%,#e6dac4_100%)]',
+  body: 'bg-[linear-gradient(135deg,#6f837d_0%,#aebdaf_52%,#ded8c7_100%)]',
+  kindness: 'bg-[linear-gradient(135deg,#cf8f86_0%,#ead0bf_50%,#c5d7ca_100%)]',
 };
 
 function CategoryCard({ category }: { category: MeditationCategory }) {
@@ -178,6 +180,20 @@ function SmallGlyph({ mood }: { mood: TrackMood }) {
       </svg>
     );
   }
+  if (mood === 'kindness') {
+    return (
+      <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none" aria-hidden="true">
+        <path
+          d="M20 31s-11-6-11-15c0-5 4-8 8-8 2 0 4 1 5 3 1-2 3-3 5-3 4 0 8 3 8 8 0 9-15 15-15 15Z"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path d="M15 20c3 2 7 2 10 0" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" opacity="0.46" />
+      </svg>
+    );
+  }
   if (mood === 'emotion') {
     return (
       <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none" aria-hidden="true">
@@ -196,6 +212,14 @@ function SmallGlyph({ mood }: { mood: TrackMood }) {
     return (
       <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none" aria-hidden="true">
         <path d="M20 7v26M7 20h26M11 11l18 18M29 11 11 29" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (mood === 'body') {
+    return (
+      <svg viewBox="0 0 40 40" className="h-9 w-9" fill="none" aria-hidden="true">
+        <circle cx="20" cy="10" r="4" fill="currentColor" opacity="0.72" />
+        <path d="M20 16v17M11 20c5 4 13 4 18 0M13 28c4 3 10 3 14 0" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
       </svg>
     );
   }

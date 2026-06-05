@@ -14,10 +14,20 @@ const MOOD_OPTIONS: { value: TrackMood; label: string }[] = [
   { value: 'emotion', label: '情绪 / 流动' },
   { value: 'care', label: '自我关怀' },
   { value: 'healing', label: '疗愈 / 自由' },
+  { value: 'body', label: '身体 / 觉知' },
+  { value: 'kindness', label: '慈心 / 祝福' },
 ];
 
 function makeId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function parseBenefits(value: string): string[] {
+  return value
+    .split(/[\n,，]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+    .slice(0, 12);
 }
 
 export default function MeditationAdminEditor({ initialContent }: Props) {
@@ -54,6 +64,9 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
           heroTitle: '新的专题',
           heroSubtitle: '从这里，慢慢进入一段声音。',
           mood: 'forest',
+          sourceNote: '',
+          featureNote: '',
+          benefits: [],
         },
       ],
     }));
@@ -252,6 +265,27 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
                   <textarea
                     value={category.description || ''}
                     onChange={e => updateCategory(category.id, { description: e.target.value })}
+                    className={`${inputCls} min-h-24 resize-y leading-relaxed`}
+                  />
+                </Field>
+                <Field label="来源说明">
+                  <textarea
+                    value={category.sourceNote || ''}
+                    onChange={e => updateCategory(category.id, { sourceNote: e.target.value })}
+                    className={`${inputCls} min-h-24 resize-y leading-relaxed`}
+                  />
+                </Field>
+                <Field label="音频特色">
+                  <textarea
+                    value={category.featureNote || ''}
+                    onChange={e => updateCategory(category.id, { featureNote: e.target.value })}
+                    className={`${inputCls} min-h-24 resize-y leading-relaxed`}
+                  />
+                </Field>
+                <Field label="益处标签">
+                  <textarea
+                    value={(category.benefits || []).join('\n')}
+                    onChange={e => updateCategory(category.id, { benefits: parseBenefits(e.target.value) })}
                     className={`${inputCls} min-h-24 resize-y leading-relaxed`}
                   />
                 </Field>

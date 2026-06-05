@@ -106,6 +106,8 @@ export default async function MeditationsPage({ searchParams }: Props) {
             </aside>
 
             <div>
+            <CategoryNotes category={activeCategory} />
+
             <div className="mb-8 flex items-end justify-between gap-6 max-md:block">
               <div>
                 <div className="mb-3 text-[11px] font-medium tracking-[0.2em] text-white/32 uppercase">
@@ -141,12 +143,60 @@ export default async function MeditationsPage({ searchParams }: Props) {
   );
 }
 
+function CategoryNotes({ category }: { category: MeditationCategory }) {
+  const benefits = (category.benefits || []).filter(Boolean);
+  const hasNotes = Boolean(category.sourceNote || category.featureNote || benefits.length);
+  if (!hasNotes) return null;
+
+  return (
+    <section className="mb-10 border-y border-white/10 py-7">
+      <div className="grid grid-cols-[1.1fr_0.9fr] gap-8 max-md:grid-cols-1 max-md:gap-6">
+        <div>
+          <div className="mb-4 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
+            来源与特色
+          </div>
+          {category.sourceNote && (
+            <p className="text-[14px] leading-[2] text-white/56">
+              {category.sourceNote}
+            </p>
+          )}
+          {category.featureNote && (
+            <p className="mt-4 text-[14px] leading-[2] text-white/48">
+              {category.featureNote}
+            </p>
+          )}
+        </div>
+
+        {benefits.length > 0 && (
+          <div>
+            <div className="mb-4 text-[11px] font-medium uppercase tracking-[0.2em] text-white/32">
+              可能带来的变化
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {benefits.map(benefit => (
+                <span
+                  key={benefit}
+                  className="rounded-full border border-white/12 bg-white/[0.055] px-4 py-2 text-[13px] text-white/64"
+                >
+                  {benefit}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 const CATEGORY_VISUALS: Record<TrackMood, string> = {
   forest: 'bg-[linear-gradient(135deg,#1d352d_0%,#668579_52%,#d3c5ac_100%)]',
   daily: 'bg-[linear-gradient(135deg,#6aa8c2_0%,#b6d2dd_54%,#eadfca_100%)]',
   emotion: 'bg-[linear-gradient(135deg,#738faa_0%,#b7c7d3_54%,#e5d6d2_100%)]',
   care: 'bg-[linear-gradient(135deg,#dcaf96_0%,#ead8c8_50%,#c7d8ce_100%)]',
   healing: 'bg-[linear-gradient(135deg,#6f8966_0%,#bac8ad_52%,#e7dac4_100%)]',
+  body: 'bg-[linear-gradient(135deg,#687d77_0%,#aebdaf_52%,#ded8c7_100%)]',
+  kindness: 'bg-[linear-gradient(135deg,#cf9087_0%,#ead0bf_50%,#c7d8cb_100%)]',
 };
 
 function CategoryHero({ category, count }: { category: MeditationCategory; count: number }) {

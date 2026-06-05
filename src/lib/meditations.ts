@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-export type TrackMood = 'forest' | 'daily' | 'emotion' | 'care' | 'healing';
+export type TrackMood = 'forest' | 'daily' | 'emotion' | 'care' | 'healing' | 'body' | 'kindness';
 
 export type MeditationCategory = {
   id: string;
@@ -9,6 +9,9 @@ export type MeditationCategory = {
   heroTitle?: string;
   heroSubtitle?: string;
   mood?: TrackMood;
+  sourceNote?: string;
+  featureNote?: string;
+  benefits?: string[];
 };
 
 export type MeditationTrack = {
@@ -67,10 +70,25 @@ export const DEFAULT_MEDITATION_CONTENT: MeditationContent = {
     {
       id: 'self-care',
       label: '自我关怀',
-      description: '用更柔软的方式陪伴自己，在身体与心里建立一点安全感。',
+      description: '源自 Kristin Neff 等人发展出的正念自我关怀取向，把正念、慈心和自我友善放进可收听的练习里。它不急着修正自己，而是帮助人在困难时刻重新靠近自己。',
       heroTitle: '自我关怀',
-      heroSubtitle: '把温柔，也留给自己',
+      heroSubtitle: '与世界和自己和解，向幸福和快乐慢慢靠近',
       mood: 'care',
+      sourceNote:
+        '自我关怀并不是纵容自己，而是在压力、挫败或情绪翻涌时，仍然愿意以理解和善意回应自己。这个模块参考 Kristin Neff 等人发展出的正念自我关怀取向，把正念觉察、共同人性和自我友善，转化成可以反复收听的练习。',
+      featureNote:
+        '这里的声音从慈心、身体觉察和温柔提问进入：先让身体松下来，再看见内在正在发生什么，慢慢练习把关爱自己的力量带回日常关系里。',
+      benefits: [
+        '与世界和自己和解',
+        '拥抱幸福和快乐',
+        '减压放松',
+        '培育幸福',
+        '管理情绪',
+        '悦纳自己',
+        '增进情商',
+        '改善关系',
+        '收获关爱自己的力量',
+      ],
     },
     {
       id: 'inner-freedom',
@@ -121,7 +139,7 @@ export const DEFAULT_MEDITATION_CONTENT: MeditationContent = {
   ],
 };
 
-const MOODS: TrackMood[] = ['forest', 'daily', 'emotion', 'care', 'healing'];
+const MOODS: TrackMood[] = ['forest', 'daily', 'emotion', 'care', 'healing', 'body', 'kindness'];
 
 function cleanText(value: unknown, fallback: string, max: number): string {
   if (typeof value !== 'string') return fallback;
@@ -135,6 +153,15 @@ function cleanId(value: unknown, fallback: string): string {
   return id || fallback;
 }
 
+function cleanList(value: unknown, fallback: string[], maxItems: number, maxText: number): string[] {
+  const items = Array.isArray(value) ? value : fallback;
+  return items
+    .filter((item): item is string => typeof item === 'string')
+    .map(item => item.trim().slice(0, maxText))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
 export function normalizeMeditationContent(input: unknown): MeditationContent {
   const raw = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
   const fallback = DEFAULT_MEDITATION_CONTENT;
@@ -143,7 +170,9 @@ export function normalizeMeditationContent(input: unknown): MeditationContent {
   for (const item of categoriesRaw) {
     const r = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
     const id = cleanId(r.id, `category-${categories.length + 1}`);
-    const fallbackCategory = fallback.categories[categories.length] || fallback.categories[0];
+    const fallbackCategory = fallback.categories.find(c => c.id === id)
+      || fallback.categories[categories.length]
+      || fallback.categories[0];
     const label = cleanText(r.label, fallbackCategory.label, 16);
     const mood = typeof r.mood === 'string' && MOODS.includes(r.mood as TrackMood)
       ? (r.mood as TrackMood)
@@ -156,6 +185,9 @@ export function normalizeMeditationContent(input: unknown): MeditationContent {
       heroTitle: cleanText(r.heroTitle, fallbackCategory.heroTitle || label, 24),
       heroSubtitle: cleanText(r.heroSubtitle, fallbackCategory.heroSubtitle || fallbackCategory.description || '', 64),
       mood,
+      sourceNote: cleanText(r.sourceNote, fallbackCategory.sourceNote || '', 320),
+      featureNote: cleanText(r.featureNote, fallbackCategory.featureNote || '', 260),
+      benefits: cleanList(r.benefits, fallbackCategory.benefits || [], 12, 18),
     });
     if (categories.length >= 8) break;
   }
