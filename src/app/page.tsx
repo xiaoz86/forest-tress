@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import HeroFilmPlayer from '@/components/HeroFilmPlayer';
 import HeroVideo from '@/components/HeroVideo';
 import MeditationSection from '@/components/MeditationSection';
 import CoreExperienceSection from '@/components/CoreExperienceSection';
@@ -281,13 +282,14 @@ export default async function Home() {
           </div>
 
           {/* CTA */}
-          <div className="animate-fade-in-delay-4">
+          <div className="flex flex-wrap items-center justify-center gap-4 animate-fade-in-delay-4">
             <a
               href="#meditations"
               className="inline-flex items-center gap-2 px-9 py-4 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-bold text-base rounded-full no-underline transition-all shadow-[0_4px_24px_rgba(212,160,160,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(212,160,160,0.45)]"
             >
               走进这片森林
             </a>
+            <HeroFilmPlayer />
           </div>
         </div>
 
