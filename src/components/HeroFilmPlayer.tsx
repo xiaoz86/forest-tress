@@ -2,7 +2,7 @@
 
 import { useRef } from 'react';
 
-const HERO_FILM_SRC = '/hero-film.mp4?v=20260618-1';
+const HERO_FILM_SRC = '/hero-film.mp4?v=20260627-1';
 
 export default function HeroFilmPlayer() {
   const triggerRef = useRef<HTMLButtonElement>(null);

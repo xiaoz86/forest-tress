@@ -9,7 +9,7 @@ const wechatInlineAttrs = {
   'x5-video-player-fullscreen': 'false',
 } as const;
 
-const HERO_VIDEO_SRC = '/hero-forest.mp4?v=20260618-1';
+const HERO_VIDEO_SRC = '/hero-forest.mp4?v=20260627-1';
 
 export default function HeroVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
