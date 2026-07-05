@@ -251,3 +251,21 @@ create policy "Allow anonymous inserts" on node_cards
 -- Only allow authenticated users to read (for admin)
 create policy "Allow authenticated reads" on node_cards
   for select using (auth.role() = 'authenticated');
+
+-- ============================================================
+-- 2026-07-05 phil-coach 知识库（教练之眼的深度弹药）
+-- 来源：本地教练知识库的原创综述（书籍卡片/深度笔记/能力库）。
+-- 注意：督导笔记与真实案例受保密规范约束，永不入此表。
+-- 检索：MVP 用 themes 数组重叠匹配；embedding 列预留给未来 pgvector。
+create table if not exists phil_coach_knowledge (
+  id uuid default gen_random_uuid() primary key,
+  source text not null,            -- 相对路径，如 教练知识库/深度笔记/03-心理学与心智/心流.md#实践工具箱
+  category text not null,          -- cards | deep-notes | competency
+  title text not null,             -- 书名或文档名（含章节）
+  themes text[] default '{}',      -- 主题标签：情绪/选择/心魔/关系/职业/意义/正念/沟通/领导力…
+  content text not null,           -- 知识块正文（≤2000 字）
+  priority int default 5,          -- 1 最高；同主题命中时的排序
+  updated_at timestamptz default now()
+);
+
+create index if not exists idx_phil_knowledge_themes on phil_coach_knowledge using gin (themes);

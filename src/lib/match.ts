@@ -1,4 +1,5 @@
 import type { NodeCard } from './supabase';
+import { createChatCompletion, getLLMConfig } from './llm';
 
 export type MatchedNode = NodeCard & {
   score: number;
@@ -115,18 +116,17 @@ export function matchNodes(
 }
 
 /**
- * AI 匹配：先用规则筛 top K 候选，再交给 Kimi 重排并补充
+ * AI 匹配：先用规则筛 top K 候选，再交给大模型重排并补充
  * 「为何匹配 / 可能共创什么」的自然语言描述。
  *
- * 没配置 MOONSHOT_API_KEY 时静默退化为规则匹配。
+ * 没配置大模型 API 时静默退化为规则匹配。
  */
 export async function matchNodesAI(
   me: NodeCard,
   others: NodeCard[],
   topN = 3,
 ): Promise<MatchedNode[]> {
-  const apiKey = process.env.MOONSHOT_API_KEY;
-  if (!apiKey) return matchNodes(me, others, topN);
+  if (!getLLMConfig()) return matchNodes(me, others, topN);
 
   // 先用规则筛出 ≤8 个候选给 AI，避免上下文过长 + 帮 AI 聚焦
   const ruleRanked = others
@@ -152,7 +152,7 @@ export async function matchNodesAI(
   if (candidates.length === 0) return [];
 
   try {
-    const ai = await callKimiMatch(me, candidates, topN);
+    const ai = await callLLMMatch(me, candidates, topN);
     if (!ai || ai.length === 0) {
       return matchNodes(me, others, topN);
     }
@@ -189,15 +189,11 @@ type AIMatchItem = {
   matchType?: MatchedNode['matchType'];
 };
 
-async function callKimiMatch(
+async function callLLMMatch(
   me: NodeCard,
   candidates: (NodeCard & { reasons: string[] })[],
   topN: number,
 ): Promise<AIMatchItem[] | null> {
-  const baseUrl = (process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1').replace(/\/+$/, '');
-  const model = process.env.KIMI_MODEL || 'kimi-k2-thinking-turbo';
-  const apiKey = process.env.MOONSHOT_API_KEY!;
-
   const candidateLines = candidates.map((c, i) => {
     return [
       `候选 ${i + 1} (id=${c.id})`,
@@ -251,39 +247,15 @@ ${candidateLines}
 }
 仅返回 JSON，不要任何额外文字。`;
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 45000);
-  let res: Response;
-  try {
-    res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-      }),
-      signal: ctrl.signal,
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    console.error('[match] Kimi non-200', res.status, text.slice(0, 300));
-    return null;
-  }
-
-  const json = await res.json();
-  const content: string | undefined = json?.choices?.[0]?.message?.content;
+  const content = await createChatCompletion({
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    temperature: 0.3,
+    responseFormat: { type: 'json_object' },
+    timeoutMs: 45000,
+  });
   if (!content) return null;
 
   let parsed: { matches?: AIMatchItem[] };

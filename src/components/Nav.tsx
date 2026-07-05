@@ -11,6 +11,7 @@ type NavLink =
 const navLinks: NavLink[] = [
   { href: '/', label: '首页', type: 'route' },
   { href: '/meditations', label: '林间归处', type: 'route' },
+  { href: '/phil-coach', label: '有人陪你', type: 'route' },
   { href: '/shares', label: '个体创造', type: 'route' },
   { href: '/creators', label: '遇见附近', type: 'route' },
   { href: '/about', label: '生态社区', type: 'route' },

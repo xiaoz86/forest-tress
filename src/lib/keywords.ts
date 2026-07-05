@@ -1,18 +1,15 @@
 import type { NodeCard } from './supabase';
+import { createChatCompletion, getLLMConfig } from './llm';
 
 /**
- * 用 Kimi 从一份创造者节点信息中抽出 5-8 个高质量关键词。
- * 没有 MOONSHOT_API_KEY 时返回 []，调用方应自行回落到规则提取。
+ * 用大模型从一份创造者节点信息中抽出 5-8 个高质量关键词。
+ * 没有模型配置时返回 []，调用方应自行回落到规则提取。
  */
 export async function generateKeywordsAI(
   node: NodeCard,
   count = 7,
 ): Promise<string[]> {
-  const apiKey = process.env.MOONSHOT_API_KEY;
-  if (!apiKey) return [];
-
-  const baseUrl = (process.env.KIMI_BASE_URL || 'https://api.moonshot.cn/v1').replace(/\/+$/, '');
-  const model = process.env.KIMI_MODEL || 'kimi-k2-turbo-preview';
+  if (!getLLMConfig()) return [];
 
   const profile = [
     node.name && `姓名：${node.name}`,
@@ -51,35 +48,16 @@ D. 主题方向/议题：如「教育创新」「AI+成长」「社区营造」
 按重要度从高到低排序，以 JSON 返回：
 {"keywords": ["关键词1", "关键词2", ...]}`;
 
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 30000);
   try {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        temperature: 0.2,
-        response_format: { type: 'json_object' },
-      }),
-      signal: ctrl.signal,
+    const content = await createChatCompletion({
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      temperature: 0.2,
+      responseFormat: { type: 'json_object' },
+      timeoutMs: 30000,
     });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      console.error('[keywords] Kimi non-200', res.status, text.slice(0, 240));
-      return [];
-    }
-
-    const json = await res.json();
-    const content: string | undefined = json?.choices?.[0]?.message?.content;
     if (!content) return [];
 
     let parsed: { keywords?: unknown };
@@ -111,7 +89,5 @@ D. 主题方向/议题：如「教育创新」「AI+成长」「社区营造」
   } catch (err) {
     console.error('[keywords] failed', err);
     return [];
-  } finally {
-    clearTimeout(timer);
   }
 }
