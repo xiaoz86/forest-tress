@@ -125,6 +125,10 @@ export default function PhilCoachExperience() {
   if (!session || !path) {
     return (
       <div>
+        <div className="mb-6 rounded-xl border border-white/10 bg-white/[0.035] px-5 py-4 text-[12px] leading-[1.8] text-white/56">
+          附近森林不把对话写入自己的数据库；为生成回复，内容会交给第三方 AI
+          服务处理。请不要输入身份证号、联系方式等敏感信息。
+        </div>
         <div className="mb-8 flex items-center gap-4 text-[12px] text-white/36">
           <span className="h-px w-10 bg-white/20" />
           <span>不用选对，只选最像今天的那一条。先从一条小径开始，剩下的慢慢聊。</span>
@@ -165,7 +169,9 @@ export default function PhilCoachExperience() {
           <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
             {path.label}
           </div>
-          <div className="mt-2 text-[12px] text-white/30">这一段只在此刻发生，不会被保存 · 说完就散</div>
+          <div className="mt-2 text-[12px] text-white/52">
+            当前不存入附近森林数据库 · 第三方 AI 服务会处理本次内容
+          </div>
         </div>
         <button
           onClick={reset}
