@@ -221,3 +221,6 @@ export const PHIL_PATHS: PhilPath[] = [
 export function getPhilPath(id: string): PhilPath | undefined {
   return PHIL_PATHS.find(p => p.id === id);
 }
+
+/** 记忆表里资料种子（由注册资料导入的「关于我」）用的 path_id 哨兵，每人至多一条。 */
+export const PROFILE_PATH = '__profile__';

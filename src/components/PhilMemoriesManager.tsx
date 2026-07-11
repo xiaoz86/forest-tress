@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { PHIL_PATHS } from '@/lib/philCoach';
+import { PHIL_PATHS, PROFILE_PATH } from '@/lib/philCoach';
 
 type Memory = {
   id: string;
@@ -16,6 +16,7 @@ type Memory = {
 };
 
 function pathLabel(id: string): string {
+  if (id === PROFILE_PATH) return '来自你的资料';
   return PHIL_PATHS.find(p => p.id === id)?.label ?? '';
 }
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { PHIL_PATHS, getPhilPath, type PhilPath } from '@/lib/philCoach';
+import { PHIL_PATHS, PROFILE_PATH, getPhilPath, type PhilPath } from '@/lib/philCoach';
 
 const MOOD_GRADIENT: Record<PhilPath['mood'], string> = {
   companion: 'bg-[linear-gradient(135deg,#cf9087_0%,#ead0bf_52%,#c7d8cb_100%)]',
@@ -37,6 +37,8 @@ export default function PhilCoachExperience() {
   const [error, setError] = useState('');
   const [loggedIn, setLoggedIn] = useState(false);
   const [keepState, setKeepState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [profileKnown, setProfileKnown] = useState(false);
+  const [importState, setImportState] = useState<'idle' | 'importing' | 'done' | 'error'>('idle');
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const path = session ? getPhilPath(session.pathId) : undefined;
@@ -55,12 +57,40 @@ export default function PhilCoachExperience() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [session?.thread.length, loading, error]);
 
-  // 登录检测：只有森林里的树（注册用户）能「留住这一段」
+  // 登录检测 + 第一次对话默认导入注册资料
   useEffect(() => {
     fetch('/api/phil-coach/memory')
-      .then(r => setLoggedIn(r.ok))
+      .then(r => (r.ok ? r.json() : null))
+      .then(json => {
+        if (!json) {
+          setLoggedIn(false);
+          return;
+        }
+        setLoggedIn(true);
+        const mems: { path_id?: string }[] = json.memories ?? [];
+        setProfileKnown(mems.some(m => m.path_id === PROFILE_PATH));
+        // 第一次：还没有任何记忆时，默认把注册资料导入为「关于我」种子
+        if (mems.length === 0) importProfile();
+      })
       .catch(() => setLoggedIn(false));
+    // 只在挂载时跑一次；importProfile 有意不入依赖
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** 把注册资料导入/刷新为 phil-coach 的「关于我」种子（默认导入 & 重新导入共用） */
+  async function importProfile() {
+    if (importState === 'importing') return;
+    setImportState('importing');
+    try {
+      const res = await fetch('/api/phil-coach/memory/import-profile', { method: 'POST' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error('import-failed');
+      if (json.memory) setProfileKnown(true);
+      setImportState('done');
+    } catch {
+      setImportState('error');
+    }
+  }
 
   function begin(p: PhilPath) {
     setDraft('');
@@ -165,6 +195,25 @@ export default function PhilCoachExperience() {
           <span className="h-px w-10 bg-white/20" />
           <span>不用选对，只选最像今天的那一条。先从一条小径开始，剩下的慢慢聊。</span>
         </div>
+        {loggedIn && (
+          <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-white/40">
+            <span>
+              {importState === 'importing'
+                ? 'phil-coach 正在读你的资料，好认识你…'
+                : profileKnown
+                  ? 'phil-coach 已经认识了你的资料。'
+                  : '让 phil-coach 先认识一下你的资料吧。'}
+            </span>
+            <button
+              onClick={importProfile}
+              disabled={importState === 'importing'}
+              type="button"
+              className="text-coral-soft underline-offset-4 transition-colors hover:text-white hover:underline disabled:opacity-50"
+            >
+              {profileKnown ? '重新导入' : '导入我的资料'}
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-6 max-md:grid-cols-1">
           {PHIL_PATHS.map(p => (
             <button
