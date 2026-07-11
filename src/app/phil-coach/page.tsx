@@ -18,29 +18,29 @@ const FAQ_ITEMS: { question: string; answer: ReactNode }[] = [
   },
   {
     question: '数据会留下吗？它下次还记得我吗？',
-    answer:
-      '附近森林不把对话写入自己的数据库，也不和你的身份关联；关掉页面就散了，下次来它不会记得你。但诚实地说：模型服务商可能按它们的规则短期留存数据，所以我们不承诺全链路「零留存」。请不要写身份证号、住址、财务或医疗资料这类敏感信息，也请照顾好别人的隐私。聊到想留住的话，用对话下面的「把这段留给自己」带走它。',
+    answer: (
+      <>
+        <p>
+          附近森林不把对话写入自己的数据库，也不和你的身份关联；关掉页面就散了，下次来它不会记得你。但诚实地说：模型服务商可能按它们的规则短期留存数据，所以我们不承诺全链路「零留存」。请不要写身份证号、住址、财务或医疗资料这类敏感信息，也请照顾好别人的隐私。聊到想留住的话，用对话下面的「把这段留给自己」带走它。
+        </p>
+        <p className="mt-3">
+          一个正在路上的计划：将来，你可以选择让它记得。
+          <Link
+            href="/login"
+            className="mx-1 text-coral-soft underline decoration-coral-soft/40 underline-offset-4 transition-colors hover:text-white"
+          >
+            成为森林里的一棵树
+          </Link>
+          （注册）之后，对话里真正重要的那一段，你可以亲手选择「留住」——明示同意才会保存，存进你自己的成长记录；下次再来，phil-coach
+          会轻轻接上：「上次你说想试试早睡——后来呢？」在这个功能长出来之前，它每次见你，都是第一次。
+        </p>
+      </>
+    ),
   },
   {
     question: '它和心理咨询有什么不同？',
     answer:
       '心理咨询与治疗，是由受过专业训练的人，在稳定的关系和专业伦理里，去理解和处理心理困扰。phil-coach 不做诊断、不做治疗、也不做危机干预，它只适合日常的自我梳理与探索。如果痛苦已经持续影响你的睡眠、工作和生活，或你有伤害自己的念头，请联系专业心理支持、当地急救，和身边可信任的人——那不是软弱，是对自己认真。',
-  },
-  {
-    question: '它和一位真实的教练，差在哪里？',
-    answer: (
-      <>
-        说实话，差得还很远——我们也不打算假装没有这条线。教练的功夫里有「三层聆听」的说法：第一层，人一边听、一边想着自己要说什么；第二层，全部注意力都在对方身上；第三层，还能听见语言之外的一切——语调的颤、句子间的停顿、身体的姿态、现场流动的能量。phil-coach
-        在文字里能做到接近第二层的专注；第三层，以及用真实的关系、生命经验与伦理承诺和你共创，仍然属于真人。当你想被一个真实的人完整地听见，这片森林里就有正在生长的同行者——去
-        <Link
-          href="/creators"
-          className="mx-1 text-coral-soft underline decoration-coral-soft/40 underline-offset-4 transition-colors hover:text-white"
-        >
-          遇见附近
-        </Link>
-        看看。
-      </>
-    ),
   },
 ];
 
@@ -129,6 +129,24 @@ export default function PhilCoachPage() {
                 </div>
               ))}
             </div>
+
+            <div className="mt-6 rounded-xl border border-white/8 bg-black/10 px-6 py-5 text-[13px] leading-[1.9] text-white/56">
+              <p>
+                <span className="font-medium text-white/72">与真人教练的分界：</span>
+                教练的功夫里有「三层聆听」的说法——第一层，人一边听、一边想着自己要说什么；第二层，全部注意力都在对方身上；第三层，还能听见语言之外的一切：语调的颤、句子间的停顿、身体的姿态、现场流动的能量。phil-coach
+                在文字里能做到接近第二层的专注；第三层，以及用真实关系与生命经验和你共创，仍然属于真人。
+              </p>
+              <p className="mt-3">
+                当你想被一个真实的人完整地听见，这片森林里就有正在生长的同行者——去
+                <Link
+                  href="/creators"
+                  className="mx-1 text-coral-soft underline decoration-coral-soft/40 underline-offset-4 transition-colors hover:text-white"
+                >
+                  遇见附近
+                </Link>
+                看看。
+              </p>
+            </div>
           </section>
 
           {/* FAQ：开口之前，把重要的事说清楚 */}
@@ -154,9 +172,9 @@ export default function PhilCoachPage() {
                       +
                     </span>
                   </summary>
-                  <p className="max-w-[860px] pb-6 pr-12 text-[13px] leading-[1.95] text-white/52 max-md:pr-4">
+                  <div className="max-w-[860px] pb-6 pr-12 text-[13px] leading-[1.95] text-white/52 max-md:pr-4">
                     {item.answer}
-                  </p>
+                  </div>
                 </details>
               ))}
             </div>
