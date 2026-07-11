@@ -35,6 +35,8 @@ export default function PhilCoachExperience() {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [keepState, setKeepState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const path = session ? getPhilPath(session.pathId) : undefined;
@@ -53,10 +55,18 @@ export default function PhilCoachExperience() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [session?.thread.length, loading, error]);
 
+  // 登录检测：只有森林里的树（注册用户）能「留住这一段」
+  useEffect(() => {
+    fetch('/api/phil-coach/memory')
+      .then(r => setLoggedIn(r.ok))
+      .catch(() => setLoggedIn(false));
+  }, []);
+
   function begin(p: PhilPath) {
     setDraft('');
     setCopied(false);
     setError('');
+    setKeepState('idle');
     setSession({ pathId: p.id, thread: seedThread(p) });
   }
 
@@ -66,6 +76,30 @@ export default function PhilCoachExperience() {
     setCopied(false);
     setLoading(false);
     setError('');
+    setKeepState('idle');
+  }
+
+  /** 明示同意的「留住」：把当前对话存进自己的记忆（仅注册用户） */
+  async function keepThread() {
+    if (!session || !path || keepState === 'saving') return;
+    setKeepState('saving');
+    try {
+      const res = await fetch('/api/phil-coach/memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pathId: path.id,
+          messages: session.thread.map(item => ({
+            role: item.kind === 'coach' ? 'assistant' : 'user',
+            content: item.text,
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error('keep-failed');
+      setKeepState('saved');
+    } catch {
+      setKeepState('error');
+    }
   }
 
   async function submit() {
@@ -101,6 +135,8 @@ export default function PhilCoachExperience() {
           ? { ...current, thread: [...current.thread, { kind: 'coach', text: json.reply.trim() }] }
           : current,
       );
+      // 对话有了新内容，「留住」重新可用
+      setKeepState(prev => (prev === 'saved' ? 'idle' : prev));
     } catch {
       setError('刚才这段没有送出去。可以稍后再试，或先把它留给自己。');
     } finally {
@@ -232,6 +268,22 @@ export default function PhilCoachExperience() {
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
             <span className="text-[11px] text-white/26">慢慢写，最多 1200 字 · ⌘/Ctrl + Enter 发送</span>
             <div className="flex flex-wrap gap-3">
+              {hasConversation && loggedIn && session.thread.some(t => t.kind === 'me') && (
+                <button
+                  onClick={keepThread}
+                  disabled={keepState === 'saving' || keepState === 'saved'}
+                  type="button"
+                  className="rounded-full border border-coral-soft/40 bg-coral-soft/10 px-5 py-2.5 text-[14px] text-coral-soft transition-colors hover:bg-coral-soft/20 disabled:opacity-60"
+                >
+                  {keepState === 'saved'
+                    ? '已留住 · 下次它会记得'
+                    : keepState === 'saving'
+                      ? '正在留住…'
+                      : keepState === 'error'
+                        ? '没留上，再试一次'
+                        : '留住这一段'}
+                </button>
+              )}
               {hasConversation && (
                 <button
                   onClick={copyThread}

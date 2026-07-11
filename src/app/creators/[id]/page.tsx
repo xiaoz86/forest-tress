@@ -10,6 +10,7 @@ import WorksCarousel from '@/components/WorksCarousel';
 import WorksEditor from '@/components/WorksEditor';
 import AIRecommendations from '@/components/AIRecommendations';
 import ProfileEditor from '@/components/ProfileEditor';
+import PhilMemoriesManager from '@/components/PhilMemoriesManager';
 import { buildRelationGraph } from '@/lib/network';
 import { isAdminId } from '@/lib/admin';
 import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
@@ -157,6 +158,11 @@ export default async function CreatorDetail({ params }: Props) {
           {canEditProfile && (
             <div className="mb-10 max-md:mb-7">
               <ProfileEditor node={me} mode={isOwner ? 'owner' : 'admin'} />
+            </div>
+          )}
+          {isOwner && (
+            <div className="mb-10 max-md:mb-7">
+              <PhilMemoriesManager />
             </div>
           )}
           <div className="space-y-12 max-md:space-y-9">

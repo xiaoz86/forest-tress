@@ -1,8 +1,11 @@
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { MEMBER_COOKIE } from '@/lib/auth';
 import { createChatCompletion, getLLMConfig, type ChatMessage } from '@/lib/llm';
 import { getPhilPath } from '@/lib/philCoach';
 import { COACH_WISDOM } from '@/lib/philCoachWisdom';
 import { fetchRelevantKnowledge } from '@/lib/philCoachKnowledge';
+import { fetchMemoryBlock } from '@/lib/philCoachMemory';
 
 export const runtime = 'nodejs';
 
@@ -126,10 +129,14 @@ export async function POST(request: Request) {
     ? `\n\n【已内化的深度材料】下面的材料是你读过的功底——让它影响你怎么看、怎么问，但不要提书名出处、不要成段复述，更不要变成讲课：\n${knowledge}`
     : '';
 
+  // 已注册用户：取 ta 之前「留住」的记忆，供开场轻轻衔接（未登录/失败静默跳过）
+  const memberId = (await cookies()).get(MEMBER_COOKIE)?.value;
+  const memoryBlock = memberId ? await fetchMemoryBlock(memberId) : '';
+
   const chatMessages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${BASE_SYSTEM}\n\n${COACH_WISDOM}${knowledgeBlock}${buildPathContext(body.pathId)}`,
+      content: `${BASE_SYSTEM}\n\n${COACH_WISDOM}${knowledgeBlock}${memoryBlock}${buildPathContext(body.pathId)}`,
     },
     ...messages.slice(-14).map(m => ({
       role: m.role,
