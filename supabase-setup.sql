@@ -269,3 +269,23 @@ create table if not exists phil_coach_knowledge (
 );
 
 create index if not exists idx_phil_knowledge_themes on phil_coach_knowledge using gin (themes);
+
+-- ============================================================
+-- 2026-07-06 phil-coach 记忆表（已在线上执行；功能暂缓，结构先行）
+-- 注册用户明示同意「留住」的对话片段。设计要点：
+--   独立表而非 node_cards 加字段：逐条可删、纯追加无竞态、生命周期独立
+--   on delete cascade：删号即删记忆，隐私靠结构保证
+--   只存「留住的片段+一句话 takeaway」，不存全对话
+--   share_to_matching 默认 false：留存与反哺匹配是两次独立同意
+create table if not exists phil_coach_memories (
+  id uuid default gen_random_uuid() primary key,
+  node_id uuid not null references node_cards(id) on delete cascade,
+  content text not null,              -- 用户选择留住的那段对话（原文）
+  takeaway text default '',           -- 一句话觉察/行动承诺（下次开场衔接用）
+  path_id text default '',            -- 来自哪条小径
+  share_to_matching boolean default false,  -- 是否同意反哺匹配（单独勾选，默认否）
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_phil_memories_node
+  on phil_coach_memories(node_id, created_at desc);
