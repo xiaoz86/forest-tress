@@ -165,7 +165,7 @@ export default function PhilCoachExperience() {
           <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
             {path.label}
           </div>
-          <div className="mt-2 text-[12px] text-white/30">这一段，只在此刻发生 · 不存入数据库</div>
+          <div className="mt-2 text-[12px] text-white/30">这一段只在此刻发生，不会被保存 · 说完就散</div>
         </div>
         <button
           onClick={reset}
