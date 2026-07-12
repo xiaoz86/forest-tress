@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import PhilCoachExperience from '@/components/PhilCoachExperience';
+import PhilFeedback from '@/components/PhilFeedback';
 import { PHIL_ROLES } from '@/lib/philCoach';
 
 export const metadata = {
@@ -91,8 +92,8 @@ export default function PhilCoachPage() {
             <div className="mt-7 grid grid-cols-2 gap-10 max-md:grid-cols-1">
               <div className="text-[14px] leading-[2.05] text-white/56">
                 <p>
-                  它是附近森林种下的一位 AI
-                  同行者。名字里的「phil」，取自希腊语 Philia——朋友之间那种平等、不占有的爱。
+                  它是附近森林种下的一位 virtual coach
+                  陪伴者。名字里的「phil」，取自希腊语 Philia——朋友之间那种平等、不占有的爱。
                 </p>
                 <p className="mt-4">
                   你可以把它当作一个会回应的树洞：开心的、难过的、说不出口的，都可以放进来。它读过许多教练与心理学的书，但它最被认真教过的一件事，是<span className="text-white/80">先听你说完，而不是急着给答案</span>。它不评判你，也不替你做决定——它相信答案在你身上，它只是陪你把答案找出来。
@@ -191,6 +192,9 @@ export default function PhilCoachPage() {
 
             <PhilCoachExperience />
           </section>
+
+          {/* 反馈 / 咨询真人教练 */}
+          <PhilFeedback />
 
           {/* 尾部 */}
           <section className="mt-20 rounded-2xl border border-white/10 bg-white/[0.03] p-10 text-center max-md:p-6">

@@ -387,3 +387,64 @@ export async function notifyShareSubmission(
     console.error('[notify] share submission send failed', err);
   }
 }
+
+// ──────────────────────────────────────────────────────────────────
+// phil-coach 反馈 / 真人教练咨询，通知主理人
+// ──────────────────────────────────────────────────────────────────
+
+export async function notifyPhilFeedback(params: {
+  kind: 'feedback' | 'coach-inquiry';
+  message: string;
+  contact?: string;
+  nodeName?: string;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('[notify] RESEND_API_KEY not set, skipping phil feedback');
+    return;
+  }
+  const recipients = getRecipients();
+  if (recipients.length === 0) return;
+
+  const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
+  const isInquiry = params.kind === 'coach-inquiry';
+  const subject = isInquiry
+    ? '🌱 有人想咨询真人教练陪伴（phil-coach）'
+    : '💬 phil-coach 收到一条模块反馈';
+
+  const lines = [
+    isInquiry ? '类型：咨询真人教练陪伴' : '类型：模块体验反馈',
+    params.nodeName ? `来自：${params.nodeName}（注册成员）` : '来自：访客',
+    params.contact ? `联系方式：${params.contact}` : '联系方式：未留',
+    '',
+    '留言：',
+    params.message,
+  ];
+  const text = lines.join('\n');
+  const html = `<!DOCTYPE html>
+<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:26px 30px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
+    <h2 style="margin:0 0 14px;font-size:17px;color:#2d4a2d;">${isInquiry ? '🌱 有人想咨询真人教练陪伴' : '💬 phil-coach 模块反馈'}</h2>
+    <p style="font-size:13px;color:#6b8f5e;margin:0 0 4px;">${params.nodeName ? `来自：${escape(params.nodeName)}（注册成员）` : '来自：访客'}</p>
+    <p style="font-size:13px;color:#6b8f5e;margin:0 0 14px;">联系方式：${escape(params.contact || '未留')}</p>
+    <div style="padding:14px 16px;background:#faf8f2;border-radius:10px;font-size:14px;color:#2a2a2a;line-height:1.8;white-space:pre-wrap;">${escape(params.message)}</div>
+  </div>
+</body></html>`;
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from, to: recipients, subject, html, text }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error('[notify] phil feedback Resend non-200', res.status, body);
+    }
+  } catch (err) {
+    console.error('[notify] phil feedback send failed', err);
+  }
+}

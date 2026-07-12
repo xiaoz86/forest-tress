@@ -289,3 +289,19 @@ create table if not exists phil_coach_memories (
 
 create index if not exists idx_phil_memories_node
   on phil_coach_memories(node_id, created_at desc);
+
+-- ============================================================
+-- 2026-07-12 phil-coach 反馈表（需在 SQL Editor 执行）
+-- 体验后的模块反馈 / 咨询真人教练陪伴的留言。
+-- node_id 可空（未登录也能反馈）；删号后置空保留反馈内容。
+create table if not exists phil_coach_feedback (
+  id uuid default gen_random_uuid() primary key,
+  node_id uuid references node_cards(id) on delete set null,
+  kind text not null default 'feedback',   -- feedback=模块反馈 | coach-inquiry=咨询真人教练
+  message text not null,
+  contact text default '',                 -- 微信/邮箱等联系方式（选填）
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_phil_feedback_created
+  on phil_coach_feedback(created_at desc);
