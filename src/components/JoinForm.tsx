@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, ChangeEvent } from 'react';
+import CommunityInviteCard from './CommunityInviteCard';
 import MatchedNodes from './MatchedNodes';
 import type { MatchedNode } from '@/lib/match';
 
@@ -298,19 +299,22 @@ export default function JoinForm() {
 
   if (status === 'success') {
     return (
-      <div className="max-w-[680px] mx-auto bg-white rounded-3xl p-10 max-md:p-6 shadow-[0_8px_40px_rgba(26,46,26,0.06)] border border-moss/10">
-        <div className="text-center mb-2">
-          <div className="text-5xl mb-3">🌱</div>
-          <h3 className="font-serif text-2xl font-bold text-forest-deep mb-2">
-            你的种子已经种下了
-          </h3>
-          <p className="text-sm text-text-secondary leading-relaxed">
-            欢迎邮件 + 登录链接已发往 {data.email}。
-            <br />
-            点开链接就能进入你的个人页继续编辑。
-          </p>
+      <div className="max-w-[680px] mx-auto space-y-8">
+        <div className="bg-white rounded-3xl p-10 max-md:p-6 shadow-[0_8px_40px_rgba(26,46,26,0.06)] border border-moss/10">
+          <div className="text-center mb-2">
+            <div className="text-5xl mb-3">🌱</div>
+            <h3 className="font-serif text-2xl font-bold text-forest-deep mb-2">
+              你的种子已经种下了
+            </h3>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              欢迎邮件 + 登录链接已发往 {data.email}。
+              <br />
+              点开链接就能进入你的个人页继续编辑。
+            </p>
+          </div>
+          <MatchedNodes matches={matches} />
         </div>
-        <MatchedNodes matches={matches} />
+        <CommunityInviteCard />
       </div>
     );
   }

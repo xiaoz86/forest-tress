@@ -11,6 +11,7 @@ import WorksEditor from '@/components/WorksEditor';
 import AIRecommendations from '@/components/AIRecommendations';
 import ProfileEditor from '@/components/ProfileEditor';
 import PhilMemoriesManager from '@/components/PhilMemoriesManager';
+import CommunityInviteCard from '@/components/CommunityInviteCard';
 import { buildRelationGraph } from '@/lib/network';
 import { isAdminId } from '@/lib/admin';
 import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
@@ -242,20 +243,28 @@ export default async function CreatorDetail({ params }: Props) {
       </section>
 
       {/* CTA */}
-      <section className="py-14 px-6 bg-white text-center max-md:py-10 border-t border-black/[0.04]">
-        <h2
-          className="text-[22px] font-semibold tracking-[-0.01em] text-forest-deep mb-3"
-          style={{ fontFamily: 'var(--font-display)' }}
-        >
-          也想被收进这片森林？
-        </h2>
-        <Link
-          href="/#join"
-          className="inline-block mt-2 px-7 py-3 bg-forest-deep text-white text-[14px] font-medium rounded-full no-underline hover:bg-forest-mid transition-colors"
-        >
-          成为森林的一棵树
-        </Link>
-      </section>
+      {!isOwner && (
+        <section className="py-14 px-6 bg-white text-center max-md:py-10 border-t border-black/[0.04]">
+          <h2
+            className="text-[22px] font-semibold tracking-[-0.01em] text-forest-deep mb-3"
+            style={{ fontFamily: 'var(--font-display)' }}
+          >
+            也想被收进这片森林？
+          </h2>
+          <Link
+            href="/#join"
+            className="inline-block mt-2 px-7 py-3 bg-forest-deep text-white text-[14px] font-medium rounded-full no-underline hover:bg-forest-mid transition-colors"
+          >
+            成为森林的一棵树
+          </Link>
+        </section>
+      )}
+
+      {isOwner && (
+        <section className="bg-[#f3f7ef] px-6 py-16 border-t border-black/[0.04] max-md:px-4 max-md:py-10">
+          <CommunityInviteCard />
+        </section>
+      )}
 
       <footer className="bg-white text-text-light py-10 px-6 text-center text-[11px] border-t border-black/[0.04]">
         <p>附近森林 · Nearby Forest</p>

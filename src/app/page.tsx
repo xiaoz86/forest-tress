@@ -241,11 +241,6 @@ export default async function Home() {
         <div className="absolute inset-0 bg-black/45" />
 
         <div className="relative z-[2] max-w-[820px]">
-          {/* 品牌名 — 极窄字距 */}
-          <div className="text-[11.5px] tracking-[0.7em] text-white/50 mb-8 pl-[0.7em] animate-fade-in">
-            附 近 森 林
-          </div>
-
           {/* 主 slogan — 单行，"有温度" 单点高亮，淡色分隔线 */}
           <h1
             className="font-serif text-[clamp(2rem,5vw,3.4rem)] font-bold text-white leading-[1.4] tracking-wide mb-6 animate-fade-in"
@@ -253,7 +248,7 @@ export default async function Home() {
           >
             连接万千
             <span className="mx-1 text-leaf">有温度</span>
-            的超级个体
+            的超级创造者
           </h1>
 
           <div className="w-12 h-px bg-white/35 mx-auto mb-7 animate-fade-in-delay-2" />
