@@ -84,7 +84,7 @@ export async function fetchMemoryBlock(nodeId: string, maxItems = 3): Promise<st
 
     let block = '';
     if (profile) {
-      block += `\n\n【关于 ta（ta 亲手从自己的资料里导入的）】ta 是森林里的一棵树。这是 ta 希望你了解的自己：\n${profile}\n用它自然地认识 ta、理解 ta 此刻说的话；不要生硬复述这些资料，也不要一上来就报菜名般提起。`;
+      block += `\n\n【关于 ta（ta 亲手从自己的资料里导入的）】ta 是森林里的一棵树。这是 ta 希望你了解的背景：\n${profile}\n重要：这些资料是背景，不是议程。它帮你更懂 ta，但不要用它给 ta 贴标签、也不要围着 ta 的身份/职业/角色提问。始终跟着 ta 此刻真实说的话走——和当下的这个人工作，而不是和这份简历工作。ta 是谁，会在对话里自己长出来，不需要你从资料里替 ta 认定。除非 ta 自己把话题引向某个身份，否则别主动提起这些标签。`;
     }
     if (memRows?.length) {
       const lines = memRows.map(row => {

@@ -403,7 +403,11 @@ export async function notifyPhilFeedback(params: {
     console.log('[notify] RESEND_API_KEY not set, skipping phil feedback');
     return;
   }
-  const recipients = getRecipients();
+  // 反馈通知除主理人外，另抄送 wendy；可用 PHIL_FEEDBACK_EMAILS 覆盖整份名单
+  const override = process.env.PHIL_FEEDBACK_EMAILS?.trim();
+  const recipients = override
+    ? override.split(',').map(s => s.trim()).filter(Boolean)
+    : Array.from(new Set([...getRecipients(), 'wendyjhwu@hotmail.com']));
   if (recipients.length === 0) return;
 
   const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
