@@ -452,3 +452,63 @@ export async function notifyPhilFeedback(params: {
     console.error('[notify] phil feedback send failed', err);
   }
 }
+
+// ──────────────────────────────────────────────────────────────────
+// phil-coach 轻登记：有人留下称呼+微信，通知主理人加微信拉群
+// ──────────────────────────────────────────────────────────────────
+
+export async function notifyPhilGuest(params: {
+  name: string;
+  contact: string;
+  source?: string;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('[notify] RESEND_API_KEY not set, skipping guest notification');
+    return;
+  }
+  // 与反馈通知同名单：主理人 + wendy；可用 PHIL_FEEDBACK_EMAILS 覆盖
+  const override = process.env.PHIL_FEEDBACK_EMAILS?.trim();
+  const recipients = override
+    ? override.split(',').map(s => s.trim()).filter(Boolean)
+    : Array.from(new Set([...getRecipients(), 'wendyjhwu@hotmail.com']));
+  if (recipients.length === 0) return;
+
+  const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
+  const subject = `🌿 ${params.name} 登记使用 phil-coach（请加微信拉群）`;
+  const text = [
+    `有新朋友登记使用 phil-coach：`,
+    `称呼：${params.name}`,
+    `微信/联系方式：${params.contact}`,
+    params.source ? `来源：${params.source}` : `来源：页面直接登记`,
+    ``,
+    `下一步：加 ta 微信，开通免费使用的问候 + 拉入附近森林社群。`,
+  ].join('\n');
+  const html = `<!DOCTYPE html>
+<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:26px 30px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
+    <h2 style="margin:0 0 14px;font-size:17px;color:#2d4a2d;">🌿 新朋友登记使用 phil-coach</h2>
+    <p style="font-size:14px;color:#2a2a2a;margin:0 0 6px;">称呼：<strong>${escape(params.name)}</strong></p>
+    <p style="font-size:14px;color:#2a2a2a;margin:0 0 6px;">微信/联系方式：<strong>${escape(params.contact)}</strong></p>
+    <p style="font-size:13px;color:#6b8f5e;margin:0 0 16px;">${params.source ? `来源：${escape(params.source)}` : '来源：页面直接登记'}</p>
+    <p style="font-size:13px;color:#8a8a8a;margin:0;">下一步：加 ta 微信 → 问候 + 拉入附近森林社群。</p>
+  </div>
+</body></html>`;
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from, to: recipients, subject, html, text }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error('[notify] guest Resend non-200', res.status, body);
+    }
+  } catch (err) {
+    console.error('[notify] guest send failed', err);
+  }
+}

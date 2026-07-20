@@ -5,7 +5,10 @@ import { createChatCompletion, getLLMConfig, type ChatMessage } from '@/lib/llm'
 import { getPhilPath } from '@/lib/philCoach';
 import { COACH_WISDOM } from '@/lib/philCoachWisdom';
 import { fetchRelevantKnowledge } from '@/lib/philCoachKnowledge';
-import { fetchMemoryBlock } from '@/lib/philCoachMemory';
+import { GUEST_COOKIE, fetchMemoryBlock, memoryClient } from '@/lib/philCoachMemory';
+
+/** 无身份时单次对话的免费回复轮数（约一条小径的长度），超过需轻登记 */
+const GUEST_FREE_TURNS = 8;
 
 export const runtime = 'nodejs';
 
@@ -118,6 +121,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'llm-not-configured' }, { status: 500 });
   }
 
+  // 轻登记闸门（方案A）：第一条小径免登记；无会员且未登记时，
+  // 单次对话超过 GUEST_FREE_TURNS 轮回复后需留下称呼+微信才能继续。
+  const cookieStore = await cookies();
+  const memberIdRaw = cookieStore.get(MEMBER_COOKIE)?.value;
+  const guestId = cookieStore.get(GUEST_COOKIE)?.value;
+  const assistantTurns = messages.filter(m => m.role === 'assistant').length;
+  if (!memberIdRaw && !guestId && assistantTurns >= GUEST_FREE_TURNS) {
+    return NextResponse.json({ error: 'guest-required' }, { status: 403 });
+  }
+  // 已登记访客：记一下活跃时间（尽力而为，不阻塞）
+  if (guestId && !memberIdRaw) {
+    const sb = memoryClient();
+    if (sb) {
+      sb.from('phil_coach_guests')
+        .update({ last_seen: new Date().toISOString() })
+        .eq('id', guestId)
+        .then(() => {});
+    }
+  }
+
   // 从 Supabase 知识库取与近两条用户消息相关的深度材料（失败静默降级）
   const recentUserText = messages
     .filter(m => m.role === 'user')
@@ -130,8 +153,7 @@ export async function POST(request: Request) {
     : '';
 
   // 已注册用户：取 ta 之前「留住」的记忆，供开场轻轻衔接（未登录/失败静默跳过）
-  const memberId = (await cookies()).get(MEMBER_COOKIE)?.value;
-  const memoryBlock = memberId ? await fetchMemoryBlock(memberId) : '';
+  const memoryBlock = memberIdRaw ? await fetchMemoryBlock(memberIdRaw) : '';
 
   const chatMessages: ChatMessage[] = [
     {

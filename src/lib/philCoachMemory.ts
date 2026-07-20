@@ -16,6 +16,9 @@ export type PhilMemory = {
 export const MAX_MEMORIES_PER_NODE = 100;
 export const MAX_MEMORY_CONTENT = 6000;
 
+/** 轻登记访客的 cookie 名（值为 phil_coach_guests.id） */
+export const GUEST_COOKIE = 'nf_guest';
+
 export function memoryClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;

@@ -305,3 +305,19 @@ create table if not exists phil_coach_feedback (
 
 create index if not exists idx_phil_feedback_created
   on phil_coach_feedback(created_at desc);
+
+-- ============================================================
+-- 2026-07-12 phil-coach 轻登记（方案A：第一条小径免登记，继续用需留称呼+微信）
+-- 登记后种 nf_guest cookie，永远免费使用；主理人收邮件后主动加微信拉入社群。
+-- 只记身份与使用时间，不记对话内容（与页面隐私承诺一致）。
+create table if not exists phil_coach_guests (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,                -- 怎么称呼
+  contact text not null,             -- 微信号（或邮箱）
+  source text default '',            -- 来源归因（?from=community 等）
+  created_at timestamptz default now(),
+  last_seen timestamptz default now()
+);
+
+create index if not exists idx_phil_guests_created
+  on phil_coach_guests(created_at desc);

@@ -39,6 +39,13 @@ export default function PhilCoachExperience() {
   const [keepState, setKeepState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [profileKnown, setProfileKnown] = useState(false);
   const [importState, setImportState] = useState<'idle' | 'importing' | 'done' | 'error'>('idle');
+  const [guestKnown, setGuestKnown] = useState(false);
+  const [showGate, setShowGate] = useState(false);
+  const [gateName, setGateName] = useState('');
+  const [gateContact, setGateContact] = useState('');
+  const [gateState, setGateState] = useState<'idle' | 'sending' | 'error'>('idle');
+  const [pendingPathId, setPendingPathId] = useState<string | null>(null);
+  const [pendingRetry, setPendingRetry] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const path = session ? getPhilPath(session.pathId) : undefined;
@@ -77,6 +84,29 @@ export default function PhilCoachExperience() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 轻登记检测（方案A：第一条小径免登记，之后需留称呼+微信继续）
+  useEffect(() => {
+    fetch('/api/phil-coach/guest')
+      .then(r => (r.ok ? r.json() : null))
+      .then(json => setGuestKnown(Boolean(json?.registered)))
+      .catch(() => {});
+  }, []);
+
+  function pathsDone(): number {
+    try {
+      return Number(localStorage.getItem('nf_phil_paths_done') || '0') || 0;
+    } catch {
+      return 0;
+    }
+  }
+  function markPathDone() {
+    try {
+      localStorage.setItem('nf_phil_paths_done', String(pathsDone() + 1));
+    } catch {
+      /* 无痕模式等场景忽略 */
+    }
+  }
+
   /** 把注册资料导入/刷新为 phil-coach 的「关于我」种子（默认导入 & 重新导入共用） */
   async function importProfile() {
     if (importState === 'importing') return;
@@ -93,6 +123,12 @@ export default function PhilCoachExperience() {
   }
 
   function begin(p: PhilPath) {
+    // 方案A：走完第一条小径后，未登录且未登记 → 先留个称呼再继续
+    if (!loggedIn && !guestKnown && pathsDone() >= 1) {
+      setPendingPathId(p.id);
+      setShowGate(true);
+      return;
+    }
     setDraft('');
     setCopied(false);
     setError('');
@@ -101,6 +137,7 @@ export default function PhilCoachExperience() {
   }
 
   function reset() {
+    if (session?.thread.some(t => t.kind === 'me')) markPathDone();
     setSession(null);
     setDraft('');
     setCopied(false);
@@ -132,6 +169,34 @@ export default function PhilCoachExperience() {
     }
   }
 
+  /** 发送对话线取回复；命中登记闸门时返回 'gate'（不视为错误） */
+  async function sendThread(thread: ThreadItem[], pathId: string): Promise<'ok' | 'gate'> {
+    const res = await fetch('/api/phil-coach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pathId,
+        messages: thread.map(item => ({
+          role: item.kind === 'coach' ? 'assistant' : 'user',
+          content: item.text,
+        })),
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (res.status === 403 && json.error === 'guest-required') return 'gate';
+    if (!res.ok || typeof json.reply !== 'string') {
+      throw new Error(json.error || 'reply-failed');
+    }
+    setSession(current =>
+      current && current.pathId === pathId
+        ? { ...current, thread: [...current.thread, { kind: 'coach', text: json.reply.trim() }] }
+        : current,
+    );
+    // 对话有了新内容，「留住」重新可用
+    setKeepState(prev => (prev === 'saved' ? 'idle' : prev));
+    return 'ok';
+  }
+
   async function submit() {
     if (!path || !session || loading) return;
     const answer = draft.trim();
@@ -144,33 +209,61 @@ export default function PhilCoachExperience() {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/phil-coach', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pathId: path.id,
-          messages: nextThread.map(item => ({
-            role: item.kind === 'coach' ? 'assistant' : 'user',
-            content: item.text,
-          })),
-        }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || typeof json.reply !== 'string') {
-        throw new Error(json.error || 'reply-failed');
+      const r = await sendThread(nextThread, path.id);
+      if (r === 'gate') {
+        setPendingRetry(true);
+        setShowGate(true);
       }
-
-      setSession(current =>
-        current && current.pathId === path.id
-          ? { ...current, thread: [...current.thread, { kind: 'coach', text: json.reply.trim() }] }
-          : current,
-      );
-      // 对话有了新内容，「留住」重新可用
-      setKeepState(prev => (prev === 'saved' ? 'idle' : prev));
     } catch {
       setError('刚才这段没有送出去。可以稍后再试，或先把它留给自己。');
     } finally {
       setLoading(false);
+    }
+  }
+
+  /** 轻登记：留下称呼+微信 → 种 cookie → 续上被拦下的动作 */
+  async function registerGuest() {
+    if (!gateName.trim() || !gateContact.trim() || gateState === 'sending') return;
+    setGateState('sending');
+    try {
+      let from = '';
+      try {
+        from = new URLSearchParams(window.location.search).get('from') || '';
+      } catch {
+        /* ignore */
+      }
+      const res = await fetch('/api/phil-coach/guest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: gateName.trim(), contact: gateContact.trim(), from }),
+      });
+      if (!res.ok) throw new Error('failed');
+      setGuestKnown(true);
+      setShowGate(false);
+      setGateState('idle');
+      if (pendingPathId) {
+        const p = getPhilPath(pendingPathId);
+        setPendingPathId(null);
+        if (p) {
+          setDraft('');
+          setCopied(false);
+          setError('');
+          setKeepState('idle');
+          setSession({ pathId: p.id, thread: seedThread(p) });
+        }
+      } else if (pendingRetry && session && path) {
+        setPendingRetry(false);
+        setLoading(true);
+        try {
+          await sendThread(session.thread, path.id);
+        } catch {
+          setError('刚才这段没有送出去。可以稍后再试。');
+        } finally {
+          setLoading(false);
+        }
+      }
+    } catch {
+      setGateState('error');
     }
   }
 
@@ -186,6 +279,55 @@ export default function PhilCoachExperience() {
     } catch {
       /* 剪贴板不可用时忽略 */
     }
+  }
+
+  if (showGate) {
+    return (
+      <div className="rounded-2xl border border-coral-soft/25 bg-white/[0.04] p-8 max-md:p-6">
+        <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
+          继续之前
+        </div>
+        <h3 className="text-xl font-semibold">留个称呼，继续免费用</h3>
+        <p className="mt-3 max-w-[560px] text-[14px] leading-[1.95] text-white/55">
+          第一段路你已经走完了。留下称呼和微信号，我们为你<span className="text-white/80">开通继续免费使用的权限</span>，并邀请你加入附近森林社群——群里可以交流反馈，也有<span className="text-white/80">真人教练答疑陪伴</span>。你的对话内容仍然不会被保存。
+        </p>
+        <div className="mt-6 grid max-w-[560px] gap-3">
+          <input
+            value={gateName}
+            onChange={e => setGateName(e.target.value)}
+            maxLength={60}
+            placeholder="怎么称呼你"
+            className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
+          />
+          <input
+            value={gateContact}
+            onChange={e => setGateContact(e.target.value)}
+            maxLength={120}
+            placeholder="微信号（或邮箱）"
+            className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
+          />
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <button
+            onClick={registerGuest}
+            disabled={!gateName.trim() || !gateContact.trim() || gateState === 'sending'}
+            type="button"
+            className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-40"
+          >
+            {gateState === 'sending' ? '正在开通…' : '开通并继续'}
+          </button>
+          {gateState === 'error' && (
+            <span className="text-[13px] text-coral-soft">没成功，稍后再试一次。</span>
+          )}
+        </div>
+        <p className="mt-5 text-[12px] leading-relaxed text-white/32">
+          这些信息只用于认识你、联系你，不做别的。已经是森林里的树？
+          <Link href="/login" className="ml-1 text-white/50 underline underline-offset-2 hover:text-white">
+            直接登录
+          </Link>
+        </p>
+      </div>
+    );
   }
 
   if (!session || !path) {
