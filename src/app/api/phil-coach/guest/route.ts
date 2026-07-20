@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { notifyPhilGuest } from '@/lib/notify';
+import { signAdminAction } from '@/lib/auth';
+import { getSiteOrigin, notifyPhilGuest } from '@/lib/notify';
 import { GUEST_COOKIE, memoryClient } from '@/lib/philCoachMemory';
 
 export const runtime = 'nodejs';
@@ -24,12 +25,20 @@ function rateLimited(ip: string): boolean {
   return false;
 }
 
-/** GET /api/phil-coach/guest —— 检查是否已登记（客户端判断用） */
+/** GET /api/phil-coach/guest —— 检查登记与审核状态（客户端判断用） */
 export async function GET() {
   const store = await cookies();
   const id = store.get(GUEST_COOKIE)?.value;
-  if (!id) return NextResponse.json({ registered: false });
-  return NextResponse.json({ registered: true });
+  if (!id) return NextResponse.json({ registered: false, approved: false });
+  const sb = memoryClient();
+  if (!sb) return NextResponse.json({ registered: true, approved: false });
+  const { data } = await sb
+    .from('phil_coach_guests')
+    .select('status')
+    .eq('id', id)
+    .maybeSingle();
+  if (!data) return NextResponse.json({ registered: false, approved: false });
+  return NextResponse.json({ registered: true, approved: data.status === 'approved' });
 }
 
 type Body = { name?: unknown; contact?: unknown; from?: unknown };
@@ -71,8 +80,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'save-failed' }, { status: 500 });
   }
 
-  // 通知主理人 + Wendy（尽力而为）
-  notifyPhilGuest({ name, contact, source }).catch(err => {
+  // 生成审核链接（HMAC 签名），通知主理人 + Wendy（尽力而为）
+  const sig = signAdminAction(`guest-approve.${data.id}`);
+  const approveUrl = sig
+    ? `${getSiteOrigin()}/api/phil-coach/guest/approve?id=${encodeURIComponent(data.id)}&sig=${encodeURIComponent(sig)}`
+    : '';
+  notifyPhilGuest({ name, contact, source, approveUrl }).catch(err => {
     console.error('[phil-guest] notify failed', err);
   });
 

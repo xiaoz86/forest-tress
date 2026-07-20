@@ -77,3 +77,22 @@ export function verifyLoginToken(token: string): VerifyResult {
 
 export const MEMBER_COOKIE = 'nf_member';
 export const MEMBER_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 年
+
+// ──────────────────────────────────────────────────────────────
+// 管理动作签名（如 phil-coach 登记审核链接）：HMAC 防伪造
+// ──────────────────────────────────────────────────────────────
+
+export function signAdminAction(payload: string): string | null {
+  const secret = getSecret();
+  if (!secret) return null;
+  return sign(`admin.${payload}`, secret);
+}
+
+export function verifyAdminAction(payload: string, sig: string): boolean {
+  const secret = getSecret();
+  if (!secret || !sig) return false;
+  const expected = sign(`admin.${payload}`, secret);
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}

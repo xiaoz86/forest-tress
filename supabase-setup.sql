@@ -321,3 +321,8 @@ create table if not exists phil_coach_guests (
 
 create index if not exists idx_phil_guests_created
   on phil_coach_guests(created_at desc);
+
+-- ============================================================
+-- 2026-07-21 轻登记增加审核流：登记后需主理人在邮件里点击通过，才可继续使用
+alter table phil_coach_guests add column if not exists status text not null default 'pending';
+alter table phil_coach_guests add column if not exists approved_at timestamptz;

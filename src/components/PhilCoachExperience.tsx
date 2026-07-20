@@ -40,10 +40,12 @@ export default function PhilCoachExperience() {
   const [profileKnown, setProfileKnown] = useState(false);
   const [importState, setImportState] = useState<'idle' | 'importing' | 'done' | 'error'>('idle');
   const [guestKnown, setGuestKnown] = useState(false);
+  const [guestApproved, setGuestApproved] = useState(false);
   const [showGate, setShowGate] = useState(false);
   const [gateName, setGateName] = useState('');
   const [gateContact, setGateContact] = useState('');
   const [gateState, setGateState] = useState<'idle' | 'sending' | 'error'>('idle');
+  const [checkState, setCheckState] = useState<'idle' | 'checking' | 'still-pending'>('idle');
   const [pendingPathId, setPendingPathId] = useState<string | null>(null);
   const [pendingRetry, setPendingRetry] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -84,11 +86,14 @@ export default function PhilCoachExperience() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 轻登记检测（方案A：第一条小径免登记，之后需留称呼+微信继续）
+  // 轻登记检测（方案A：第一条小径免登记，之后登记并经主理人通过后继续）
   useEffect(() => {
     fetch('/api/phil-coach/guest')
       .then(r => (r.ok ? r.json() : null))
-      .then(json => setGuestKnown(Boolean(json?.registered)))
+      .then(json => {
+        setGuestKnown(Boolean(json?.registered));
+        setGuestApproved(Boolean(json?.approved));
+      })
       .catch(() => {});
   }, []);
 
@@ -123,8 +128,8 @@ export default function PhilCoachExperience() {
   }
 
   function begin(p: PhilPath) {
-    // 方案A：走完第一条小径后，未登录且未登记 → 先留个称呼再继续
-    if (!loggedIn && !guestKnown && pathsDone() >= 1) {
+    // 方案A：走完第一条小径后，未登录且（未登记或未获通过）→ 先走登记/等待流程
+    if (!loggedIn && !(guestKnown && guestApproved) && pathsDone() >= 1) {
       setPendingPathId(p.id);
       setShowGate(true);
       return;
@@ -183,7 +188,9 @@ export default function PhilCoachExperience() {
       }),
     });
     const json = await res.json().catch(() => ({}));
-    if (res.status === 403 && json.error === 'guest-required') return 'gate';
+    if (res.status === 403 && (json.error === 'guest-required' || json.error === 'guest-pending')) {
+      return 'gate';
+    }
     if (!res.ok || typeof json.reply !== 'string') {
       throw new Error(json.error || 'reply-failed');
     }
@@ -221,7 +228,7 @@ export default function PhilCoachExperience() {
     }
   }
 
-  /** 轻登记：留下称呼+微信 → 种 cookie → 续上被拦下的动作 */
+  /** 轻登记：留下称呼+微信 → 进入「等待开通」状态（主理人邮件里点击通过后放行） */
   async function registerGuest() {
     if (!gateName.trim() || !gateContact.trim() || gateState === 'sending') return;
     setGateState('sending');
@@ -238,32 +245,57 @@ export default function PhilCoachExperience() {
         body: JSON.stringify({ name: gateName.trim(), contact: gateContact.trim(), from }),
       });
       if (!res.ok) throw new Error('failed');
-      setGuestKnown(true);
-      setShowGate(false);
+      setGuestKnown(true); // 进入等待卡；pendingPathId / pendingRetry 保留，通过后自动续上
       setGateState('idle');
-      if (pendingPathId) {
-        const p = getPhilPath(pendingPathId);
-        setPendingPathId(null);
-        if (p) {
-          setDraft('');
-          setCopied(false);
-          setError('');
-          setKeepState('idle');
-          setSession({ pathId: p.id, thread: seedThread(p) });
-        }
-      } else if (pendingRetry && session && path) {
-        setPendingRetry(false);
-        setLoading(true);
-        try {
-          await sendThread(session.thread, path.id);
-        } catch {
-          setError('刚才这段没有送出去。可以稍后再试。');
-        } finally {
-          setLoading(false);
-        }
-      }
     } catch {
       setGateState('error');
+    }
+  }
+
+  /** 通过开通后，续上被拦下的动作 */
+  async function resumePending() {
+    if (pendingPathId) {
+      const p = getPhilPath(pendingPathId);
+      setPendingPathId(null);
+      if (p) {
+        setDraft('');
+        setCopied(false);
+        setError('');
+        setKeepState('idle');
+        setSession({ pathId: p.id, thread: seedThread(p) });
+      }
+      return;
+    }
+    if (pendingRetry && session && path) {
+      setPendingRetry(false);
+      setLoading(true);
+      try {
+        await sendThread(session.thread, path.id);
+      } catch {
+        setError('刚才这段没有送出去。可以稍后再试。');
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+
+  /** 等待卡上的「看看开通了吗」 */
+  async function checkApproval() {
+    if (checkState === 'checking') return;
+    setCheckState('checking');
+    try {
+      const res = await fetch('/api/phil-coach/guest');
+      const json = await res.json().catch(() => ({}));
+      if (json?.approved) {
+        setGuestApproved(true);
+        setShowGate(false);
+        setCheckState('idle');
+        await resumePending();
+      } else {
+        setCheckState('still-pending');
+      }
+    } catch {
+      setCheckState('still-pending');
     }
   }
 
@@ -281,6 +313,39 @@ export default function PhilCoachExperience() {
     }
   }
 
+  if (showGate && guestKnown && !guestApproved) {
+    return (
+      <div className="rounded-2xl border border-coral-soft/25 bg-white/[0.04] p-8 max-md:p-6">
+        <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
+          就快好了
+        </div>
+        <h3 className="text-xl font-semibold">已收到，正在为你开通</h3>
+        <p className="mt-3 max-w-[560px] text-[14px] leading-[1.95] text-white/55">
+          我们已经收到你的登记，正在确认开通（通常很快）。通过后，我们也会按你留下的微信号来加你、邀你进附近森林社群。你随时可以回到这个页面——它会记得你，开通后继续就行。
+        </p>
+        <div className="mt-5 flex flex-wrap items-center gap-4">
+          <button
+            onClick={checkApproval}
+            disabled={checkState === 'checking'}
+            type="button"
+            className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-50"
+          >
+            {checkState === 'checking' ? '看看去…' : '看看开通了吗'}
+          </button>
+          {checkState === 'still-pending' && (
+            <span className="text-[13px] text-white/40">还在路上，稍等一会儿再试试。</span>
+          )}
+        </div>
+        <p className="mt-5 text-[12px] leading-relaxed text-white/32">
+          已经是森林里的树？
+          <Link href="/login" className="ml-1 text-white/50 underline underline-offset-2 hover:text-white">
+            直接登录
+          </Link>
+        </p>
+      </div>
+    );
+  }
+
   if (showGate) {
     return (
       <div className="rounded-2xl border border-coral-soft/25 bg-white/[0.04] p-8 max-md:p-6">
@@ -289,7 +354,7 @@ export default function PhilCoachExperience() {
         </div>
         <h3 className="text-xl font-semibold">留个称呼，继续免费用</h3>
         <p className="mt-3 max-w-[560px] text-[14px] leading-[1.95] text-white/55">
-          第一段路你已经走完了。留下称呼和微信号，我们为你<span className="text-white/80">开通继续免费使用的权限</span>，并邀请你加入附近森林社群——群里可以交流反馈，也有<span className="text-white/80">真人教练答疑陪伴</span>。你的对话内容仍然不会被保存。
+          第一段路你已经走完了。留下称呼和微信号，我们确认后为你<span className="text-white/80">开通继续免费使用的权限</span>（通常很快），并按微信号加你、邀你进附近森林社群——群里可以交流反馈，也有<span className="text-white/80">真人教练答疑陪伴</span>。你的对话内容仍然不会被保存。
         </p>
         <div className="mt-6 grid max-w-[560px] gap-3">
           <input
@@ -314,7 +379,7 @@ export default function PhilCoachExperience() {
             type="button"
             className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-40"
           >
-            {gateState === 'sending' ? '正在开通…' : '开通并继续'}
+            {gateState === 'sending' ? '正在提交…' : '提交登记'}
           </button>
           {gateState === 'error' && (
             <span className="text-[13px] text-coral-soft">没成功，稍后再试一次。</span>

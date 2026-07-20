@@ -461,6 +461,7 @@ export async function notifyPhilGuest(params: {
   name: string;
   contact: string;
   source?: string;
+  approveUrl?: string;
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -475,14 +476,18 @@ export async function notifyPhilGuest(params: {
   if (recipients.length === 0) return;
 
   const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
-  const subject = `🌿 ${params.name} 登记使用 phil-coach（请加微信拉群）`;
+  const subject = `🌿 ${params.name} 登记使用 phil-coach（待你点击通过）`;
   const text = [
-    `有新朋友登记使用 phil-coach：`,
+    `有新朋友登记使用 phil-coach，等待开通：`,
     `称呼：${params.name}`,
     `微信/联系方式：${params.contact}`,
     params.source ? `来源：${params.source}` : `来源：页面直接登记`,
     ``,
-    `下一步：加 ta 微信，开通免费使用的问候 + 拉入附近森林社群。`,
+    params.approveUrl
+      ? `点击通过开通（点完 ta 才能继续使用）：\n${params.approveUrl}`
+      : `（审核链接生成失败：请在 Supabase 中将该记录 status 改为 approved）`,
+    ``,
+    `通过后：加 ta 微信 → 问候 + 拉入附近森林社群。`,
   ].join('\n');
   const html = `<!DOCTYPE html>
 <html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
@@ -491,7 +496,15 @@ export async function notifyPhilGuest(params: {
     <p style="font-size:14px;color:#2a2a2a;margin:0 0 6px;">称呼：<strong>${escape(params.name)}</strong></p>
     <p style="font-size:14px;color:#2a2a2a;margin:0 0 6px;">微信/联系方式：<strong>${escape(params.contact)}</strong></p>
     <p style="font-size:13px;color:#6b8f5e;margin:0 0 16px;">${params.source ? `来源：${escape(params.source)}` : '来源：页面直接登记'}</p>
-    <p style="font-size:13px;color:#8a8a8a;margin:0;">下一步：加 ta 微信 → 问候 + 拉入附近森林社群。</p>
+    ${
+      params.approveUrl
+        ? `<p style="text-align:center;margin:20px 0;">
+      <a href="${params.approveUrl}" style="display:inline-block;padding:12px 28px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">✓ 通过开通</a>
+    </p>
+    <p style="font-size:12px;color:#8a8a8a;margin:0 0 12px;text-align:center;">点击后 ta 才能继续使用；你或 Wendy 任一人点即可，重复点击无害。</p>`
+        : `<p style="font-size:13px;color:#c0392b;margin:0 0 12px;">审核链接生成失败：请在 Supabase 中把该记录 status 改为 approved。</p>`
+    }
+    <p style="font-size:13px;color:#8a8a8a;margin:0;">通过后：加 ta 微信 → 问候 + 拉入附近森林社群。</p>
   </div>
 </body></html>`;
 

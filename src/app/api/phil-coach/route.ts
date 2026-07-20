@@ -121,24 +121,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'llm-not-configured' }, { status: 500 });
   }
 
-  // 轻登记闸门（方案A）：第一条小径免登记；无会员且未登记时，
-  // 单次对话超过 GUEST_FREE_TURNS 轮回复后需留下称呼+微信才能继续。
+  // 轻登记闸门（方案A + 审核流）：第一条小径免登记；之后需登记且
+  // 经主理人在邮件里点击「通过开通」后（status=approved）才能继续。
   const cookieStore = await cookies();
   const memberIdRaw = cookieStore.get(MEMBER_COOKIE)?.value;
   const guestId = cookieStore.get(GUEST_COOKIE)?.value;
   const assistantTurns = messages.filter(m => m.role === 'assistant').length;
-  if (!memberIdRaw && !guestId && assistantTurns >= GUEST_FREE_TURNS) {
-    return NextResponse.json({ error: 'guest-required' }, { status: 403 });
-  }
-  // 已登记访客：记一下活跃时间（尽力而为，不阻塞）
-  if (guestId && !memberIdRaw) {
+  if (!memberIdRaw && assistantTurns >= GUEST_FREE_TURNS) {
+    if (!guestId) {
+      return NextResponse.json({ error: 'guest-required' }, { status: 403 });
+    }
     const sb = memoryClient();
     if (sb) {
+      const { data: guest } = await sb
+        .from('phil_coach_guests')
+        .select('status')
+        .eq('id', guestId)
+        .maybeSingle();
+      if (!guest) {
+        return NextResponse.json({ error: 'guest-required' }, { status: 403 });
+      }
+      if (guest.status !== 'approved') {
+        return NextResponse.json({ error: 'guest-pending' }, { status: 403 });
+      }
+      // 已开通：记活跃时间（尽力而为，不阻塞）
       sb.from('phil_coach_guests')
         .update({ last_seen: new Date().toISOString() })
         .eq('id', guestId)
         .then(() => {});
     }
+    // Supabase 不可用时放行——对话可用性优先于闸门严格性
   }
 
   // 从 Supabase 知识库取与近两条用户消息相关的深度材料（失败静默降级）
