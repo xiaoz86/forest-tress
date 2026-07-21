@@ -15,7 +15,8 @@ const navLinks: NavLink[] = [
   { href: '/shares', label: '个体创造', type: 'route' },
   { href: '/creators', label: '遇见附近', type: 'route' },
   { href: '/about', label: '生态社区', type: 'route' },
-  { href: '/login', label: '加入森林', type: 'route' },
+  { href: '#join', label: '加入森林', type: 'anchor' },
+  { href: '/login', label: '登录', type: 'route' },
 ];
 
 export default function Nav() {
