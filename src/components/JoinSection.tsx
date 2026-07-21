@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import JoinForm from './JoinForm';
 
@@ -64,6 +65,12 @@ export default function JoinSection() {
           成为一棵树
           <span className="text-[15px] leading-none">↗</span>
         </button>
+        <p className="mt-5 text-[12px] text-text-light/70 leading-relaxed">
+          填一张节点卡即加入森林；这也是注册。已经加入过了？
+          <Link href="/login" className="text-forest-deep underline underline-offset-2 ml-1">
+            用邮箱登录
+          </Link>
+        </p>
       </div>
     );
   }

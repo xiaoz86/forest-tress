@@ -655,7 +655,7 @@ export default function PhilCoachExperience() {
           再走一条小径
         </button>
         <Link
-          href="/login"
+          href="/#join"
           className="rounded-full bg-coral-soft px-5 py-2.5 text-[14px] font-medium text-[#20140f] no-underline transition-opacity hover:opacity-90"
         >
           成为森林里的一棵树

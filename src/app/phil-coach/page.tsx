@@ -30,7 +30,7 @@ const FAQ_ITEMS: { question: string; answer: ReactNode }[] = [
         <p className="mt-3">
           一个正在路上的计划：将来，你可以选择让它记得。
           <Link
-            href="/login"
+            href="/#join"
             className="mx-1 text-coral-soft underline decoration-coral-soft/40 underline-offset-4 transition-colors hover:text-white"
           >
             成为森林里的一棵树
@@ -213,7 +213,7 @@ export default function PhilCoachPage() {
             </p>
             <div className="mt-8 flex justify-center gap-4 max-md:flex-col max-md:items-stretch">
               <Link
-                href="/login"
+                href="/#join"
                 className="rounded-full bg-coral-soft px-7 py-3 text-[15px] font-medium text-[#20140f] no-underline transition-opacity hover:opacity-90"
               >
                 成为森林里的一棵树

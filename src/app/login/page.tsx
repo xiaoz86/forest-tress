@@ -51,9 +51,13 @@ export default async function LoginPage({ searchParams }: Props) {
           <LoginForm />
 
           <p className="mt-6 text-[12px] text-text-light leading-relaxed">
+            登录用于已加入的成员：可编辑资料、查看 AI 推荐，并解锁个性化
+            phil-coach——记得你的专属虚拟陪伴教练，等更多服务。
+          </p>
+          <p className="mt-2 text-[12px] text-text-light leading-relaxed">
             还没有节点？
             <Link href="/#join" className="text-forest-deep underline underline-offset-2 ml-1">
-              先填一张节点卡
+              先填一张节点卡加入森林
             </Link>
           </p>
         </div>
