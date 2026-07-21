@@ -462,6 +462,8 @@ export async function notifyPhilGuest(params: {
   contact: string;
   source?: string;
   approveUrl?: string;
+  /** true = 免费期满的续期申请（点同一个通过按钮即续 3 个月） */
+  renewal?: boolean;
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -476,9 +478,13 @@ export async function notifyPhilGuest(params: {
   if (recipients.length === 0) return;
 
   const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
-  const subject = `🌿 ${params.name} 登记使用 phil-coach（待你点击通过）`;
+  const subject = params.renewal
+    ? `🌿 ${params.name} 申请续期 phil-coach（免费期已满，点击续 3 个月）`
+    : `🌿 ${params.name} 登记使用 phil-coach（待你点击通过）`;
   const text = [
-    `有新朋友登记使用 phil-coach，等待开通：`,
+    params.renewal
+      ? `老朋友的免费 3 个月用满了，申请续期：`
+      : `有新朋友登记使用 phil-coach，等待开通：`,
     `称呼：${params.name}`,
     `微信/联系方式：${params.contact}`,
     params.source ? `来源：${params.source}` : `来源：页面直接登记`,
@@ -492,7 +498,7 @@ export async function notifyPhilGuest(params: {
   const html = `<!DOCTYPE html>
 <html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:26px 30px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
-    <h2 style="margin:0 0 14px;font-size:17px;color:#2d4a2d;">🌿 新朋友登记使用 phil-coach</h2>
+    <h2 style="margin:0 0 14px;font-size:17px;color:#2d4a2d;">${params.renewal ? '🌿 老朋友申请续期 phil-coach（免费期已满）' : '🌿 新朋友登记使用 phil-coach'}</h2>
     <p style="font-size:14px;color:#2a2a2a;margin:0 0 6px;">称呼：<strong>${escape(params.name)}</strong></p>
     <p style="font-size:14px;color:#2a2a2a;margin:0 0 6px;">微信/联系方式：<strong>${escape(params.contact)}</strong></p>
     <p style="font-size:13px;color:#6b8f5e;margin:0 0 16px;">${params.source ? `来源：${escape(params.source)}` : '来源：页面直接登记'}</p>

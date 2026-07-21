@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { signAdminAction } from '@/lib/auth';
 import { getSiteOrigin, notifyPhilGuest } from '@/lib/notify';
-import { GUEST_COOKIE, memoryClient } from '@/lib/philCoachMemory';
+import { GUEST_COOKIE, guestActive, memoryClient } from '@/lib/philCoachMemory';
 
 export const runtime = 'nodejs';
 
@@ -25,20 +25,25 @@ function rateLimited(ip: string): boolean {
   return false;
 }
 
-/** GET /api/phil-coach/guest —— 检查登记与审核状态（客户端判断用） */
+/** GET /api/phil-coach/guest —— 检查登记/审核/有效期状态（客户端判断用） */
 export async function GET() {
   const store = await cookies();
   const id = store.get(GUEST_COOKIE)?.value;
-  if (!id) return NextResponse.json({ registered: false, approved: false });
+  if (!id) return NextResponse.json({ registered: false, approved: false, expired: false });
   const sb = memoryClient();
-  if (!sb) return NextResponse.json({ registered: true, approved: false });
+  if (!sb) return NextResponse.json({ registered: true, approved: false, expired: false });
   const { data } = await sb
     .from('phil_coach_guests')
-    .select('status')
+    .select('status, approved_at')
     .eq('id', id)
     .maybeSingle();
-  if (!data) return NextResponse.json({ registered: false, approved: false });
-  return NextResponse.json({ registered: true, approved: data.status === 'approved' });
+  if (!data) return NextResponse.json({ registered: false, approved: false, expired: false });
+  const active = guestActive(data.status, data.approved_at);
+  return NextResponse.json({
+    registered: true,
+    approved: active, // approved = 此刻可用
+    expired: data.status === 'approved' && !active, // 曾开通但免费期已满
+  });
 }
 
 type Body = { name?: unknown; contact?: unknown; from?: unknown };

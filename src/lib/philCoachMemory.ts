@@ -19,6 +19,18 @@ export const MAX_MEMORY_CONTENT = 6000;
 /** 轻登记访客的 cookie 名（值为 phil_coach_guests.id） */
 export const GUEST_COOKIE = 'nf_guest';
 
+/** 审核通过后的免费使用天数（3 个月）；到期需申请续期（邮件里再点一次通过即续） */
+export const GUEST_FREE_DAYS = 90;
+
+/** 免费期是否仍有效：approved 且 approved_at 在 90 天内 */
+export function guestActive(status?: string | null, approvedAt?: string | null): boolean {
+  if (status !== 'approved') return false;
+  if (!approvedAt) return true; // 老数据无时间戳时宽松放行
+  const t = new Date(approvedAt).getTime();
+  if (Number.isNaN(t)) return true;
+  return Date.now() - t < GUEST_FREE_DAYS * 24 * 60 * 60 * 1000;
+}
+
 export function memoryClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;

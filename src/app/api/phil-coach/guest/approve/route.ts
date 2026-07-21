@@ -38,18 +38,20 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
   if (!guest) return page('没有找到这条登记', '记录可能已被删除。');
 
-  if (guest.status !== 'approved') {
-    const { error } = await sb
-      .from('phil_coach_guests')
-      .update({ status: 'approved', approved_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) return page('开通失败', `写入失败：${error.message}，请稍后重试。`);
-  }
+  // 点一次 = 开通/续期 3 个月（approved_at 刷新，重复点击等于延长，无害）
+  const { error } = await sb
+    .from('phil_coach_guests')
+    .update({ status: 'approved', approved_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) return page('开通失败', `写入失败：${error.message}，请稍后重试。`);
 
+  const isRenewal = guest.status === 'approved';
   return page(
-    guest.status === 'approved' ? '已经开通过了' : '🌿 已通过开通',
-    `<p style="margin:0 0 10px;"><strong>${guest.name}</strong> 现在可以继续使用 phil-coach 了。</p>
+    isRenewal ? '🌿 已续期 3 个月' : '🌿 已通过开通',
+    `<p style="margin:0 0 10px;"><strong>${guest.name}</strong> ${
+      isRenewal ? '的免费使用已续期 3 个月。' : '现在可以继续使用 phil-coach 了（免费 3 个月）。'
+    }</p>
      <p style="margin:0 0 10px;">微信/联系方式：<strong>${guest.contact}</strong></p>
-     <p style="margin:0;color:#6b8f5e;">下一步：加 ta 微信，问候并邀请进附近森林社群。</p>`,
+     <p style="margin:0;color:#6b8f5e;">${isRenewal ? '如还没加 ta 微信，记得补上。' : '下一步：加 ta 微信，问候并邀请进附近森林社群。'}</p>`,
   );
 }

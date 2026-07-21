@@ -41,6 +41,8 @@ export default function PhilCoachExperience() {
   const [importState, setImportState] = useState<'idle' | 'importing' | 'done' | 'error'>('idle');
   const [guestKnown, setGuestKnown] = useState(false);
   const [guestApproved, setGuestApproved] = useState(false);
+  const [guestExpired, setGuestExpired] = useState(false);
+  const [renewState, setRenewState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [showGate, setShowGate] = useState(false);
   const [gateName, setGateName] = useState('');
   const [gateContact, setGateContact] = useState('');
@@ -93,9 +95,23 @@ export default function PhilCoachExperience() {
       .then(json => {
         setGuestKnown(Boolean(json?.registered));
         setGuestApproved(Boolean(json?.approved));
+        setGuestExpired(Boolean(json?.expired));
       })
       .catch(() => {});
   }, []);
+
+  /** 免费期满后申请续期（主理人邮件里点一次即续 3 个月） */
+  async function requestRenewal() {
+    if (renewState === 'sending') return;
+    setRenewState('sending');
+    try {
+      const res = await fetch('/api/phil-coach/guest/renew', { method: 'POST' });
+      if (!res.ok) throw new Error('failed');
+      setRenewState('sent');
+    } catch {
+      setRenewState('error');
+    }
+  }
 
   function pathsDone(): number {
     try {
@@ -188,7 +204,14 @@ export default function PhilCoachExperience() {
       }),
     });
     const json = await res.json().catch(() => ({}));
-    if (res.status === 403 && (json.error === 'guest-required' || json.error === 'guest-pending')) {
+    if (
+      res.status === 403 &&
+      (json.error === 'guest-required' || json.error === 'guest-pending' || json.error === 'guest-expired')
+    ) {
+      if (json.error === 'guest-expired') {
+        setGuestExpired(true);
+        setGuestApproved(false);
+      }
       return 'gate';
     }
     if (!res.ok || typeof json.reply !== 'string') {
@@ -288,10 +311,13 @@ export default function PhilCoachExperience() {
       const json = await res.json().catch(() => ({}));
       if (json?.approved) {
         setGuestApproved(true);
+        setGuestExpired(false);
+        setRenewState('idle');
         setShowGate(false);
         setCheckState('idle');
         await resumePending();
       } else {
+        setGuestExpired(Boolean(json?.expired));
         setCheckState('still-pending');
       }
     } catch {
@@ -326,7 +352,53 @@ export default function PhilCoachExperience() {
         >
           ×
         </button>
-        {guestKnown && !guestApproved ? (
+        {guestKnown && guestExpired && !guestApproved ? (
+          <>
+            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
+              一段旅程走完了
+            </div>
+            <h3 className="text-xl font-semibold">免费 3 个月已满</h3>
+            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">
+              你的免费使用期到了。想继续的话，点下面申请续期——我们确认后，会为你<span className="text-white/80">再开 3 个月的免费使用与答疑</span>（通常很快）。你的对话记录都还在下面，随时可以回看。
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-4">
+              {renewState !== 'sent' ? (
+                <button
+                  onClick={requestRenewal}
+                  disabled={renewState === 'sending'}
+                  type="button"
+                  className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-50"
+                >
+                  {renewState === 'sending' ? '正在申请…' : '申请续期'}
+                </button>
+              ) : (
+                <button
+                  onClick={checkApproval}
+                  disabled={checkState === 'checking'}
+                  type="button"
+                  className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-50"
+                >
+                  {checkState === 'checking' ? '看看去…' : '看看续上了吗'}
+                </button>
+              )}
+              {renewState === 'sent' && checkState !== 'still-pending' && (
+                <span className="text-[13px] text-white/40">申请已发出，我们确认后就能继续。</span>
+              )}
+              {checkState === 'still-pending' && (
+                <span className="text-[13px] text-white/40">还在路上，稍等一会儿再试试。</span>
+              )}
+              {renewState === 'error' && (
+                <span className="text-[13px] text-coral-soft">没发出去，稍后再试一次。</span>
+              )}
+            </div>
+            <p className="mt-5 text-[12px] leading-relaxed text-white/32">
+              已经是森林里的树？
+              <Link href="/login" className="ml-1 text-white/50 underline underline-offset-2 hover:text-white">
+                直接登录
+              </Link>
+            </p>
+          </>
+        ) : guestKnown && !guestApproved ? (
           <>
             <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
               就快好了

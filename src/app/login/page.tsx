@@ -39,7 +39,9 @@ export default async function LoginPage({ searchParams }: Props) {
           <p className="text-[14px] leading-relaxed text-text-secondary mb-6">
             输入注册时填写的邮箱，我们会把登录链接发到你邮箱。
             <br />
-            点击链接即可回到个人页编辑资料、查看 AI 推荐。
+            点击链接即可回到个人页编辑资料、查看 AI 推荐，并解锁
+            <span className="text-forest-deep font-medium">个性化 phil-coach</span>
+            ——记得你的专属虚拟陪伴教练，等更多服务。
           </p>
 
           {errMsg && (

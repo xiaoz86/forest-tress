@@ -5,7 +5,7 @@ import { createChatCompletion, getLLMConfig, type ChatMessage } from '@/lib/llm'
 import { getPhilPath } from '@/lib/philCoach';
 import { COACH_WISDOM } from '@/lib/philCoachWisdom';
 import { fetchRelevantKnowledge } from '@/lib/philCoachKnowledge';
-import { GUEST_COOKIE, fetchMemoryBlock, memoryClient } from '@/lib/philCoachMemory';
+import { GUEST_COOKIE, fetchMemoryBlock, guestActive, memoryClient } from '@/lib/philCoachMemory';
 
 /** 无身份时单次对话的免费回复轮数（约一条小径的长度），超过需轻登记 */
 const GUEST_FREE_TURNS = 8;
@@ -135,7 +135,7 @@ export async function POST(request: Request) {
     if (sb) {
       const { data: guest } = await sb
         .from('phil_coach_guests')
-        .select('status')
+        .select('status, approved_at')
         .eq('id', guestId)
         .maybeSingle();
       if (!guest) {
@@ -143,6 +143,9 @@ export async function POST(request: Request) {
       }
       if (guest.status !== 'approved') {
         return NextResponse.json({ error: 'guest-pending' }, { status: 403 });
+      }
+      if (!guestActive(guest.status, guest.approved_at)) {
+        return NextResponse.json({ error: 'guest-expired' }, { status: 403 });
       }
       // 已开通：记活跃时间（尽力而为，不阻塞）
       sb.from('phil_coach_guests')
