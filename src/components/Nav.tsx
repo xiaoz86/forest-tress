@@ -5,23 +5,29 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 type NavLink =
-  | { href: string; label: string; type: 'anchor' }
-  | { href: string; label: string; type: 'route' };
+  | { href: string; label: string; type: 'anchor'; cta?: boolean }
+  | { href: string; label: string; type: 'route'; cta?: boolean };
 
-const navLinks: NavLink[] = [
+// 基础导航（登录前后都在）
+const baseLinks: NavLink[] = [
   { href: '/', label: '首页', type: 'route' },
   { href: '/meditations', label: '林间归处', type: 'route' },
   { href: '/phil-coach', label: '回到自己', type: 'route' },
   { href: '/shares', label: '个体创造', type: 'route' },
   { href: '/creators', label: '遇见附近', type: 'route' },
   { href: '/about', label: '生态社区', type: 'route' },
-  { href: '#join', label: '加入森林', type: 'anchor' },
-  { href: '/login', label: '登录', type: 'route' },
 ];
+
+function readMemberId(): string | null {
+  if (typeof document === 'undefined') return null;
+  const m = document.cookie.match(/(?:^|;\s*)nf_member=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
 
 export default function Nav() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [memberId, setMemberId] = useState<string | null>(null);
   const pathname = usePathname();
   const isHome = pathname === '/';
 
@@ -30,6 +36,19 @@ export default function Nav() {
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // 登录态：读 nf_member cookie（值即节点 id）→ 决定尾部展示「个人中心」还是「加入森林/登录」
+  useEffect(() => {
+    setMemberId(readMemberId());
+  }, [pathname]);
+
+  const tailLinks: NavLink[] = memberId
+    ? [{ href: `/creators/${memberId}`, label: '个人中心', type: 'route', cta: true }]
+    : [
+        { href: '#join', label: '加入森林', type: 'anchor', cta: true },
+        { href: '/login', label: '登录', type: 'route' },
+      ];
+  const navLinks = [...baseLinks, ...tailLinks];
 
   // 在非主页时，锚点链接需要先回主页再定位
   const resolveHref = (link: NavLink): string => {
@@ -60,10 +79,12 @@ export default function Nav() {
       </button>
 
       {/* Desktop nav */}
-      <ul className="flex gap-6 list-none max-md:hidden">
+      <ul className="flex items-center gap-6 list-none max-md:hidden">
         {navLinks.map(link => {
           const href = resolveHref(link);
-          const cls = 'text-white/70 no-underline text-sm transition-colors hover:text-white';
+          const cls = link.cta
+            ? 'rounded-full border border-white/40 px-4 py-1.5 text-sm text-white no-underline transition-colors hover:bg-white hover:text-forest-deep hover:border-white'
+            : 'text-white/70 no-underline text-sm transition-colors hover:text-white';
           return (
             <li key={link.href}>
               {link.type === 'route' ? (
@@ -81,7 +102,9 @@ export default function Nav() {
         <div className="hidden max-md:flex flex-col absolute top-full left-0 right-0 bg-forest-deep/95 backdrop-blur-[20px] py-4 px-5">
           {navLinks.map(link => {
             const href = resolveHref(link);
-            const cls = 'text-white/70 no-underline text-sm py-3 border-b border-white/5 transition-colors hover:text-white';
+            const cls = link.cta
+              ? 'mt-3 inline-block self-start rounded-full border border-white/40 px-4 py-2 text-sm text-white no-underline transition-colors hover:bg-white hover:text-forest-deep'
+              : 'text-white/70 no-underline text-sm py-3 border-b border-white/5 transition-colors hover:text-white';
             return link.type === 'route' ? (
               <Link
                 key={link.href}
