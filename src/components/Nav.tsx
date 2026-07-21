@@ -37,9 +37,12 @@ export default function Nav() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // 登录态：读 nf_member cookie（值即节点 id）→ 决定尾部展示「个人中心」还是「加入森林/登录」
+  // 登录态：挂载后读 nf_member cookie（值即节点 id）→ 决定尾部展示「个人中心」还是「加入森林/登录」。
+  // 必须在挂载后读：SSR 无 document，且首帧需与服务端一致（null）以避免 hydration 不匹配。
   useEffect(() => {
-    setMemberId(readMemberId());
+    const id = readMemberId();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMemberId(prev => (prev === id ? prev : id));
   }, [pathname]);
 
   const tailLinks: NavLink[] = memberId
