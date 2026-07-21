@@ -313,91 +313,102 @@ export default function PhilCoachExperience() {
     }
   }
 
-  if (showGate && guestKnown && !guestApproved) {
-    return (
-      <div className="rounded-2xl border border-coral-soft/25 bg-white/[0.04] p-8 max-md:p-6">
-        <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
-          就快好了
-        </div>
-        <h3 className="text-xl font-semibold">已收到，正在为你开通</h3>
-        <p className="mt-3 max-w-[560px] text-[14px] leading-[1.95] text-white/55">
-          我们已经收到你的登记，正在确认开通（通常很快）。通过后，我们也会按你留下的微信号来加你、邀你进附近森林社群。你随时可以回到这个页面——它会记得你，开通后继续就行。
-        </p>
-        <div className="mt-5 flex flex-wrap items-center gap-4">
-          <button
-            onClick={checkApproval}
-            disabled={checkState === 'checking'}
-            type="button"
-            className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-50"
-          >
-            {checkState === 'checking' ? '看看去…' : '看看开通了吗'}
-          </button>
-          {checkState === 'still-pending' && (
-            <span className="text-[13px] text-white/40">还在路上，稍等一会儿再试试。</span>
-          )}
-        </div>
-        <p className="mt-5 text-[12px] leading-relaxed text-white/32">
-          已经是森林里的树？
-          <Link href="/login" className="ml-1 text-white/50 underline underline-offset-2 hover:text-white">
-            直接登录
-          </Link>
-        </p>
+  // 登记/等待卡：悬浮在当前视图之上——对话记录保持可见可回看，可点 × 关闭；
+  // 关闭后仍可浏览记录，只是发送会被服务端拦下并重新弹出这张卡。
+  const gateOverlay = showGate ? (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto bg-black/55 p-4 backdrop-blur-sm">
+      <div className="relative w-full max-w-[560px] rounded-2xl border border-coral-soft/25 bg-[#131a15] p-8 shadow-[0_24px_80px_rgba(0,0,0,0.55)] max-md:p-6">
+        <button
+          onClick={() => setShowGate(false)}
+          type="button"
+          aria-label="先关闭，回去看对话"
+          className="absolute right-4 top-3 text-2xl leading-none text-white/35 transition-colors hover:text-white"
+        >
+          ×
+        </button>
+        {guestKnown && !guestApproved ? (
+          <>
+            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
+              就快好了
+            </div>
+            <h3 className="text-xl font-semibold">已收到，正在为你开通</h3>
+            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">
+              我们已经收到你的登记，正在为你开通<span className="text-white/80">免费 3 个月的 phil-coach 使用与答疑</span>（通常很快）。通过后，我们也会按你留下的微信号来加你、邀你进附近森林社群。你的对话记录都还在下面，开通后接着聊就行。
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-4">
+              <button
+                onClick={checkApproval}
+                disabled={checkState === 'checking'}
+                type="button"
+                className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-50"
+              >
+                {checkState === 'checking' ? '看看去…' : '看看开通了吗'}
+              </button>
+              {checkState === 'still-pending' && (
+                <span className="text-[13px] text-white/40">还在路上，稍等一会儿再试试。</span>
+              )}
+            </div>
+            <p className="mt-5 text-[12px] leading-relaxed text-white/32">
+              已经是森林里的树？
+              <Link href="/login" className="ml-1 text-white/50 underline underline-offset-2 hover:text-white">
+                直接登录
+              </Link>
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
+              继续之前
+            </div>
+            <h3 className="text-xl font-semibold">留个称呼，继续免费用</h3>
+            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">
+              第一段路你已经走完了。留下称呼和微信号，我们确认后，附近森林为你<span className="text-white/80">继续开放免费 3 个月的 phil-coach 使用与答疑</span>（通常很快），并按微信号加你、邀你进社群——群里可以交流反馈，也有<span className="text-white/80">真人教练答疑陪伴</span>。你下面的对话记录一直都在，随时可以回看。
+            </p>
+            <div className="mt-6 grid gap-3">
+              <input
+                value={gateName}
+                onChange={e => setGateName(e.target.value)}
+                maxLength={60}
+                placeholder="怎么称呼你"
+                className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
+              />
+              <input
+                value={gateContact}
+                onChange={e => setGateContact(e.target.value)}
+                maxLength={120}
+                placeholder="微信号（或邮箱）"
+                className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
+              />
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-4">
+              <button
+                onClick={registerGuest}
+                disabled={!gateName.trim() || !gateContact.trim() || gateState === 'sending'}
+                type="button"
+                className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-40"
+              >
+                {gateState === 'sending' ? '正在提交…' : '提交登记'}
+              </button>
+              {gateState === 'error' && (
+                <span className="text-[13px] text-coral-soft">没成功，稍后再试一次。</span>
+              )}
+            </div>
+            <p className="mt-5 text-[12px] leading-relaxed text-white/32">
+              这些信息只用于认识你、联系你，不做别的。已经是森林里的树？
+              <Link href="/login" className="ml-1 text-white/50 underline underline-offset-2 hover:text-white">
+                直接登录
+              </Link>
+            </p>
+          </>
+        )}
       </div>
-    );
-  }
-
-  if (showGate) {
-    return (
-      <div className="rounded-2xl border border-coral-soft/25 bg-white/[0.04] p-8 max-md:p-6">
-        <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
-          继续之前
-        </div>
-        <h3 className="text-xl font-semibold">留个称呼，继续免费用</h3>
-        <p className="mt-3 max-w-[560px] text-[14px] leading-[1.95] text-white/55">
-          第一段路你已经走完了。留下称呼和微信号，我们确认后为你<span className="text-white/80">开通继续免费使用的权限</span>（通常很快），并按微信号加你、邀你进附近森林社群——群里可以交流反馈，也有<span className="text-white/80">真人教练答疑陪伴</span>。你的对话内容仍然不会被保存。
-        </p>
-        <div className="mt-6 grid max-w-[560px] gap-3">
-          <input
-            value={gateName}
-            onChange={e => setGateName(e.target.value)}
-            maxLength={60}
-            placeholder="怎么称呼你"
-            className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
-          />
-          <input
-            value={gateContact}
-            onChange={e => setGateContact(e.target.value)}
-            maxLength={120}
-            placeholder="微信号（或邮箱）"
-            className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
-          />
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-4">
-          <button
-            onClick={registerGuest}
-            disabled={!gateName.trim() || !gateContact.trim() || gateState === 'sending'}
-            type="button"
-            className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-40"
-          >
-            {gateState === 'sending' ? '正在提交…' : '提交登记'}
-          </button>
-          {gateState === 'error' && (
-            <span className="text-[13px] text-coral-soft">没成功，稍后再试一次。</span>
-          )}
-        </div>
-        <p className="mt-5 text-[12px] leading-relaxed text-white/32">
-          这些信息只用于认识你、联系你，不做别的。已经是森林里的树？
-          <Link href="/login" className="ml-1 text-white/50 underline underline-offset-2 hover:text-white">
-            直接登录
-          </Link>
-        </p>
-      </div>
-    );
-  }
+    </div>
+  ) : null;
 
   if (!session || !path) {
     return (
       <div>
+        {gateOverlay}
         <div className="mb-8 flex items-center gap-4 text-[12px] text-white/36">
           <span className="h-px w-10 bg-white/20" />
           <span>不用选对，只选最像今天的那一条。先从一条小径开始，剩下的慢慢聊。</span>
@@ -452,6 +463,7 @@ export default function PhilCoachExperience() {
 
   return (
     <div>
+      {gateOverlay}
       <div className="mb-7 flex items-center justify-between gap-4">
         <div>
           <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
