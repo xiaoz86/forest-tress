@@ -52,7 +52,7 @@ export default function JoinSection() {
           把正在发芽的自己，轻轻放进森林
         </p>
         <p className="mt-3 text-[13px] text-text-light/80 leading-[1.9]">
-          种下后你会拥有：自己的节点卡与 AI 连接推荐、
+          种下后你会拥有：自己的节点卡与同频伙伴 AI 推荐、
           <span className="text-forest-deep font-medium">个性化 phil-coach</span>
           ——记得你的专属虚拟陪伴教练，以及更多正在生长的服务
         </p>
