@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { MEMBER_COOKIE } from '@/lib/auth';
 import { createChatCompletion } from '@/lib/llm';
+import { PROFILE_PATH, normalizePhilProfileName } from '@/lib/philCoach';
 import {
   MAX_MEMORIES_PER_NODE,
   MAX_MEMORY_CONTENT,
@@ -23,14 +24,19 @@ export async function GET() {
   const sb = memoryClient();
   if (!sb) return NextResponse.json({ error: 'not-configured' }, { status: 500 });
 
-  const { data, error } = await sb
-    .from('phil_coach_memories')
-    .select('id, content, takeaway, path_id, created_at')
-    .eq('node_id', memberId)
-    .order('created_at', { ascending: false })
-    .limit(MAX_MEMORIES_PER_NODE);
+  const [{ data, error }, { data: node }] = await Promise.all([
+    sb
+      .from('phil_coach_memories')
+      .select('id, content, takeaway, path_id, created_at')
+      .eq('node_id', memberId)
+      .order('created_at', { ascending: false })
+      .limit(MAX_MEMORIES_PER_NODE),
+    sb.from('node_cards').select('name').eq('id', memberId).maybeSingle(),
+  ]);
   if (error) return NextResponse.json({ error: 'query-failed' }, { status: 500 });
-  return NextResponse.json({ memories: data ?? [] });
+  const hasProfile = (data ?? []).some(memory => memory.path_id === PROFILE_PATH);
+  const profileName = hasProfile ? normalizePhilProfileName(node?.name) : '';
+  return NextResponse.json({ memories: data ?? [], profileName });
 }
 
 type SaveBody = {

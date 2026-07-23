@@ -2,7 +2,14 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { PHIL_PATHS, PROFILE_PATH, getPhilPath, type PhilPath } from '@/lib/philCoach';
+import {
+  PHIL_PATHS,
+  PROFILE_PATH,
+  getPhilOpening,
+  getPhilPath,
+  normalizePhilProfileName,
+  type PhilPath,
+} from '@/lib/philCoach';
 
 const MOOD_GRADIENT: Record<PhilPath['mood'], string> = {
   companion: 'bg-[linear-gradient(135deg,#cf9087_0%,#ead0bf_52%,#c7d8cb_100%)]',
@@ -20,10 +27,23 @@ type Session = {
   thread: ThreadItem[];
 };
 
-function seedThread(path: PhilPath): ThreadItem[] {
+const OPENING_INDEX_KEY = 'nf_phil_opening_index';
+
+function nextOpeningIndex(): number {
+  try {
+    const stored = Number(localStorage.getItem(OPENING_INDEX_KEY));
+    const current = Number.isSafeInteger(stored) && stored >= 0 ? stored : 0;
+    localStorage.setItem(OPENING_INDEX_KEY, String(current + 1));
+    return current;
+  } catch {
+    return Date.now();
+  }
+}
+
+function seedThread(path: PhilPath, opening: string): ThreadItem[] {
   const thread: ThreadItem[] = [];
-  for (const beat of path.beats) {
-    thread.push({ kind: 'coach', text: beat.coach });
+  for (const [index, beat] of path.beats.entries()) {
+    thread.push({ kind: 'coach', text: index === 0 ? opening : beat.coach });
     if (beat.input) break;
   }
   return thread;
@@ -38,6 +58,8 @@ export default function PhilCoachExperience() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [keepState, setKeepState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [profileKnown, setProfileKnown] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [identityReady, setIdentityReady] = useState(false);
   const [importState, setImportState] = useState<'idle' | 'importing' | 'done' | 'error'>('idle');
   const [guestKnown, setGuestKnown] = useState(false);
   const [guestApproved, setGuestApproved] = useState(false);
@@ -51,9 +73,11 @@ export default function PhilCoachExperience() {
   const [pendingPathId, setPendingPathId] = useState<string | null>(null);
   const [pendingRetry, setPendingRetry] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const importPromiseRef = useRef<Promise<void> | null>(null);
 
   const path = session ? getPhilPath(session.pathId) : undefined;
   const hasConversation = Boolean(session?.thread.length);
+  const conversationReady = identityReady && importState !== 'importing';
 
   useEffect(() => {
     if (!session) return;
@@ -70,22 +94,34 @@ export default function PhilCoachExperience() {
 
   // 登录检测 + 第一次对话默认导入注册资料
   useEffect(() => {
-    fetch('/api/phil-coach/memory')
-      .then(r => (r.ok ? r.json() : null))
-      .then(json => {
+    let active = true;
+
+    async function loadIdentity() {
+      try {
+        const response = await fetch('/api/phil-coach/memory');
+        const json = response.ok ? await response.json() : null;
+        if (!active) return;
         if (!json) {
           setLoggedIn(false);
           return;
         }
         setLoggedIn(true);
+        setProfileName(normalizePhilProfileName(json.profileName));
         const mems: { path_id?: string }[] = json.memories ?? [];
         setProfileKnown(mems.some(m => m.path_id === PROFILE_PATH));
         // 第一次：还没有任何记忆时，默认把注册资料导入为「关于我」种子
-        if (mems.length === 0) importProfile();
-      })
-      .catch(() => setLoggedIn(false));
-    // 只在挂载时跑一次；importProfile 有意不入依赖
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        if (mems.length === 0) await importProfile();
+      } catch {
+        if (active) setLoggedIn(false);
+      } finally {
+        if (active) setIdentityReady(true);
+      }
+    }
+
+    void loadIdentity();
+    return () => {
+      active = false;
+    };
   }, []);
 
   // 轻登记检测（方案A：第一条小径免登记，之后登记并经主理人通过后继续）
@@ -129,21 +165,36 @@ export default function PhilCoachExperience() {
   }
 
   /** 把注册资料导入/刷新为 phil-coach 的「关于我」种子（默认导入 & 重新导入共用） */
-  async function importProfile() {
-    if (importState === 'importing') return;
-    setImportState('importing');
-    try {
-      const res = await fetch('/api/phil-coach/memory/import-profile', { method: 'POST' });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error('import-failed');
-      if (json.memory) setProfileKnown(true);
-      setImportState('done');
-    } catch {
-      setImportState('error');
-    }
+  function importProfile(): Promise<void> {
+    if (importPromiseRef.current) return importPromiseRef.current;
+
+    const request = (async () => {
+      setImportState('importing');
+      try {
+        const res = await fetch('/api/phil-coach/memory/import-profile', { method: 'POST' });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error('import-failed');
+        setProfileName(normalizePhilProfileName(json.profileName));
+        if (json.memory) setProfileKnown(true);
+        setImportState('done');
+      } catch {
+        setImportState('error');
+      }
+    })();
+
+    importPromiseRef.current = request;
+    void request.finally(() => {
+      if (importPromiseRef.current === request) importPromiseRef.current = null;
+    });
+    return request;
+  }
+
+  function openingForNextConversation(): string {
+    return getPhilOpening(profileKnown ? profileName : '', nextOpeningIndex());
   }
 
   function begin(p: PhilPath) {
+    if (!identityReady || importPromiseRef.current) return;
     // 方案A：走完第一条小径后，未登录且（未登记或未获通过）→ 先走登记/等待流程
     if (!loggedIn && !(guestKnown && guestApproved) && pathsDone() >= 1) {
       setPendingPathId(p.id);
@@ -154,7 +205,7 @@ export default function PhilCoachExperience() {
     setCopied(false);
     setError('');
     setKeepState('idle');
-    setSession({ pathId: p.id, thread: seedThread(p) });
+    setSession({ pathId: p.id, thread: seedThread(p, openingForNextConversation()) });
   }
 
   function reset() {
@@ -285,7 +336,7 @@ export default function PhilCoachExperience() {
         setCopied(false);
         setError('');
         setKeepState('idle');
-        setSession({ pathId: p.id, thread: seedThread(p) });
+        setSession({ pathId: p.id, thread: seedThread(p, openingForNextConversation()) });
       }
       return;
     }
@@ -509,7 +560,8 @@ export default function PhilCoachExperience() {
             <button
               key={p.id}
               onClick={() => begin(p)}
-              className={`group relative overflow-hidden rounded-lg border border-white/12 p-7 text-left shadow-[0_18px_60px_rgba(0,0,0,0.16)] transition-transform hover:-translate-y-0.5 ${MOOD_GRADIENT[p.mood]}`}
+              disabled={!conversationReady}
+              className={`group relative overflow-hidden rounded-lg border border-white/12 p-7 text-left shadow-[0_18px_60px_rgba(0,0,0,0.16)] transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0 ${MOOD_GRADIENT[p.mood]}`}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_24%_16%,rgba(255,255,255,0.24),transparent_36%),linear-gradient(180deg,transparent_0%,rgba(5,17,11,0.42)_100%)]" />
               <div className="relative">
@@ -522,7 +574,7 @@ export default function PhilCoachExperience() {
                 </h3>
                 <p className="mt-3 text-[14px] leading-relaxed text-white/78">{p.hint}</p>
                 <span className="mt-6 inline-flex items-center gap-2 text-[13px] text-white/82">
-                  开始对话
+                  {conversationReady ? '开始对话' : '正在准备对话…'}
                   <span className="transition-transform group-hover:translate-x-1">→</span>
                 </span>
               </div>

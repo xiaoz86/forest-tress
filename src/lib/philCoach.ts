@@ -54,6 +54,33 @@ export type PhilPath = {
   beats: Beat[];
 };
 
+const NAMED_OPENINGS = [
+  (name: string) => `Hi，${name}，今天想和我聊点什么？`,
+  (name: string) => `Hi，${name}。此刻有什么想和我说说？`,
+  (name: string) => `${name}，我在。你想从哪里开始聊起？`,
+  (name: string) => `见到你了，${name}。今天想把什么带到这里？`,
+];
+
+const ANONYMOUS_OPENINGS = [
+  'Hi，今天想和我聊点什么？',
+  '我在。此刻有什么想和我说说？',
+  '不用想得太完整，你想从哪里开始聊起？',
+  '见到你了。今天想把什么带到这里？',
+];
+
+export function normalizePhilProfileName(value: unknown): string {
+  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, 60) : '';
+}
+
+/** 按次序轮换开场；只有已导入资料记忆时，调用方才传入用户称呼。 */
+export function getPhilOpening(profileName: string, variantIndex: number): string {
+  const name = normalizePhilProfileName(profileName);
+  const variants = name ? NAMED_OPENINGS : ANONYMOUS_OPENINGS;
+  const safeIndex = Number.isFinite(variantIndex) ? Math.abs(Math.trunc(variantIndex)) : 0;
+  const opening = variants[safeIndex % variants.length];
+  return typeof opening === 'function' ? opening(name) : opening;
+}
+
 /** 四条自我探索小径——每条都是一段可以一个人走完的十分钟 */
 export const PHIL_PATHS: PhilPath[] = [
   {
@@ -65,7 +92,7 @@ export const PHIL_PATHS: PhilPath[] = [
       '这条小径以陪伴为主：接住、命名、允许情绪在场，基本不给建议、不推进解决；情绪被看见后，才轻轻问 ta 想不想多说一点或往前走。',
     beats: [
       {
-        coach: '很开心，能够与你开启一段对话。你想要和我聊些什么？',
+        coach: '我在。此刻有什么想和我说说？',
         input: true,
         placeholder: '我想和你说说…',
       },
@@ -98,7 +125,7 @@ export const PHIL_PATHS: PhilPath[] = [
       '这条小径帮 ta 从一团乱里看清：先陪 ta 把最占地方的事说出来，再探索 ta 自己真正想要什么、为什么重要，最后才轻轻落到一小步。不替 ta 整理，让 ta 自己长出方向。',
     beats: [
       {
-        coach: '很开心，能够与你开启一段对话。你想要和我聊些什么？',
+        coach: '慢慢来。最近最让你觉得有点乱的，是什么？',
         input: true,
         placeholder: '我最近有点乱的是…',
       },
@@ -140,7 +167,7 @@ export const PHIL_PATHS: PhilPath[] = [
       '这条小径陪 ta 看清选择：探索纠结底下守护的价值、什么可控什么不可控、身体对各选项的反应；可以提议小而可逆的试探，但绝不替 ta 选。',
     beats: [
       {
-        coach: '很开心，能够与你开启一段对话。你想要和我聊些什么？',
+        coach: '我在。你正站在哪个选择面前？',
         input: true,
         placeholder: '我在纠结的是…',
       },
@@ -182,7 +209,7 @@ export const PHIL_PATHS: PhilPath[] = [
       '这条小径是照见自己：陪 ta 看见此刻状态、亮起来的时刻（潜能共鸣）与拦住 ta 的内在声音；对那个声音做温和的分离与理解（它想保护什么），最后回到 ta 更大的自己。',
     beats: [
       {
-        coach: '很开心，能够与你开启一段对话。你想要和我聊些什么？',
+        coach: '先停一停。此刻的你，最想从哪里说起？',
         input: true,
         placeholder: '我想聊聊此刻的自己…',
       },
