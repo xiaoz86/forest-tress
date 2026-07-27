@@ -28,6 +28,33 @@ type Session = {
 };
 
 const OPENING_INDEX_KEY = 'nf_phil_opening_index';
+/** 当前这段对话的暂存键：登录/注册跳走再回来，对话还在（只在本次浏览会话内，关掉标签页即散） */
+const DRAFT_SESSION_KEY = 'nf_phil_session';
+
+function saveSession(s: Session | null) {
+  try {
+    if (s && s.thread.some(t => t.kind === 'me')) {
+      sessionStorage.setItem(DRAFT_SESSION_KEY, JSON.stringify(s));
+    } else {
+      sessionStorage.removeItem(DRAFT_SESSION_KEY);
+    }
+  } catch {
+    /* 无痕模式等场景忽略 */
+  }
+}
+
+function loadSession(): Session | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as Session;
+    if (!s || typeof s.pathId !== 'string' || !Array.isArray(s.thread)) return null;
+    if (!s.thread.length || !getPhilPath(s.pathId)) return null;
+    return s;
+  } catch {
+    return null;
+  }
+}
 
 function nextOpeningIndex(): number {
   try {
@@ -78,6 +105,18 @@ export default function PhilCoachExperience() {
   const path = session ? getPhilPath(session.pathId) : undefined;
   const hasConversation = Boolean(session?.thread.length);
   const conversationReady = identityReady && importState !== 'importing';
+
+  // 挂载时恢复上一次未走完的对话（去登录/注册回来后，聊过的内容不会丢）
+  useEffect(() => {
+    const restored = loadSession();
+    if (!restored) return;
+    setSession(current => current ?? restored);
+  }, []);
+
+  // 对话有变化就暂存（仅本次浏览会话）
+  useEffect(() => {
+    saveSession(session);
+  }, [session]);
 
   useEffect(() => {
     if (!session) return;
@@ -444,8 +483,13 @@ export default function PhilCoachExperience() {
             </div>
             <p className="mt-5 text-[12px] leading-relaxed text-white/32">
               已经是森林里的树？
-              <Link href="/login" className="ml-1 text-white/50 underline underline-offset-2 hover:text-white">
-                直接登录
+              <Link
+                href="/login"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 text-white/50 underline underline-offset-2 hover:text-white"
+              >
+                直接登录（新窗口，不影响这段对话）
               </Link>
             </p>
           </>
@@ -473,8 +517,13 @@ export default function PhilCoachExperience() {
             </div>
             <p className="mt-5 text-[12px] leading-relaxed text-white/32">
               已经是森林里的树？
-              <Link href="/login" className="ml-1 text-white/50 underline underline-offset-2 hover:text-white">
-                直接登录
+              <Link
+                href="/login"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 text-white/50 underline underline-offset-2 hover:text-white"
+              >
+                直接登录（新窗口，不影响这段对话）
               </Link>
             </p>
           </>
@@ -518,8 +567,13 @@ export default function PhilCoachExperience() {
             </div>
             <p className="mt-5 text-[12px] leading-relaxed text-white/32">
               这些信息只用于认识你、联系你，不做别的。已经是森林里的树？
-              <Link href="/login" className="ml-1 text-white/50 underline underline-offset-2 hover:text-white">
-                直接登录
+              <Link
+                href="/login"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 text-white/50 underline underline-offset-2 hover:text-white"
+              >
+                直接登录（新窗口，不影响这段对话）
               </Link>
             </p>
           </>
@@ -708,6 +762,8 @@ export default function PhilCoachExperience() {
         </button>
         <Link
           href="/#join"
+          target="_blank"
+          rel="noopener noreferrer"
           className="rounded-full bg-coral-soft px-5 py-2.5 text-[14px] font-medium text-[#20140f] no-underline transition-opacity hover:opacity-90"
         >
           成为森林里的一棵树
