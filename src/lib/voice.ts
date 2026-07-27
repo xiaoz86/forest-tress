@@ -132,6 +132,60 @@ export function useSpeechInput(onText: (text: string) => void) {
 
 const VOICE_PREF_KEY = 'nf_phil_read_aloud';
 
+/** 挑一个温柔的中文声音：优先柔和的女声，其次任意中文声音 */
+const PREFERRED_VOICES = [
+  'Tingting', '婷婷', 'Ting-Ting',      // macOS / iOS 中文默认，温和
+  'Google 普通话（中国大陆）', 'Google 普通话',
+  'Mei-Jia', '美佳', 'Sinji', 'Yu-shu',
+  'Microsoft Xiaoxiao', 'Microsoft Yaoyao', 'Huihui',
+];
+
+function pickGentleVoice(): SpeechSynthesisVoice | null {
+  try {
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+    const zh = voices.filter(v => /^zh|cmn|Chinese/i.test(v.lang) || /中文|普通话/.test(v.name));
+    if (!zh.length) return null;
+    for (const want of PREFERRED_VOICES) {
+      const hit = zh.find(v => v.name.includes(want));
+      if (hit) return hit;
+    }
+    // 退而求其次：优先大陆普通话
+    return zh.find(v => /zh[-_]?CN|cmn/i.test(v.lang)) || zh[0];
+  } catch {
+    return null;
+  }
+}
+
+/** 把长回复切成短句，让朗读有呼吸——像有人坐在旁边慢慢说，而不是播报 */
+function splitForBreath(text: string): string[] {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (!clean) return [];
+  // 在句末标点后断句，同时保留标点
+  const rough = clean.split(/(?<=[。！？!?…；;])/);
+  const out: string[] = [];
+  for (const piece of rough) {
+    const s = piece.trim();
+    if (!s) continue;
+    // 过长的句子再按逗号切一次，避免一口气念太久
+    if (s.length > 34) {
+      let buf = '';
+      for (const part of s.split(/(?<=[，,、])/)) {
+        if ((buf + part).length > 34 && buf) {
+          out.push(buf.trim());
+          buf = part;
+        } else {
+          buf += part;
+        }
+      }
+      if (buf.trim()) out.push(buf.trim());
+    } else {
+      out.push(s);
+    }
+  }
+  return out;
+}
+
 /** 听它说：把 phil-coach 的回复读出来，让人可以闭着眼睛待一会儿 */
 export function useSpeechOutput() {
   const supported = useClientFlag(
@@ -148,6 +202,7 @@ export function useSpeechOutput() {
   const [override, setOverride] = useState<boolean | null>(null);
   const enabled = override ?? storedPref;
   const [speaking, setSpeaking] = useState(false);
+  const speakTokenRef = useRef<symbol | null>(null);
 
   useEffect(() => {
     return () => {
@@ -167,6 +222,7 @@ export function useSpeechOutput() {
       /* ignore */
     }
     if (!v && typeof window !== 'undefined') {
+      speakTokenRef.current = null;
       try {
         window.speechSynthesis.cancel();
       } catch {
@@ -178,20 +234,48 @@ export function useSpeechOutput() {
 
   const speak = useCallback((text: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    const clean = text.replace(/\s+/g, ' ').trim();
-    if (!clean) return;
+    const sentences = splitForBreath(text);
+    if (!sentences.length) return;
+
+    // 本次朗读的令牌：中途被取消/开始新一段时，旧队列自动作废
+    const token = Symbol('speak');
+    speakTokenRef.current = token;
+
+    const voice = pickGentleVoice();
+    const sayFrom = (i: number) => {
+      if (speakTokenRef.current !== token) return;      // 已被取代
+      if (i >= sentences.length) {
+        setSpeaking(false);
+        return;
+      }
+      try {
+        const u = new SpeechSynthesisUtterance(sentences[i]);
+        u.lang = 'zh-CN';
+        u.rate = 0.84;    // 更慢：像坐在你旁边，不赶时间
+        u.pitch = 0.96;   // 略低：沉一点更安定，不尖不亮
+        u.volume = 0.92;  // 收一点，不逼近耳朵
+        if (voice) u.voice = voice;
+        u.onend = () => {
+          if (speakTokenRef.current !== token) return;
+          // 句与句之间留一口气；段末停顿更长一些
+          const tail = sentences[i].slice(-1);
+          const pause = /[。！？!?…]/.test(tail) ? 520 : 300;
+          window.setTimeout(() => sayFrom(i + 1), pause);
+        };
+        u.onerror = () => {
+          if (speakTokenRef.current === token) setSpeaking(false);
+        };
+        window.speechSynthesis.speak(u);
+      } catch {
+        setSpeaking(false);
+      }
+    };
+
     try {
       window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(clean);
-      u.lang = 'zh-CN';
-      u.rate = 0.92;   // 稍慢一点，像有人在你旁边慢慢说
-      u.pitch = 1.0;
-      const zh = window.speechSynthesis.getVoices().find(v => /zh|Chinese/i.test(v.lang));
-      if (zh) u.voice = zh;
-      u.onend = () => setSpeaking(false);
-      u.onerror = () => setSpeaking(false);
       setSpeaking(true);
-      window.speechSynthesis.speak(u);
+      // 有些浏览器 getVoices() 首次为空，稍等一拍再开口，能拿到中文嗓音
+      window.setTimeout(() => sayFrom(0), voice ? 120 : 320);
     } catch {
       setSpeaking(false);
     }
@@ -199,6 +283,7 @@ export function useSpeechOutput() {
 
   const stop = useCallback(() => {
     if (typeof window === 'undefined') return;
+    speakTokenRef.current = null;   // 作废未念完的句子队列
     try {
       window.speechSynthesis.cancel();
     } catch {
