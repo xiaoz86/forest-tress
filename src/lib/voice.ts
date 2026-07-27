@@ -46,8 +46,17 @@ function getRecognitionCtor(): RecognitionCtor | null {
 }
 
 /** 说给它听：把语音实时转成文字，追加进输入框 */
+/** 微信内置浏览器：不给 Web Speech 麦克风权限，需要引导去系统浏览器打开 */
+export function isWeChatBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /MicroMessenger/i.test(navigator.userAgent);
+}
+
 export function useSpeechInput(onText: (text: string) => void) {
-  const supported = useClientFlag(() => Boolean(getRecognitionCtor()));
+  const rawSupported = useClientFlag(() => Boolean(getRecognitionCtor()));
+  const inWeChat = useClientFlag(isWeChatBrowser);
+  // 微信里即使有 API 也拿不到麦克风，视为不可用，改为引导去浏览器打开
+  const supported = rawSupported && !inWeChat;
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState('');
   const [error, setError] = useState('');
@@ -127,10 +136,11 @@ export function useSpeechInput(onText: (text: string) => void) {
     else start();
   }, [listening, start, stop]);
 
-  return { supported, listening, interim, error, start, stop, toggle };
+  return { supported, inWeChat, listening, interim, error, start, stop, toggle };
 }
 
 const VOICE_PREF_KEY = 'nf_phil_read_aloud';
+const VOICE_NAME_KEY = 'nf_phil_voice_name';
 
 /** 挑一个温柔的中文声音：优先柔和的女声，其次任意中文声音 */
 const PREFERRED_VOICES = [
@@ -140,21 +150,38 @@ const PREFERRED_VOICES = [
   'Microsoft Xiaoxiao', 'Microsoft Yaoyao', 'Huihui',
 ];
 
-function pickGentleVoice(): SpeechSynthesisVoice | null {
+/** 列出设备上所有可用的中文嗓音（按自然度从高到低排序） */
+export function listChineseVoices(): SpeechSynthesisVoice[] {
   try {
-    const voices = window.speechSynthesis.getVoices();
-    if (!voices.length) return null;
+    const voices = window.speechSynthesis?.getVoices() ?? [];
     const zh = voices.filter(v => /^zh|cmn|Chinese/i.test(v.lang) || /中文|普通话/.test(v.name));
-    if (!zh.length) return null;
-    for (const want of PREFERRED_VOICES) {
-      const hit = zh.find(v => v.name.includes(want));
-      if (hit) return hit;
-    }
-    // 退而求其次：优先大陆普通话
-    return zh.find(v => /zh[-_]?CN|cmn/i.test(v.lang)) || zh[0];
+    const score = (v: SpeechSynthesisVoice) => {
+      let s = 0;
+      // 增强／高级音色：同一把嗓子里最自然的一档
+      if (/enhanced|premium|增强|高级|natural|neural/i.test(v.name)) s += 100;
+      // 云端合成通常比设备本地基础音色自然
+      if (v.localService === false) s += 40;
+      // 偏好列表里的温柔嗓音
+      const idx = PREFERRED_VOICES.findIndex(w => v.name.includes(w));
+      if (idx >= 0) s += 30 - idx;
+      // 大陆普通话优先
+      if (/zh[-_]?CN|cmn/i.test(v.lang)) s += 10;
+      return s;
+    };
+    return zh.sort((a, b) => score(b) - score(a));
   } catch {
-    return null;
+    return [];
   }
+}
+
+function pickGentleVoice(preferredName?: string): SpeechSynthesisVoice | null {
+  const zh = listChineseVoices();
+  if (!zh.length) return null;
+  if (preferredName) {
+    const chosen = zh.find(v => v.name === preferredName);
+    if (chosen) return chosen;
+  }
+  return zh[0];
 }
 
 /** 把长回复切成短句，让朗读有呼吸——像有人坐在旁边慢慢说，而不是播报 */
@@ -203,6 +230,39 @@ export function useSpeechOutput() {
   const enabled = override ?? storedPref;
   const [speaking, setSpeaking] = useState(false);
   const speakTokenRef = useRef<symbol | null>(null);
+  // 用户选定的嗓音（同一设备下次沿用）
+  const [voiceName, setVoiceNameState] = useState<string>('');
+  const [voiceOptions, setVoiceOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const refresh = () => {
+      const names = listChineseVoices().map(v => v.name);
+      setVoiceOptions(names);
+      setVoiceNameState(prev => {
+        if (prev && names.includes(prev)) return prev;
+        try {
+          const saved = localStorage.getItem(VOICE_NAME_KEY) || '';
+          if (saved && names.includes(saved)) return saved;
+        } catch {
+          /* ignore */
+        }
+        return names[0] || '';
+      });
+    };
+    refresh();
+    window.speechSynthesis.addEventListener?.('voiceschanged', refresh);
+    return () => window.speechSynthesis.removeEventListener?.('voiceschanged', refresh);
+  }, []);
+
+  const setVoiceName = useCallback((name: string) => {
+    setVoiceNameState(name);
+    try {
+      localStorage.setItem(VOICE_NAME_KEY, name);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -241,7 +301,7 @@ export function useSpeechOutput() {
     const token = Symbol('speak');
     speakTokenRef.current = token;
 
-    const voice = pickGentleVoice();
+    const voice = pickGentleVoice(voiceName);
     const sayFrom = (i: number) => {
       if (speakTokenRef.current !== token) return;      // 已被取代
       if (i >= sentences.length) {
@@ -279,7 +339,7 @@ export function useSpeechOutput() {
     } catch {
       setSpeaking(false);
     }
-  }, []);
+  }, [voiceName]);
 
   const stop = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -292,5 +352,8 @@ export function useSpeechOutput() {
     setSpeaking(false);
   }, []);
 
-  return { supported, enabled, setEnabled, speaking, speak, stop };
+  return {
+    supported, enabled, setEnabled, speaking, speak, stop,
+    voiceName, setVoiceName, voiceOptions,
+  };
 }

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { useSpeechInput, useSpeechOutput } from '@/lib/voice';
+import { TTS_VOICES, useServerSpeech, useServerSpeechInput } from '@/lib/voiceServer';
 import {
   PHIL_PATHS,
   PROFILE_PATH,
@@ -102,8 +102,8 @@ export default function PhilCoachExperience() {
   const [pendingRetry, setPendingRetry] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   // 语音：说给它听 / 听它说
-  const voiceIn = useSpeechInput(text => setDraft(d => (d ? `${d}${text}` : text)));
-  const voiceOut = useSpeechOutput();
+  const voiceIn = useServerSpeechInput(text => setDraft(d => (d ? `${d}${text}` : text)));
+  const voiceOut = useServerSpeech();
   const spokenRef = useRef<string>('');
   const importPromiseRef = useRef<Promise<void> | null>(null);
 
@@ -714,25 +714,27 @@ export default function PhilCoachExperience() {
             </div>
           )}
           {/* 语音：说给它听 / 听它说 —— 不支持的浏览器上按钮直接不出现 */}
-          {(voiceIn.supported || voiceOut.supported) && (
-            <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
               {voiceIn.supported && (
                 <button
                   onClick={voiceIn.toggle}
-                  disabled={loading}
+                  disabled={loading || voiceIn.transcribing}
                   type="button"
-                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] transition-colors disabled:opacity-40 ${
-                    voiceIn.listening
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] transition-colors disabled:opacity-50 ${
+                    voiceIn.recording
                       ? 'border-coral-soft/60 bg-coral-soft/20 text-coral-soft'
                       : 'border-white/16 bg-white/[0.05] text-white/70 hover:bg-white/12 hover:text-white'
                   }`}
                 >
-                  <span aria-hidden="true">{voiceIn.listening ? '◉' : '🎙'}</span>
-                  {voiceIn.listening ? '在听着，说完点一下' : '说给它听'}
+                  <span aria-hidden="true">{voiceIn.recording ? '◉' : '🎙'}</span>
+                  {voiceIn.transcribing
+                    ? '正在把话变成字…'
+                    : voiceIn.recording
+                      ? '在听着，说完点一下'
+                      : '说给它听'}
                 </button>
               )}
-              {voiceOut.supported && (
-                <button
+              <button
                   onClick={() => voiceOut.setEnabled(!voiceOut.enabled)}
                   type="button"
                   className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] transition-colors ${
@@ -742,9 +744,12 @@ export default function PhilCoachExperience() {
                   }`}
                 >
                   <span aria-hidden="true">{voiceOut.enabled ? '🔊' : '🔈'}</span>
-                  {voiceOut.enabled ? '读给你听（开）' : '读给我听'}
-                </button>
-              )}
+                  {voiceOut.enabled
+                    ? voiceOut.loading
+                      ? '正在准备声音…'
+                      : '读给你听（开）'
+                    : '读给我听'}
+              </button>
               {voiceOut.speaking && (
                 <button
                   onClick={voiceOut.stop}
@@ -754,8 +759,23 @@ export default function PhilCoachExperience() {
                   停下来
                 </button>
               )}
-            </div>
-          )}
+              {voiceOut.enabled && (
+                <label className="flex items-center gap-1.5 text-[12px] text-white/35">
+                  嗓音
+                  <select
+                    value={voiceOut.voice}
+                    onChange={e => voiceOut.setVoice(e.target.value)}
+                    className="rounded-lg border border-white/12 bg-[#161d18] px-2 py-1 text-[12px] text-white/70 focus:outline-none"
+                  >
+                    {TTS_VOICES.map(v => (
+                      <option key={v.id} value={v.id}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+            )}
+          </div>
           {voiceIn.error && (
             <div className="mb-3 text-[12px] text-coral-soft/90">{voiceIn.error}</div>
           )}
@@ -768,12 +788,9 @@ export default function PhilCoachExperience() {
             disabled={loading}
             rows={3}
             maxLength={1200}
-            placeholder={voiceIn.listening ? '在听着…想到什么就说' : '照此刻真实的样子说就好…'}
+            placeholder={voiceIn.recording ? '在听着…想到什么就说' : '照此刻真实的样子说就好…'}
             className="w-full resize-none rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[15px] leading-relaxed text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none disabled:opacity-55"
           />
-          {voiceIn.interim && (
-            <div className="mt-2 text-[13px] leading-relaxed text-white/38">{voiceIn.interim}…</div>
-          )}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
             <span className="text-[11px] text-white/26">慢慢写，最多 1200 字 · ⌘/Ctrl + Enter 发送</span>
             <div className="flex flex-wrap gap-3">
