@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { useSpeechInput, useSpeechOutput } from '@/lib/voice';
 import {
   PHIL_PATHS,
   PROFILE_PATH,
@@ -100,6 +101,10 @@ export default function PhilCoachExperience() {
   const [pendingPathId, setPendingPathId] = useState<string | null>(null);
   const [pendingRetry, setPendingRetry] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  // 语音：说给它听 / 听它说
+  const voiceIn = useSpeechInput(text => setDraft(d => (d ? `${d}${text}` : text)));
+  const voiceOut = useSpeechOutput();
+  const spokenRef = useRef<string>('');
   const importPromiseRef = useRef<Promise<void> | null>(null);
 
   const path = session ? getPhilPath(session.pathId) : undefined;
@@ -130,6 +135,15 @@ export default function PhilCoachExperience() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [session?.thread.length, loading, error]);
+
+  // 开了「读给我听」时，把最新一条回复念出来（同一条不重复念）
+  useEffect(() => {
+    if (!voiceOut.enabled || !session) return;
+    const last = [...session.thread].reverse().find(t => t.kind === 'coach');
+    if (!last || last.text === spokenRef.current) return;
+    spokenRef.current = last.text;
+    voiceOut.speak(last.text);
+  }, [session, voiceOut]);
 
   // 登录检测 + 第一次对话默认导入注册资料
   useEffect(() => {
@@ -699,6 +713,52 @@ export default function PhilCoachExperience() {
               {error}
             </div>
           )}
+          {/* 语音：说给它听 / 听它说 —— 不支持的浏览器上按钮直接不出现 */}
+          {(voiceIn.supported || voiceOut.supported) && (
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              {voiceIn.supported && (
+                <button
+                  onClick={voiceIn.toggle}
+                  disabled={loading}
+                  type="button"
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] transition-colors disabled:opacity-40 ${
+                    voiceIn.listening
+                      ? 'border-coral-soft/60 bg-coral-soft/20 text-coral-soft'
+                      : 'border-white/16 bg-white/[0.05] text-white/70 hover:bg-white/12 hover:text-white'
+                  }`}
+                >
+                  <span aria-hidden="true">{voiceIn.listening ? '◉' : '🎙'}</span>
+                  {voiceIn.listening ? '在听着，说完点一下' : '说给它听'}
+                </button>
+              )}
+              {voiceOut.supported && (
+                <button
+                  onClick={() => voiceOut.setEnabled(!voiceOut.enabled)}
+                  type="button"
+                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] transition-colors ${
+                    voiceOut.enabled
+                      ? 'border-coral-soft/60 bg-coral-soft/20 text-coral-soft'
+                      : 'border-white/16 bg-white/[0.05] text-white/70 hover:bg-white/12 hover:text-white'
+                  }`}
+                >
+                  <span aria-hidden="true">{voiceOut.enabled ? '🔊' : '🔈'}</span>
+                  {voiceOut.enabled ? '读给你听（开）' : '读给我听'}
+                </button>
+              )}
+              {voiceOut.speaking && (
+                <button
+                  onClick={voiceOut.stop}
+                  type="button"
+                  className="text-[12px] text-white/40 underline-offset-4 hover:text-white hover:underline"
+                >
+                  停下来
+                </button>
+              )}
+            </div>
+          )}
+          {voiceIn.error && (
+            <div className="mb-3 text-[12px] text-coral-soft/90">{voiceIn.error}</div>
+          )}
           <textarea
             value={draft}
             onChange={e => setDraft(e.target.value)}
@@ -708,9 +768,12 @@ export default function PhilCoachExperience() {
             disabled={loading}
             rows={3}
             maxLength={1200}
-            placeholder="照此刻真实的样子说就好…"
+            placeholder={voiceIn.listening ? '在听着…想到什么就说' : '照此刻真实的样子说就好…'}
             className="w-full resize-none rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[15px] leading-relaxed text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none disabled:opacity-55"
           />
+          {voiceIn.interim && (
+            <div className="mt-2 text-[13px] leading-relaxed text-white/38">{voiceIn.interim}…</div>
+          )}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
             <span className="text-[11px] text-white/26">慢慢写，最多 1200 字 · ⌘/Ctrl + Enter 发送</span>
             <div className="flex flex-wrap gap-3">
