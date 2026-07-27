@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { TTS_VOICES, useServerSpeech, useServerSpeechInput } from '@/lib/voiceServer';
+import type { VoiceAnalysis } from '@/lib/philCoachVoice';
 import {
   PHIL_PATHS,
   PROFILE_PATH,
@@ -101,8 +102,13 @@ export default function PhilCoachExperience() {
   const [pendingPathId, setPendingPathId] = useState<string | null>(null);
   const [pendingRetry, setPendingRetry] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const pendingVoiceContextRef = useRef<VoiceAnalysis | null>(null);
+  const retryVoiceContextRef = useRef<VoiceAnalysis | null>(null);
   // 语音：说给它听 / 听它说
-  const voiceIn = useServerSpeechInput(text => setDraft(d => (d ? `${d}${text}` : text)));
+  const voiceIn = useServerSpeechInput(result => {
+    setDraft(d => (d ? `${d} ${result.text}` : result.text));
+    pendingVoiceContextRef.current = result.voiceContext;
+  });
   const voiceOut = useServerSpeech();
   const spokenRef = useRef<string>('');
   const importPromiseRef = useRef<Promise<void> | null>(null);
@@ -248,6 +254,7 @@ export default function PhilCoachExperience() {
 
   function begin(p: PhilPath) {
     if (!identityReady || importPromiseRef.current) return;
+    voiceIn.cancel();
     // 方案A：走完第一条小径后，未登录且（未登记或未获通过）→ 先走登记/等待流程
     if (!loggedIn && !(guestKnown && guestApproved) && pathsDone() >= 1) {
       setPendingPathId(p.id);
@@ -258,10 +265,13 @@ export default function PhilCoachExperience() {
     setCopied(false);
     setError('');
     setKeepState('idle');
+    pendingVoiceContextRef.current = null;
+    retryVoiceContextRef.current = null;
     setSession({ pathId: p.id, thread: seedThread(p, openingForNextConversation()) });
   }
 
   function reset() {
+    voiceIn.cancel();
     if (session?.thread.some(t => t.kind === 'me')) markPathDone();
     setSession(null);
     setDraft('');
@@ -269,6 +279,8 @@ export default function PhilCoachExperience() {
     setLoading(false);
     setError('');
     setKeepState('idle');
+    pendingVoiceContextRef.current = null;
+    retryVoiceContextRef.current = null;
   }
 
   /** 明示同意的「留住」：把当前对话存进自己的记忆（仅注册用户） */
@@ -295,7 +307,11 @@ export default function PhilCoachExperience() {
   }
 
   /** 发送对话线取回复；命中登记闸门时返回 'gate'（不视为错误） */
-  async function sendThread(thread: ThreadItem[], pathId: string): Promise<'ok' | 'gate'> {
+  async function sendThread(
+    thread: ThreadItem[],
+    pathId: string,
+    voiceContext: VoiceAnalysis | null = null,
+  ): Promise<'ok' | 'gate'> {
     const res = await fetch('/api/phil-coach', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -305,6 +321,7 @@ export default function PhilCoachExperience() {
           role: item.kind === 'coach' ? 'assistant' : 'user',
           content: item.text,
         })),
+        ...(voiceContext ? { voiceContext } : {}),
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -332,9 +349,12 @@ export default function PhilCoachExperience() {
   }
 
   async function submit() {
-    if (!path || !session || loading) return;
+    if (!path || !session || loading || voiceIn.transcribing) return;
     const answer = draft.trim();
     if (!answer) return;
+    const capturedVoiceContext = pendingVoiceContextRef.current;
+    const voiceContext = capturedVoiceContext;
+    pendingVoiceContextRef.current = null;
 
     const nextThread: ThreadItem[] = [...session.thread, { kind: 'me', text: answer }];
     setSession({ ...session, thread: nextThread });
@@ -343,12 +363,16 @@ export default function PhilCoachExperience() {
     setLoading(true);
 
     try {
-      const r = await sendThread(nextThread, path.id);
+      const r = await sendThread(nextThread, path.id, voiceContext);
       if (r === 'gate') {
+        retryVoiceContextRef.current = voiceContext;
         setPendingRetry(true);
         setShowGate(true);
+      } else {
+        retryVoiceContextRef.current = null;
       }
     } catch {
+      retryVoiceContextRef.current = null;
       setError('刚才这段没有送出去。可以稍后再试，或先把它留给自己。');
     } finally {
       setLoading(false);
@@ -389,6 +413,8 @@ export default function PhilCoachExperience() {
         setCopied(false);
         setError('');
         setKeepState('idle');
+        pendingVoiceContextRef.current = null;
+        retryVoiceContextRef.current = null;
         setSession({ pathId: p.id, thread: seedThread(p, openingForNextConversation()) });
       }
       return;
@@ -397,7 +423,9 @@ export default function PhilCoachExperience() {
       setPendingRetry(false);
       setLoading(true);
       try {
-        await sendThread(session.thread, path.id);
+        const r = await sendThread(session.thread, path.id, retryVoiceContextRef.current);
+        if (r === 'ok') retryVoiceContextRef.current = null;
+        else setPendingRetry(true);
       } catch {
         setError('刚才这段没有送出去。可以稍后再试。');
       } finally {
@@ -781,7 +809,10 @@ export default function PhilCoachExperience() {
           )}
           <textarea
             value={draft}
-            onChange={e => setDraft(e.target.value)}
+            onChange={e => {
+              setDraft(e.target.value);
+              pendingVoiceContextRef.current = null;
+            }}
             onKeyDown={e => {
               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit();
             }}
@@ -821,7 +852,7 @@ export default function PhilCoachExperience() {
               )}
               <button
                 onClick={submit}
-                disabled={loading || !draft.trim()}
+                disabled={loading || voiceIn.transcribing || !draft.trim()}
                 type="button"
                 className="rounded-full bg-white px-6 py-2.5 text-[14px] font-medium text-[#141a12] transition-opacity disabled:opacity-35"
               >
