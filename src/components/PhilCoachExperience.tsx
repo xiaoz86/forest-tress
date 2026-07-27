@@ -787,6 +787,15 @@ export default function PhilCoachExperience() {
                   停下来
                 </button>
               )}
+              {voiceOut.playbackBlocked && (
+                <button
+                  onClick={voiceOut.resume}
+                  type="button"
+                  className="rounded-full border border-coral-soft/50 bg-coral-soft/12 px-4 py-2 text-[13px] text-coral-soft"
+                >
+                  ▶ 点一下播放声音
+                </button>
+              )}
               {voiceOut.enabled && (
                 <label className="flex items-center gap-1.5 text-[12px] text-white/35">
                   嗓音
@@ -806,6 +815,9 @@ export default function PhilCoachExperience() {
           </div>
           {voiceIn.error && (
             <div className="mb-3 text-[12px] text-coral-soft/90">{voiceIn.error}</div>
+          )}
+          {voiceOut.error && (
+            <div className="mb-3 text-[12px] text-coral-soft/90">{voiceOut.error}</div>
           )}
           <textarea
             value={draft}

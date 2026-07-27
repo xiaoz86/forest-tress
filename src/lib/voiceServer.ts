@@ -251,9 +251,12 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     } catch (e) {
       if (generationRef.current !== generation) return;
       const name = (e as { name?: string })?.name || '';
+      const inWeChat = /MicroMessenger/i.test(navigator.userAgent);
       setError(
         name === 'NotAllowedError'
-          ? '没有拿到麦克风权限。允许之后就可以对它说话了。'
+          ? inWeChat
+            ? '微信没有开放麦克风。请点右上角「…」，选择在浏览器打开后再允许麦克风。'
+            : '没有拿到麦克风权限。允许之后就可以对它说话了。'
           : '这个环境暂时用不了麦克风，可以先打字。',
       );
       cleanup();
@@ -314,6 +317,8 @@ export function useServerSpeech() {
   const voice = voiceOverride ?? storedVoice;
   const [speaking, setSpeaking] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [playbackBlocked, setPlaybackBlocked] = useState(false);
+  const [error, setError] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string>('');
   const tokenRef = useRef<symbol | null>(null);
@@ -331,6 +336,7 @@ export function useServerSpeech() {
     }
     setSpeaking(false);
     setLoading(false);
+    setPlaybackBlocked(false);
   }, []);
 
   useEffect(() => stop, [stop]);
@@ -365,6 +371,7 @@ export function useServerSpeech() {
       tokenRef.current = token;
       stop();
       tokenRef.current = token;      // stop 会清掉，重新标记
+      setError('');
       setLoading(true);
       try {
         const res = await fetch('/api/phil-coach/tts', {
@@ -380,15 +387,30 @@ export function useServerSpeech() {
         const audio = new Audio(url);
         audioRef.current = audio;
         audio.onended = () => {
-          if (tokenRef.current === token) setSpeaking(false);
+          if (tokenRef.current === token) {
+            setSpeaking(false);
+            setPlaybackBlocked(false);
+          }
         };
         audio.onerror = () => {
-          if (tokenRef.current === token) setSpeaking(false);
+          if (tokenRef.current === token) {
+            setSpeaking(false);
+            setPlaybackBlocked(false);
+            setError('这段声音没能播放，可以稍后再试。');
+          }
         };
-        setSpeaking(true);
-        await audio.play().catch(() => setSpeaking(false));
+        try {
+          await audio.play();
+          if (tokenRef.current === token) setSpeaking(true);
+        } catch {
+          if (tokenRef.current === token) {
+            setSpeaking(false);
+            setPlaybackBlocked(true);
+          }
+        }
       } catch {
         setSpeaking(false);
+        setError('声音暂时没有准备好，可以稍后再试。');
       } finally {
         if (tokenRef.current === token) setLoading(false);
       }
@@ -396,5 +418,31 @@ export function useServerSpeech() {
     [stop, voice],
   );
 
-  return { enabled, setEnabled, voice, setVoice, speaking, loading, speak, stop };
+  const resume = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    setError('');
+    setPlaybackBlocked(false);
+    void audio.play().then(
+      () => setSpeaking(true),
+      () => {
+        setSpeaking(false);
+        setPlaybackBlocked(true);
+      },
+    );
+  }, []);
+
+  return {
+    enabled,
+    setEnabled,
+    voice,
+    setVoice,
+    speaking,
+    loading,
+    playbackBlocked,
+    error,
+    speak,
+    resume,
+    stop,
+  };
 }
