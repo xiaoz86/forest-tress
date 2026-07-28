@@ -126,16 +126,72 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   const generationRef = useRef(0);
   const busyRef = useRef(false);
   const onResultRef = useRef(onResult);
+  // 实时音量（0~1）：让人看见自己的声音，录音才不像对着黑盒说话
+  const [level, setLevel] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const startedAtRef = useRef(0);
 
   useEffect(() => {
     onResultRef.current = onResult;
   }, [onResult]);
+
+  const stopMeter = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    try {
+      void audioCtxRef.current?.close();
+    } catch {
+      /* ignore */
+    }
+    audioCtxRef.current = null;
+    setLevel(0);
+    setElapsed(0);
+  }, []);
+
+  const startMeter = useCallback((stream: MediaStream) => {
+    try {
+      const Ctx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      audioCtxRef.current = ctx;
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.75;
+      source.connect(analyser);
+      const buf = new Uint8Array(analyser.frequencyBinCount);
+      startedAtRef.current = Date.now();
+      const tick = () => {
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i += 1) {
+          const v = (buf[i] - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / buf.length);
+        // 放大到易感知的范围，并留一点底噪门限
+        setLevel(Math.min(1, Math.max(0, (rms - 0.01) * 6)));
+        setElapsed(Math.floor((Date.now() - startedAtRef.current) / 1000));
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    } catch {
+      /* 没有音量表也不影响录音 */
+    }
+  }, []);
 
   const cleanup = useCallback(() => {
     if (maxTimerRef.current) {
       clearTimeout(maxTimerRef.current);
       maxTimerRef.current = null;
     }
+    stopMeter();
     try {
       streamRef.current?.getTracks().forEach(t => t.stop());
     } catch {
@@ -144,7 +200,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     streamRef.current = null;
     recRef.current = null;
     chunksRef.current = [];
-  }, []);
+  }, [stopMeter]);
 
   const cancel = useCallback(() => {
     generationRef.current += 1;
@@ -184,6 +240,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       }
       setRequesting(false);
       streamRef.current = stream;
+      startMeter(stream);
       const mimeType = pickMimeType();
       const rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       chunksRef.current = [];
@@ -264,7 +321,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       setRequesting(false);
       setRecording(false);
     }
-  }, [cleanup]);
+  }, [cleanup, startMeter]);
 
   const stop = useCallback(() => {
     try {
@@ -280,7 +337,11 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     else void start();
   }, [recording, start, stop]);
 
-  return { supported, requesting, recording, transcribing, error, start, stop, toggle, cancel };
+  return {
+    supported, requesting, recording, transcribing, error,
+    level, elapsed,
+    start, stop, toggle, cancel,
+  };
 }
 
 const TTS_PREF_KEY = 'nf_phil_read_aloud';
