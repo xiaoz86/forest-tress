@@ -960,7 +960,7 @@ export default function PhilCoachExperience() {
                     title={
                       voiceOut.enabled
                         ? 'phil-coach 的回复会读出来 · 点一下关掉'
-                        : '打开后，phil-coach 的回复会读出来'
+                        : '打开后，phil-coach 的回复会用语音回复'
                     }
                     className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] transition-colors ${
                       voiceOut.enabled
@@ -972,8 +972,8 @@ export default function PhilCoachExperience() {
                     {voiceOut.enabled
                       ? voiceOut.loading
                         ? '准备中'
-                        : '读给我听 · 开'
-                      : '读给我听'}
+                        : '语音回复 · 开'
+                      : '语音回复 · 关'}
                   </button>
                   {voiceIn.supported && (
                     <button
