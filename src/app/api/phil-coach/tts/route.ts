@@ -11,8 +11,7 @@ const WINDOW_MS = 5 * 60 * 1000;
 const MAX_PER_WINDOW = 60;
 const buckets = new Map<string, number[]>();
 
-/** 可选音色：默认 anna（温和女声），其余留给用户挑 */
-const VOICES = new Set(['anna', 'bella', 'claire', 'diana', 'charles', 'david']);
+const PHIL_COACH_VOICE = 'FunAudioLLM/CosyVoice2-0.5B:anna';
 
 function rateLimited(ip: string): boolean {
   const now = Date.now();
@@ -34,12 +33,9 @@ export async function POST(request: NextRequest) {
   if (rateLimited(ip)) return NextResponse.json({ error: 'too-many' }, { status: 429 });
 
   let text = '';
-  let voice = 'anna';
   try {
-    const body = (await request.json()) as { text?: unknown; voice?: unknown };
+    const body = (await request.json()) as { text?: unknown };
     text = typeof body.text === 'string' ? body.text.trim().slice(0, MAX_CHARS) : '';
-    const v = typeof body.voice === 'string' ? body.voice : '';
-    if (VOICES.has(v)) voice = v;
   } catch {
     return NextResponse.json({ error: 'bad-json' }, { status: 400 });
   }
@@ -55,7 +51,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: 'FunAudioLLM/CosyVoice2-0.5B',
         input: text,
-        voice: `FunAudioLLM/CosyVoice2-0.5B:${voice}`,
+        voice: PHIL_COACH_VOICE,
         response_format: 'mp3',
         speed: 0.9,          // 稍慢，贴陪伴的语速
       }),

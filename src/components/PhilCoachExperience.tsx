@@ -2,7 +2,12 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { TTS_VOICES, useServerSpeech, useServerSpeechInput } from '@/lib/voiceServer';
+import { useSpeechInput } from '@/lib/voice';
+import {
+  PHIL_COACH_TTS_VOICE,
+  useServerSpeech,
+  useServerSpeechInput,
+} from '@/lib/voiceServer';
 import type { VoiceAnalysis } from '@/lib/philCoachVoice';
 import {
   PHIL_PATHS,
@@ -78,9 +83,40 @@ function seedThread(path: PhilPath, opening: string): ThreadItem[] {
   return thread;
 }
 
+function mergeTranscript(current: string, transcript: string): { text: string; complete: boolean } {
+  const addition = transcript.trim();
+  if (!addition) return { text: current, complete: false };
+  const separator = current.trim() ? ' ' : '';
+  const merged = `${current.trimEnd()}${separator}${addition}`;
+  return { text: merged.slice(0, 1200), complete: merged.length <= 1200 };
+}
+
+function appendTranscript(current: string, transcript: string): string {
+  return mergeTranscript(current, transcript).text;
+}
+
+function MicrophoneIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current">
+      <rect x="9" y="3" width="6" height="11" rx="3" strokeWidth="1.8" />
+      <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M9 21h6" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function VoiceWaveIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current">
+      <path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function PhilCoachExperience() {
   const [session, setSession] = useState<Session | null>(null);
   const [draft, setDraft] = useState('');
+  const draftRef = useRef('');
+  const [voiceInputNotice, setVoiceInputNotice] = useState('');
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -104,10 +140,34 @@ export default function PhilCoachExperience() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const pendingVoiceContextRef = useRef<VoiceAnalysis | null>(null);
   const retryVoiceContextRef = useRef<VoiceAnalysis | null>(null);
-  // 语音：说给它听 / 听它说
+  // 语音：实时听写 / 录音后识别 / 听它说
+  const liveVoice = useSpeechInput(text => {
+    const currentDraft = draftRef.current;
+    const merged = mergeTranscript(currentDraft, text);
+    draftRef.current = merged.text;
+    setDraft(merged.text);
+    setVoiceInputNotice(
+      merged.complete
+        ? ''
+        : currentDraft.length >= 1200
+          ? '输入框已到 1200 字，后面的实时听写没有加入。请点击完成。'
+          : '输入框已到 1200 字，最后一句只有前面一部分被加入。请点击完成。',
+    );
+    pendingVoiceContextRef.current = null;
+  });
   const voiceIn = useServerSpeechInput(result => {
-    setDraft(d => (d ? `${d} ${result.text}` : result.text));
-    pendingVoiceContextRef.current = result.voiceContext;
+    const currentDraft = draftRef.current;
+    const merged = mergeTranscript(currentDraft, result.text);
+    draftRef.current = merged.text;
+    setDraft(merged.text);
+    pendingVoiceContextRef.current = merged.complete ? result.voiceContext : null;
+    setVoiceInputNotice(
+      merged.complete
+        ? ''
+        : currentDraft.length >= 1200
+          ? '输入框已到 1200 字，这段录音没有加入。'
+          : '输入框已到 1200 字，这段话只有前面一部分被加入。',
+    );
   });
   const voiceOut = useServerSpeech();
   const spokenRef = useRef<string>('');
@@ -116,6 +176,13 @@ export default function PhilCoachExperience() {
   const path = session ? getPhilPath(session.pathId) : undefined;
   const hasConversation = Boolean(session?.thread.length);
   const conversationReady = identityReady && importState !== 'importing';
+  const displayedDraft = liveVoice.interim
+    ? appendTranscript(draft, liveVoice.interim)
+    : draft;
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
 
   // 挂载时恢复上一次未走完的对话（去登录/注册回来后，聊过的内容不会丢）
   useEffect(() => {
@@ -254,6 +321,7 @@ export default function PhilCoachExperience() {
 
   function begin(p: PhilPath) {
     if (!identityReady || importPromiseRef.current) return;
+    liveVoice.cancel();
     voiceIn.cancel();
     // 方案A：走完第一条小径后，未登录且（未登记或未获通过）→ 先走登记/等待流程
     if (!loggedIn && !(guestKnown && guestApproved) && pathsDone() >= 1) {
@@ -262,6 +330,7 @@ export default function PhilCoachExperience() {
       return;
     }
     setDraft('');
+    setVoiceInputNotice('');
     setCopied(false);
     setError('');
     setKeepState('idle');
@@ -271,10 +340,12 @@ export default function PhilCoachExperience() {
   }
 
   function reset() {
+    liveVoice.cancel();
     voiceIn.cancel();
     if (session?.thread.some(t => t.kind === 'me')) markPathDone();
     setSession(null);
     setDraft('');
+    setVoiceInputNotice('');
     setCopied(false);
     setLoading(false);
     setError('');
@@ -349,7 +420,15 @@ export default function PhilCoachExperience() {
   }
 
   async function submit() {
-    if (!path || !session || loading || voiceIn.transcribing) return;
+    if (
+      !path ||
+      !session ||
+      loading ||
+      liveVoice.listening ||
+      voiceIn.requesting ||
+      voiceIn.recording ||
+      voiceIn.transcribing
+    ) return;
     const answer = draft.trim();
     if (!answer) return;
     const capturedVoiceContext = pendingVoiceContextRef.current;
@@ -359,6 +438,7 @@ export default function PhilCoachExperience() {
     const nextThread: ThreadItem[] = [...session.thread, { kind: 'me', text: answer }];
     setSession({ ...session, thread: nextThread });
     setDraft('');
+    setVoiceInputNotice('');
     setError('');
     setLoading(true);
 
@@ -377,6 +457,32 @@ export default function PhilCoachExperience() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function toggleLiveVoice() {
+    if (loading || voiceIn.transcribing) return;
+    voiceOut.stop();
+    if (liveVoice.listening) {
+      liveVoice.stop();
+      return;
+    }
+    voiceIn.cancel();
+    pendingVoiceContextRef.current = null;
+    setVoiceInputNotice('');
+    liveVoice.start();
+  }
+
+  function toggleRecordedVoice() {
+    if (loading || voiceIn.transcribing) return;
+    voiceOut.stop();
+    if (voiceIn.recording) {
+      voiceIn.stop();
+      return;
+    }
+    liveVoice.cancel();
+    pendingVoiceContextRef.current = null;
+    setVoiceInputNotice('');
+    void voiceIn.start();
   }
 
   /** 轻登记：留下称呼+微信 → 进入「等待开通」状态（主理人邮件里点击通过后放行） */
@@ -410,6 +516,7 @@ export default function PhilCoachExperience() {
       setPendingPathId(null);
       if (p) {
         setDraft('');
+        setVoiceInputNotice('');
         setCopied(false);
         setError('');
         setKeepState('idle');
@@ -741,42 +848,162 @@ export default function PhilCoachExperience() {
               {error}
             </div>
           )}
-          {/* 语音：说给它听 / 听它说 —— 不支持的浏览器上按钮直接不出现 */}
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-              {voiceIn.supported && (
-                <button
-                  onClick={voiceIn.toggle}
-                  disabled={loading || voiceIn.transcribing}
-                  type="button"
-                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] transition-colors disabled:opacity-50 ${
-                    voiceIn.recording
-                      ? 'border-coral-soft/60 bg-coral-soft/20 text-coral-soft'
-                      : 'border-white/16 bg-white/[0.05] text-white/70 hover:bg-white/12 hover:text-white'
-                  }`}
-                >
-                  <span aria-hidden="true">{voiceIn.recording ? '◉' : '🎙'}</span>
-                  {voiceIn.transcribing
-                    ? '正在把话变成字…'
-                    : voiceIn.recording
-                      ? '在听着，说完点一下'
-                      : '说给它听'}
-                </button>
-              )}
+          <section aria-labelledby="voice-input-title" className="mb-4">
+            <div>
+              <h3 id="voice-input-title" className="text-[14px] font-medium text-white/78">
+                用声音输入
+              </h3>
+              <p className="mt-1 text-[13px] leading-relaxed text-white/55">
+                选择一种方式。文字会先进入输入框，由你确认后再发送。
+              </p>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3 max-sm:grid-cols-1">
               <button
-                  onClick={() => voiceOut.setEnabled(!voiceOut.enabled)}
-                  type="button"
-                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] transition-colors ${
-                    voiceOut.enabled
-                      ? 'border-coral-soft/60 bg-coral-soft/20 text-coral-soft'
-                      : 'border-white/16 bg-white/[0.05] text-white/70 hover:bg-white/12 hover:text-white'
-                  }`}
-                >
-                  <span aria-hidden="true">{voiceOut.enabled ? '🔊' : '🔈'}</span>
-                  {voiceOut.enabled
-                    ? voiceOut.loading
-                      ? '正在准备声音…'
-                      : '读给你听（开）'
-                    : '读给我听'}
+                onClick={toggleLiveVoice}
+                disabled={
+                  !liveVoice.supported ||
+                  loading ||
+                  (!liveVoice.listening && draft.length >= 1200) ||
+                  liveVoice.stopping ||
+                  voiceIn.requesting ||
+                  voiceIn.recording ||
+                  voiceIn.transcribing
+                }
+                aria-pressed={liveVoice.listening}
+                type="button"
+                className={`min-h-[92px] rounded-2xl border p-3.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                  liveVoice.listening
+                    ? 'border-coral-soft/75 bg-coral-soft/20 text-coral-soft'
+                    : 'border-white/14 bg-white/[0.055] text-white/76 hover:border-white/25 hover:bg-white/10'
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${liveVoice.listening ? 'bg-coral-soft text-[#24140f]' : 'bg-white/9'}`}>
+                    <VoiceWaveIcon />
+                  </span>
+                  <span>
+                    <span className="block text-[14px] font-medium">
+                      {liveVoice.stopping
+                        ? '正在完成'
+                        : liveVoice.listening
+                          ? '完成实时输入'
+                          : '实时输入'}
+                    </span>
+                    <span className="mt-1 block text-[12px] leading-relaxed opacity-75">
+                      {liveVoice.stopping
+                        ? '正在收好最后一句话'
+                        : liveVoice.listening
+                          ? '持续听写中 · 点此完成'
+                          : liveVoice.supported
+                            ? '边说边显示文字'
+                            : '当前浏览器不可用'}
+                    </span>
+                  </span>
+                </span>
+              </button>
+              <button
+                onClick={toggleRecordedVoice}
+                disabled={
+                  !voiceIn.supported ||
+                  loading ||
+                  (!voiceIn.recording && draft.length >= 1200) ||
+                  liveVoice.listening ||
+                  liveVoice.stopping ||
+                  voiceIn.requesting ||
+                  voiceIn.transcribing
+                }
+                aria-pressed={voiceIn.recording}
+                type="button"
+                className={`min-h-[92px] rounded-2xl border p-3.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                  voiceIn.recording
+                    ? 'border-coral-soft/75 bg-coral-soft/20 text-coral-soft'
+                    : 'border-white/14 bg-white/[0.055] text-white/76 hover:border-white/25 hover:bg-white/10'
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${voiceIn.recording ? 'bg-coral-soft text-[#24140f]' : 'bg-white/9'}`}>
+                    <MicrophoneIcon />
+                  </span>
+                  <span>
+                    <span className="block text-[14px] font-medium">
+                      {voiceIn.requesting
+                        ? '正在打开麦克风'
+                        : voiceIn.transcribing
+                          ? '正在识别'
+                          : voiceIn.recording
+                            ? '完成录音'
+                            : '录一段'}
+                    </span>
+                    <span className="mt-1 block text-[12px] leading-relaxed opacity-75">
+                      {voiceIn.transcribing
+                        ? '文字马上回来'
+                        : voiceIn.recording
+                          ? '正在听 · 点此完成'
+                          : voiceIn.supported
+                            ? '说完后点击完成'
+                            : '当前环境不可用'}
+                    </span>
+                  </span>
+                </span>
+              </button>
+            </div>
+            {!liveVoice.supported && (
+              <p className="mt-2 text-[12px] leading-relaxed text-white/50">
+                {liveVoice.inWeChat
+                  ? '微信内暂不支持实时听写，可使用「录一段」，或在系统浏览器打开。'
+                  : '当前浏览器暂不支持实时听写，可使用「录一段」。'}
+              </p>
+            )}
+            <p aria-live="polite" className="sr-only">
+              {liveVoice.stopping
+                ? '正在完成实时输入'
+                : liveVoice.listening
+                  ? '正在实时听写，点击完成实时输入即可结束'
+                  : voiceIn.requesting
+                    ? '正在请求麦克风权限'
+                    : voiceIn.recording
+                      ? '正在录音，点击完成录音即可结束'
+                      : voiceIn.transcribing
+                        ? '正在把录音识别成文字'
+                        : ''}
+            </p>
+          </section>
+          {voiceIn.error && (
+            <div role="alert" className="mb-3 text-[12px] text-coral-soft/90">{voiceIn.error}</div>
+          )}
+          {liveVoice.error && (
+            <div role="alert" className="mb-3 text-[12px] text-coral-soft/90">{liveVoice.error}</div>
+          )}
+          {voiceInputNotice && (
+            <div role="status" className="mb-3 text-[12px] text-coral-soft/90">
+              {voiceInputNotice}
+            </div>
+          )}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.035] px-4 py-3">
+            <div>
+              <div className="text-[13px] text-white/68">朗读 Phil Coach 的回复</div>
+              <div className="mt-0.5 text-[12px] text-white/50">
+                固定音色 · {PHIL_COACH_TTS_VOICE.label}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => voiceOut.setEnabled(!voiceOut.enabled)}
+                aria-pressed={voiceOut.enabled}
+                type="button"
+                className={`rounded-full border px-4 py-2 text-[13px] transition-colors ${
+                  voiceOut.enabled
+                    ? 'border-coral-soft/60 bg-coral-soft/18 text-coral-soft'
+                    : 'border-white/14 bg-white/[0.05] text-white/62 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                {voiceOut.enabled
+                  ? voiceOut.loading
+                    ? '正在准备…'
+                    : voiceOut.speaking
+                      ? '正在朗读'
+                      : '已开启'
+                  : '开启朗读'}
               </button>
               {voiceOut.speaking && (
                 <button
@@ -787,55 +1014,48 @@ export default function PhilCoachExperience() {
                   停下来
                 </button>
               )}
-              {voiceOut.playbackBlocked && (
-                <button
-                  onClick={voiceOut.resume}
-                  type="button"
-                  className="rounded-full border border-coral-soft/50 bg-coral-soft/12 px-4 py-2 text-[13px] text-coral-soft"
-                >
-                  ▶ 点一下播放声音
-                </button>
-              )}
-              {voiceOut.enabled && (
-                <label className="flex items-center gap-1.5 text-[12px] text-white/35">
-                  嗓音
-                  <select
-                    value={voiceOut.voice}
-                    onChange={e => voiceOut.setVoice(e.target.value)}
-                    className="rounded-lg border border-white/12 bg-[#161d18] px-2 py-1 text-[12px] text-white/70 focus:outline-none"
-                  >
-                    {TTS_VOICES.map(v => (
-                      <option key={v.id} value={v.id}>
-                        {v.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            </div>
+            {voiceOut.playbackBlocked && (
+              <button
+                onClick={voiceOut.resume}
+                type="button"
+                className="w-full rounded-full border border-coral-soft/50 bg-coral-soft/12 px-4 py-2 text-[13px] text-coral-soft"
+              >
+                ▶ 点一下播放声音
+              </button>
             )}
           </div>
-          {voiceIn.error && (
-            <div className="mb-3 text-[12px] text-coral-soft/90">{voiceIn.error}</div>
-          )}
           {voiceOut.error && (
-            <div className="mb-3 text-[12px] text-coral-soft/90">{voiceOut.error}</div>
+            <div role="alert" className="mb-3 text-[12px] text-coral-soft/90">{voiceOut.error}</div>
           )}
           <textarea
-            value={draft}
+            value={displayedDraft}
             onChange={e => {
+              draftRef.current = e.target.value;
               setDraft(e.target.value);
+              setVoiceInputNotice('');
               pendingVoiceContextRef.current = null;
             }}
             onKeyDown={e => {
               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit();
             }}
-            disabled={loading}
+            disabled={loading || voiceIn.transcribing}
+            readOnly={liveVoice.listening}
             rows={3}
             maxLength={1200}
-            placeholder={voiceIn.recording ? '在听着…想到什么就说' : '照此刻真实的样子说就好…'}
+            placeholder={
+              liveVoice.listening || voiceIn.recording
+                ? '在听着…想到什么就说'
+                : '照此刻真实的样子说就好…'
+            }
             className="w-full resize-none rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[15px] leading-relaxed text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none disabled:opacity-55"
           />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
-            <span className="text-[11px] text-white/26">慢慢写，最多 1200 字 · ⌘/Ctrl + Enter 发送</span>
+            <span className="text-[12px] text-white/45">
+              {displayedDraft.length >= 1200
+                ? '已到 1200 字上限'
+                : `${displayedDraft.length}/1200 字 · ⌘/Ctrl + Enter 发送`}
+            </span>
             <div className="flex flex-wrap gap-3">
               {hasConversation && loggedIn && session.thread.some(t => t.kind === 'me') && (
                 <button
@@ -864,7 +1084,14 @@ export default function PhilCoachExperience() {
               )}
               <button
                 onClick={submit}
-                disabled={loading || voiceIn.transcribing || !draft.trim()}
+                disabled={
+                  loading ||
+                  liveVoice.listening ||
+                  voiceIn.requesting ||
+                  voiceIn.recording ||
+                  voiceIn.transcribing ||
+                  !draft.trim()
+                }
                 type="button"
                 className="rounded-full bg-white px-6 py-2.5 text-[14px] font-medium text-[#141a12] transition-opacity disabled:opacity-35"
               >

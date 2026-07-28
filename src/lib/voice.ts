@@ -1,10 +1,7 @@
 'use client';
 
-// phil-coach 的语音能力：说给它听（识别）+ 听它说（朗读）。
-// 全部用浏览器原生 API，不依赖任何第三方服务，也不上传音频。
-// 兼容性说明：识别依赖 webkitSpeechRecognition（Chrome/Edge/部分安卓 WebView 支持，
-// iOS Safari 与微信内置浏览器多半不支持）；朗读用 speechSynthesis，覆盖面广得多。
-// 因此两个能力各自独立探测、各自降级，不支持时相关按钮直接不出现。
+// 浏览器原生的实时语音识别。部分浏览器会把音频交给浏览器厂商的识别服务；
+// 因此这里只作为渐进增强，微信等不可靠环境会降级到录音后上传转写。
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
@@ -58,45 +55,65 @@ export function useSpeechInput(onText: (text: string) => void) {
   // 微信里即使有 API 也拿不到麦克风，视为不可用，改为引导去浏览器打开
   const supported = rawSupported && !inWeChat;
   const [listening, setListening] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [interim, setInterim] = useState('');
   const [error, setError] = useState('');
   const recRef = useRef<RecognitionInstance | null>(null);
+  const wantedRef = useRef(false);
+  const stoppingRef = useRef(false);
+  const pendingRef = useRef('');
+  const generationRef = useRef(0);
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startRecognitionRef = useRef<() => void>(() => undefined);
+  const startedAtRef = useRef(0);
+  const quickEndCountRef = useRef(0);
   const onTextRef = useRef(onText);
 
   useEffect(() => {
     onTextRef.current = onText;
   }, [onText]);
 
-  useEffect(() => {
-    return () => {
-      try {
-        recRef.current?.abort();
-      } catch {
-        /* ignore */
-      }
-    };
-  }, []);
-
-  const stop = useCallback(() => {
-    try {
-      recRef.current?.stop();
-    } catch {
-      /* ignore */
+  const clearRestartTimer = useCallback(() => {
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
     }
-    setListening(false);
-    setInterim('');
   }, []);
 
-  const start = useCallback(() => {
+  const clearStopTimer = useCallback(() => {
+    if (stopTimerRef.current) {
+      clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
+  }, []);
+
+  const commitPending = useCallback(() => {
+    const text = pendingRef.current.trim();
+    pendingRef.current = '';
+    setInterim('');
+    if (text) onTextRef.current(text);
+  }, []);
+
+  const startRecognition = useCallback(() => {
+    if (!wantedRef.current || typeof document === 'undefined' || document.hidden) return;
     const Ctor = getRecognitionCtor();
-    if (!Ctor) return;
-    setError('');
+    if (!Ctor) {
+      wantedRef.current = false;
+      setListening(false);
+      setError('这个浏览器暂时不支持实时语音输入。');
+      return;
+    }
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
     try {
       const rec = new Ctor();
       rec.lang = 'zh-CN';
       rec.continuous = true;
       rec.interimResults = true;
       rec.onresult = e => {
+        if (generationRef.current !== generation || recRef.current !== rec) return;
+        quickEndCountRef.current = 0;
         let finalText = '';
         let pending = '';
         for (let i = e.resultIndex; i < e.results.length; i += 1) {
@@ -106,37 +123,193 @@ export function useSpeechInput(onText: (text: string) => void) {
           else pending += text;
         }
         if (finalText) onTextRef.current(finalText);
+        pendingRef.current = pending;
         setInterim(pending);
       };
       rec.onerror = e => {
-        // no-speech / aborted 属于常见且无害的情况，不打扰用户
+        if (generationRef.current !== generation || recRef.current !== rec) return;
+        const fatal = e.error !== 'no-speech' && e.error !== 'aborted';
+        if (fatal) {
+          wantedRef.current = false;
+          clearRestartTimer();
+          clearStopTimer();
+        }
         if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
           setError('没有拿到麦克风权限，可以在浏览器设置里允许后再试。');
+        } else if (e.error === 'audio-capture') {
+          setError('没有找到可用的麦克风，可以检查设备后再试。');
+        } else if (e.error === 'network') {
+          setError('实时听写暂时连不上，可以改用「录一段」。');
         } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
           setError('刚才没听清，再说一次试试。');
         }
-        setListening(false);
-        setInterim('');
+        if (fatal) {
+          setListening(false);
+          stoppingRef.current = false;
+          setStopping(false);
+          commitPending();
+        }
       };
       rec.onend = () => {
-        setListening(false);
-        setInterim('');
+        if (generationRef.current !== generation || recRef.current !== rec) return;
+        recRef.current = null;
+        clearStopTimer();
+        commitPending();
+        stoppingRef.current = false;
+        setStopping(false);
+        if (!wantedRef.current) {
+          setListening(false);
+          return;
+        }
+        if (typeof document !== 'undefined' && document.hidden) return;
+        quickEndCountRef.current = Date.now() - startedAtRef.current < 1500
+          ? quickEndCountRef.current + 1
+          : 0;
+        if (quickEndCountRef.current >= 3) {
+          wantedRef.current = false;
+          setListening(false);
+          setError('实时听写没有成功保持开启，可以改用「录一段」。');
+          return;
+        }
+        restartTimerRef.current = setTimeout(() => startRecognitionRef.current(), 250);
       };
       recRef.current = rec;
+      startedAtRef.current = Date.now();
       rec.start();
       setListening(true);
     } catch {
+      recRef.current = null;
+      wantedRef.current = false;
+      stoppingRef.current = false;
+      setStopping(false);
       setError('这个浏览器暂时不支持语音输入。');
       setListening(false);
     }
-  }, []);
+  }, [clearRestartTimer, clearStopTimer, commitPending]);
+
+  useEffect(() => {
+    startRecognitionRef.current = startRecognition;
+  }, [startRecognition]);
+
+  const start = useCallback(() => {
+    if (!supported || wantedRef.current || stoppingRef.current) return;
+    clearRestartTimer();
+    clearStopTimer();
+    setError('');
+    wantedRef.current = true;
+    stoppingRef.current = false;
+    setStopping(false);
+    quickEndCountRef.current = 0;
+    setListening(true);
+    startRecognitionRef.current();
+  }, [clearRestartTimer, clearStopTimer, supported]);
+
+  const stop = useCallback(() => {
+    if (stoppingRef.current) return;
+    wantedRef.current = false;
+    clearRestartTimer();
+    const rec = recRef.current;
+    if (!rec) {
+      commitPending();
+      setListening(false);
+      return;
+    }
+    stoppingRef.current = true;
+    setStopping(true);
+    try {
+      rec.stop();
+      if (stoppingRef.current && recRef.current === rec) {
+        stopTimerRef.current = setTimeout(() => {
+          if (!stoppingRef.current || recRef.current !== rec) return;
+          generationRef.current += 1;
+          recRef.current = null;
+          try {
+            rec.abort();
+          } catch {
+            /* ignore */
+          }
+          stoppingRef.current = false;
+          setStopping(false);
+          commitPending();
+          setListening(false);
+        }, 2500);
+      }
+    } catch {
+      recRef.current = null;
+      clearStopTimer();
+      stoppingRef.current = false;
+      setStopping(false);
+      commitPending();
+      setListening(false);
+    }
+  }, [clearRestartTimer, clearStopTimer, commitPending]);
+
+  const cancel = useCallback(() => {
+    wantedRef.current = false;
+    stoppingRef.current = false;
+    clearRestartTimer();
+    clearStopTimer();
+    generationRef.current += 1;
+    const rec = recRef.current;
+    recRef.current = null;
+    try {
+      rec?.abort();
+    } catch {
+      /* ignore */
+    }
+    pendingRef.current = '';
+    setInterim('');
+    setListening(false);
+    setStopping(false);
+  }, [clearRestartTimer, clearStopTimer]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearRestartTimer();
+        if (stoppingRef.current) return;
+        const rec = recRef.current;
+        try {
+          rec?.stop();
+        } catch {
+          /* ignore */
+        }
+        if (rec && recRef.current === rec) {
+          clearStopTimer();
+          stopTimerRef.current = setTimeout(() => {
+            if (recRef.current !== rec) return;
+            generationRef.current += 1;
+            recRef.current = null;
+            try {
+              rec.abort();
+            } catch {
+              /* ignore */
+            }
+            commitPending();
+            if (!document.hidden && wantedRef.current) {
+              restartTimerRef.current = setTimeout(() => startRecognitionRef.current(), 250);
+            }
+          }, 2500);
+        }
+        return;
+      }
+      if (!document.hidden && wantedRef.current && !recRef.current) {
+        clearRestartTimer();
+        restartTimerRef.current = setTimeout(() => startRecognitionRef.current(), 250);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [clearRestartTimer, clearStopTimer, commitPending]);
+
+  useEffect(() => cancel, [cancel]);
 
   const toggle = useCallback(() => {
     if (listening) stop();
     else start();
   }, [listening, start, stop]);
 
-  return { supported, inWeChat, listening, interim, error, start, stop, toggle };
+  return { supported, inWeChat, listening, stopping, interim, error, start, stop, toggle, cancel };
 }
 
 const VOICE_PREF_KEY = 'nf_phil_read_aloud';

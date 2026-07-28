@@ -84,10 +84,6 @@ const noopSubscribe = () => () => {};
 function useClientFlag(probe: () => boolean): boolean {
   return useSyncExternalStore(noopSubscribe, probe, () => false);
 }
-/** SSR 安全地读取一个客户端值（如 localStorage 偏好） */
-function useClientValue(probe: () => string, fallback: string): string {
-  return useSyncExternalStore(noopSubscribe, probe, () => fallback);
-}
 
 function pickMimeType(): string {
   if (typeof MediaRecorder === 'undefined') return '';
@@ -118,6 +114,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       Boolean(navigator.mediaDevices?.getUserMedia) &&
       typeof MediaRecorder !== 'undefined',
   );
+  const [requesting, setRequesting] = useState(false);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [error, setError] = useState('');
@@ -165,6 +162,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       }
     }
     cleanup();
+    setRequesting(false);
     setRecording(false);
     setTranscribing(false);
   }, [cleanup]);
@@ -177,12 +175,14 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     setError('');
+    setRequesting(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (generationRef.current !== generation) {
         stream.getTracks().forEach(track => track.stop());
         return;
       }
+      setRequesting(false);
       streamRef.current = stream;
       const mimeType = pickMimeType();
       const rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
@@ -261,6 +261,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       );
       cleanup();
       busyRef.current = false;
+      setRequesting(false);
       setRecording(false);
     }
   }, [cleanup]);
@@ -279,20 +280,11 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     else void start();
   }, [recording, start, stop]);
 
-  return { supported, recording, transcribing, error, start, stop, toggle, cancel };
+  return { supported, requesting, recording, transcribing, error, start, stop, toggle, cancel };
 }
 
 const TTS_PREF_KEY = 'nf_phil_read_aloud';
-const TTS_VOICE_KEY = 'nf_phil_tts_voice';
-
-export const TTS_VOICES: { id: string; label: string }[] = [
-  { id: 'anna', label: '安然（女声）' },
-  { id: 'bella', label: '贝拉（女声）' },
-  { id: 'claire', label: '克莱尔（女声）' },
-  { id: 'diana', label: '黛安（女声）' },
-  { id: 'charles', label: '沉稳（男声）' },
-  { id: 'david', label: '温和（男声）' },
-];
+export const PHIL_COACH_TTS_VOICE = { id: 'anna', label: '安然（女声）' } as const;
 
 /** 让 phil-coach 的回复用自然的嗓音读出来（服务端神经网络合成） */
 export function useServerSpeech() {
@@ -303,18 +295,8 @@ export function useServerSpeech() {
       return false;
     }
   });
-  const storedVoice = useClientValue(() => {
-    try {
-      return localStorage.getItem(TTS_VOICE_KEY) || 'anna';
-    } catch {
-      return 'anna';
-    }
-  }, 'anna');
-
   const [override, setOverride] = useState<boolean | null>(null);
-  const [voiceOverride, setVoiceOverride] = useState<string | null>(null);
   const enabled = override ?? storedPref;
-  const voice = voiceOverride ?? storedVoice;
   const [speaking, setSpeaking] = useState(false);
   const [loading, setLoading] = useState(false);
   const [playbackBlocked, setPlaybackBlocked] = useState(false);
@@ -354,15 +336,6 @@ export function useServerSpeech() {
     [stop],
   );
 
-  const setVoice = useCallback((v: string) => {
-    setVoiceOverride(v);
-    try {
-      localStorage.setItem(TTS_VOICE_KEY, v);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
   const speak = useCallback(
     async (text: string) => {
       const clean = text.replace(/\s+/g, ' ').trim();
@@ -377,7 +350,7 @@ export function useServerSpeech() {
         const res = await fetch('/api/phil-coach/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: clean, voice }),
+          body: JSON.stringify({ text: clean }),
         });
         if (!res.ok) throw new Error('tts');
         const blob = await res.blob();
@@ -409,13 +382,15 @@ export function useServerSpeech() {
           }
         }
       } catch {
-        setSpeaking(false);
-        setError('声音暂时没有准备好，可以稍后再试。');
+        if (tokenRef.current === token) {
+          setSpeaking(false);
+          setError('声音暂时没有准备好，可以稍后再试。');
+        }
       } finally {
         if (tokenRef.current === token) setLoading(false);
       }
     },
-    [stop, voice],
+    [stop],
   );
 
   const resume = useCallback(() => {
@@ -435,8 +410,6 @@ export function useServerSpeech() {
   return {
     enabled,
     setEnabled,
-    voice,
-    setVoice,
     speaking,
     loading,
     playbackBlocked,
