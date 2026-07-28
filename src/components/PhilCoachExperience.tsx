@@ -128,6 +128,23 @@ function MicrophoneIcon() {
   );
 }
 
+function SpeakerIcon({ waves = true, className = 'h-4 w-4' }: { waves?: boolean; className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={`${className} shrink-0 fill-none stroke-current`}>
+      <path d="M4 9.3h3.3L12 5.4v13.2L7.3 14.7H4z" strokeWidth="1.7" strokeLinejoin="round" />
+      {waves ? (
+        <>
+          <path d="M15.6 9.4a3.6 3.6 0 0 1 0 5.2" strokeWidth="1.7" strokeLinecap="round" />
+          <path d="M18.3 7a7.2 7.2 0 0 1 0 10" strokeWidth="1.7" strokeLinecap="round" />
+        </>
+      ) : (
+        <path d="M16.2 9.8l4.4 4.4M20.6 9.8l-4.4 4.4" strokeWidth="1.7" strokeLinecap="round" />
+      )}
+    </svg>
+  );
+}
+
+
 
 export default function PhilCoachExperience() {
   const [session, setSession] = useState<Session | null>(null);
@@ -228,7 +245,7 @@ export default function PhilCoachExperience() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [session?.thread.length, loading, error]);
 
-  // 开了「读给我听」时，把最新一条回复念出来（同一条不重复念）
+  // 开着朗读时，把最新一条回复念出来（同一条不重复念）
   useEffect(() => {
     if (!voiceOut.enabled || !session) return;
     const last = [...session.thread].reverse().find(t => t.kind === 'coach');
@@ -794,20 +811,6 @@ export default function PhilCoachExperience() {
           <div className="mt-2 text-[12px] text-white/30">这一段只在此刻发生，不会被保存 · 说完就散</div>
         </div>
         <button
-          onClick={() => voiceOut.setEnabled(!voiceOut.enabled)}
-          aria-pressed={voiceOut.enabled}
-          type="button"
-          title={voiceOut.enabled ? '正在读给你听 · 点一下关掉' : '让它读给你听'}
-          className={`mr-3 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] transition-colors ${
-            voiceOut.enabled
-              ? 'border-coral-soft/55 bg-coral-soft/15 text-coral-soft'
-              : 'border-white/12 bg-white/[0.04] text-white/50 hover:text-white'
-          }`}
-        >
-          <span aria-hidden="true">{voiceOut.enabled ? '🔊' : '🔈'}</span>
-          {voiceOut.enabled ? (voiceOut.loading ? '准备中' : '读给你听') : '读给我听'}
-        </button>
-        <button
           onClick={reset}
           className="text-[13px] text-white/40 underline-offset-4 transition-colors hover:text-white"
         >
@@ -870,6 +873,18 @@ export default function PhilCoachExperience() {
           )}
           {voiceOut.error && (
             <div role="alert" className="mb-3 text-[12px] text-coral-soft/90">{voiceOut.error}</div>
+          )}
+          {voiceOut.playbackBlocked && (
+            <div role="status" className="mb-3 flex flex-wrap items-center gap-2 text-[12px] text-white/55">
+              浏览器挡住了自动播放
+              <button
+                onClick={voiceOut.resume}
+                type="button"
+                className="rounded-full border border-coral-soft/40 px-2.5 py-1 text-coral-soft transition-colors hover:bg-coral-soft/12"
+              >
+                点一下就能听
+              </button>
+            </div>
           )}
           <div
             className={`relative rounded-2xl border transition-colors ${
@@ -936,7 +951,30 @@ export default function PhilCoachExperience() {
                   placeholder="照此刻真实的样子说就好…"
                   className="w-full resize-none rounded-2xl border-0 bg-transparent px-4 pb-1 pt-3.5 text-[15px] leading-relaxed text-white placeholder:text-white/28 focus:outline-none disabled:opacity-55"
                 />
-                <div className="flex items-center justify-end gap-2 px-3 pb-3">
+                <div className="flex items-center justify-between gap-2 px-3 pb-3">
+                  {/* 朗读开关：和麦克风放在一起，说和听在同一排 */}
+                  <button
+                    onClick={() => voiceOut.setEnabled(!voiceOut.enabled)}
+                    aria-pressed={voiceOut.enabled}
+                    type="button"
+                    title={
+                      voiceOut.enabled
+                        ? 'phil-coach 的回复会读出来 · 点一下关掉'
+                        : '打开后，phil-coach 的回复会读出来'
+                    }
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] transition-colors ${
+                      voiceOut.enabled
+                        ? 'border-coral-soft/55 bg-coral-soft/12 text-coral-soft'
+                        : 'border-white/12 bg-white/[0.04] text-white/45 hover:text-white'
+                    }`}
+                  >
+                    <SpeakerIcon waves={voiceOut.enabled} />
+                    {voiceOut.enabled
+                      ? voiceOut.loading
+                        ? '准备中'
+                        : '读给我听 · 开'
+                      : '读给我听'}
+                  </button>
                   {voiceIn.supported && (
                     <button
                       onClick={voiceIn.start}
