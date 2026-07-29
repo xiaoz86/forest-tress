@@ -59,8 +59,11 @@ export default async function Home() {
   const showcaseCenter =
     visible.find(n => (n.name || '').toLowerCase() === 'doratest') || visible[0] || null;
 
+  // 把森林里的人都放进关系网，别只截前 6 个；上限 9 是为了以后人多时不至于挤成一团
   const showcaseGraph =
-    showcaseCenter && visible.length > 1 ? buildRelationGraph(showcaseCenter, visible, 6) : null;
+    showcaseCenter && visible.length > 1
+      ? buildRelationGraph(showcaseCenter, visible, Math.min(9, visible.length - 1))
+      : null;
 
   return (
     <>

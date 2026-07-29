@@ -52,7 +52,12 @@ export default function Nav() {
     'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-forest px-6 text-[14px] font-medium text-white no-underline shadow-[0_14px_28px_rgba(47,81,61,0.18)] transition-all hover:-translate-y-0.5 hover:bg-forest-dark';
 
   return (
-    <div className="fixed left-1/2 top-4 z-[100] w-[min(calc(100%-28px),1220px)] -translate-x-1/2 rounded-[999px] border border-white/50 bg-paper/[0.82] shadow-[0_12px_38px_rgba(31,48,37,0.07)] backdrop-blur-[18px] max-md:top-2 max-md:w-[calc(100%-16px)]">
+    <div
+      className={`fixed left-1/2 top-4 z-[100] w-[min(calc(100%-28px),1220px)] -translate-x-1/2 border border-white/50 bg-paper/[0.82] shadow-[0_12px_38px_rgba(31,48,37,0.07)] backdrop-blur-[18px] max-md:top-2 max-md:w-[calc(100%-16px)] ${
+        // 展开后容器变高，999px 圆角会把它撑成一个盖住半屏的巨大椭圆
+        menuOpen ? 'rounded-[26px]' : 'rounded-[999px]'
+      }`}
+    >
       <nav className="flex h-[68px] items-center justify-between gap-6 pl-6 pr-3.5 max-md:h-[62px] max-md:pl-4">
         <Link
           href="/"

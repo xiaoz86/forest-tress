@@ -19,18 +19,33 @@ const W = 720;
 const H = 520;
 const STEP_MS = 380;
 
-// layoutGraph 只保证圆心落在画布内，没算头像半径和名字占的位置，
-// 于是顶部节点会顶出容器压到上面的标题。这里把整张图收进内边距：
-// 上留头像半径，下再多留一行名字加城市，左右留名字的一半宽度。
-const PAD = { top: 52, bottom: 68, x: 58 };
-const fitX = (x: number): number => PAD.x + (x / W) * (W - PAD.x * 2);
-const fitY = (y: number): number => PAD.top + (y / H) * (H - PAD.top - PAD.bottom);
-
 const STRENGTH_ORDER: Record<'strong' | 'medium' | 'weak', number> = {
   strong: 0,
   medium: 1,
   weak: 2,
 };
+
+// 头像和名字是固定像素，容器却随视口缩放：手机上容器只有 375 宽、
+// 头像还是 56，比例上就顶到一起了。所以按容器宽度缩一档，
+// 再用「缩完之后的真实像素」反推内边距——这样任何宽度都不会重叠。
+const MIN_SCALE = 0.62;
+const LABEL_HALF_W = 48; // 名字块最宽 96，居中后各占一半
+
+function nodeScale(containerWidth: number): number {
+  if (!containerWidth) return 1;
+  return Math.max(MIN_SCALE, Math.min(1, containerWidth / W));
+}
+
+/** 名字 + 城市两行的高度。字号有下限，不能按 scale 线性缩——照线性算会少留位置。 */
+export function nameFontSize(scale: number): number {
+  return Math.max(10, Math.round(12 * scale));
+}
+export function cityFontSize(scale: number): number {
+  return Math.max(9, Math.round(10.5 * scale));
+}
+function labelHeight(scale: number): number {
+  return 6 + (nameFontSize(scale) + cityFontSize(scale)) * 1.5;
+}
 
 export default function RelationNetwork({
   graph,
@@ -38,6 +53,38 @@ export default function RelationNetwork({
   darkBg = false,
   animate = false,
 }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [boxWidth, setBoxWidth] = useState(W);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width;
+      if (w) setBoxWidth(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const scale = nodeScale(boxWidth);
+  const sizeOf = (s: 'strong' | 'medium' | 'weak'): number =>
+    Math.round((s === 'strong' ? 56 : s === 'medium' ? 48 : 40) * scale);
+  const centerSize = Math.round(64 * scale);
+
+  // 容器 1 CSS px = 多少个 viewBox 单位。内边距按真实像素换算过来。
+  // 注意：整块（头像 + 名字）是按整体居中的，所以上下各要留半块高，
+  // 而不是半个头像——按半个头像算，顶上那个节点会连名字一起顶出去。
+  const unitPerPx = boxWidth ? W / boxWidth : 1;
+  const halfBlock = (centerSize + labelHeight(scale)) / 2;
+  const pad = {
+    top: (halfBlock + 14) * unitPerPx,
+    bottom: (halfBlock + 10) * unitPerPx,
+    x: (LABEL_HALF_W * scale + 4) * unitPerPx,
+  };
+  const fitX = (x: number): number => pad.x + (x / W) * (W - pad.x * 2);
+  const fitY = (y: number): number => pad.top + (y / H) * (H - pad.top - pad.bottom);
+
   const positions = layoutGraph(graph, W, H).map(p => ({
     ...p,
     x: fitX(p.x),
@@ -61,7 +108,6 @@ export default function RelationNetwork({
     [revealOrder],
   );
 
-  const containerRef = useRef<HTMLDivElement>(null);
   // 初值是「全亮」：SSR、没有 JS、或不需要动画时，图本来就该是完整的，
   // 绝不能让内容的可见性依赖动画跑起来。
   const [lit, setLit] = useState(revealOrder.length);
@@ -113,9 +159,6 @@ export default function RelationNetwork({
   }, [animate, revealOrder.length]);
 
   const isLit = (id: string): boolean => (rankById.get(id) ?? 0) < lit;
-
-  const sizeOf = (s: 'strong' | 'medium' | 'weak'): number =>
-    s === 'strong' ? 56 : s === 'medium' ? 48 : 40;
 
   // 深色底时边线用接近白的浅色（同时把基础透明度也调亮一档）
   const edgeStroke = darkBg ? '#f5f5f0' : '#1a2e1a';
@@ -176,10 +219,11 @@ export default function RelationNetwork({
       <NodeBubble
         x={centerPos.x}
         y={centerPos.y}
-        size={64}
+        size={centerSize}
         name={graph.center.name}
         avatarUrl={graph.center.avatar_url}
         sublabel={graph.center.city || ''}
+        scale={scale}
         emphasized
         darkBg={darkBg}
         lit={isLit(centerId)}
@@ -196,6 +240,7 @@ export default function RelationNetwork({
             name={n.name}
             avatarUrl={n.avatar_url}
             sublabel={n.city || ''}
+            scale={scale}
             interactive={isMember}
             darkBg={darkBg}
             lit={isLit(n.id || '')}
@@ -227,6 +272,7 @@ function NodeBubble({
   name,
   avatarUrl,
   sublabel,
+  scale = 1,
   emphasized = false,
   interactive = false,
   darkBg = false,
@@ -238,6 +284,7 @@ function NodeBubble({
   name: string;
   avatarUrl?: string | null;
   sublabel?: string;
+  scale?: number;
   emphasized?: boolean;
   interactive?: boolean;
   darkBg?: boolean;
@@ -274,11 +321,23 @@ function NodeBubble({
         />
       </div>
       <div
-        className="pointer-events-none mt-2 text-center"
-        style={{ maxWidth: Math.max(size + 32, 96) }}
+        className="pointer-events-none mt-1.5 text-center"
+        style={{ maxWidth: Math.round(96 * scale) }}
       >
-        <div className={`truncate text-[12px] tracking-wide ${nameCls}`}>{name}</div>
-        {sublabel && <div className={`truncate text-[10.5px] ${subCls}`}>{sublabel}</div>}
+        <div
+          className={`truncate tracking-wide ${nameCls}`}
+          style={{ fontSize: nameFontSize(scale) }}
+        >
+          {name}
+        </div>
+        {sublabel && (
+          <div
+            className={`truncate ${subCls}`}
+            style={{ fontSize: cityFontSize(scale) }}
+          >
+            {sublabel}
+          </div>
+        )}
       </div>
     </div>
   );

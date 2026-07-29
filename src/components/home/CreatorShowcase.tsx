@@ -156,7 +156,7 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
             <Link
               key={node.id}
               href={`/creators/${node.id}`}
-              className="group grid animate-swap-in grid-cols-[auto_1fr_auto] h-full items-start gap-5 rounded-[26px] max-lg:h-[176px] border border-forest-deep/[0.11] bg-[rgba(250,248,242,0.7)] p-7 no-underline transition-all hover:-translate-y-1 hover:bg-[rgba(250,248,242,0.95)] hover:shadow-[0_18px_44px_rgba(42,59,47,0.08)] max-md:p-6"
+              className="group grid animate-swap-in h-full grid-cols-[auto_1fr_auto] items-start gap-5 overflow-hidden rounded-[26px] max-lg:h-[184px] border border-forest-deep/[0.11] bg-[rgba(250,248,242,0.7)] p-7 no-underline transition-all hover:-translate-y-1 hover:bg-[rgba(250,248,242,0.95)] hover:shadow-[0_18px_44px_rgba(42,59,47,0.08)] max-md:p-6"
             >
               <Avatar name={node.name} url={node.avatarUrl} size={52} />
               <div className="min-w-0 overflow-hidden">
@@ -170,7 +170,7 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
                   {[node.topics[0], node.city].filter(Boolean).join(' · ')}
                 </p>
                 {node.doing && (
-                  <p className="mt-3 line-clamp-3 text-[13.5px] leading-[1.8] text-ink-soft">
+                  <p className="mt-3 line-clamp-3 text-[13.5px] leading-[1.8] text-ink-soft max-lg:line-clamp-2">
                     {node.doing}
                   </p>
                 )}
@@ -191,7 +191,7 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
 
           {/* AI 推荐：收成一条轻提示，不做成功能面板 */}
           {sideNodes.length > 0 && (
-            <div className="grid grid-cols-[auto_1fr] items-center gap-3.5 rounded-[22px] bg-forest px-5 py-4 text-cream max-lg:h-[92px]">
+            <div className="grid grid-cols-[auto_1fr] items-center gap-3.5 overflow-hidden rounded-[22px] bg-forest px-5 py-4 text-cream max-lg:h-[96px]">
               <span
                 aria-hidden="true"
                 className="grid h-10 w-10 place-items-center rounded-full border border-white/18 bg-white/[0.08] text-white"
