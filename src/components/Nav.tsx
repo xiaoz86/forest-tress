@@ -12,12 +12,13 @@ type NavLink =
   | { href: string; label: string; type: 'route' };
 
 // 中间那排：品牌已经指向首页，这里就不再重复放「首页」
-const baseLinks: NavLink[] = [
-  { href: '/meditations', label: '林间归处', type: 'route' },
-  { href: '/phil-coach', label: '回到自己', type: 'route' },
-  { href: '/shares', label: '个体创造', type: 'route' },
-  { href: '/creators', label: '遇见附近', type: 'route' },
-  { href: '/about', label: '生态社区', type: 'route' },
+// icon 沿用首页四条小径那套汉字符号，手机菜单排成两列时靠它认路
+const baseLinks: (NavLink & { icon: string })[] = [
+  { href: '/meditations', label: '林间归处', type: 'route', icon: '息' },
+  { href: '/phil-coach', label: '回到自己', type: 'route', icon: '伴' },
+  { href: '/shares', label: '个体创造', type: 'route', icon: '创' },
+  { href: '/creators', label: '遇见附近', type: 'route', icon: '见' },
+  { href: '/about', label: '生态社区', type: 'route', icon: '林' },
 ];
 
 function readMemberId(): string | null {
@@ -124,26 +125,51 @@ export default function Nav() {
       </nav>
 
       {menuOpen && (
-        <div className="hidden flex-col gap-1 border-t border-forest/10 px-6 pb-5 pt-3 max-lg:flex">
-          {baseLinks.map(link => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="border-b border-forest/[0.07] py-3 text-[14px] text-[#445148] no-underline transition-colors hover:text-forest"
-              onClick={() => setMenuOpen(false)}
-            >
-              {link.label}
-            </Link>
-          ))}
-          {!memberId && (
-            <Link
-              href="/login"
-              className="py-3 text-[14px] text-[#445148] no-underline transition-colors hover:text-forest"
-              onClick={() => setMenuOpen(false)}
-            >
-              登录
-            </Link>
-          )}
+        /*
+          两列卡片而不是一行一条：一行一条时右半边整块空着，
+          面板还被拉到近半屏。两列把宽度用满、行数减半，
+          汉字符号也和首页四条小径对得上。
+        */
+        <div className="hidden border-t border-forest/10 px-4 pb-4 pt-3 max-lg:block">
+          <div className="grid grid-cols-2 gap-2">
+            {baseLinks.map((link, i) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMenuOpen(false)}
+                className={`flex items-center gap-3 rounded-2xl bg-forest/[0.05] px-4 py-3.5 no-underline transition-colors active:bg-forest/10 ${
+                  // 奇数个时最后一张占满整行，不留半个空格
+                  i === baseLinks.length - 1 && baseLinks.length % 2 === 1 && memberId
+                    ? 'col-span-2'
+                    : ''
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-paper-soft text-[15px] text-forest"
+                  style={{ fontFamily: 'var(--font-serif)' }}
+                >
+                  {link.icon}
+                </span>
+                <span className="text-[14px] text-[#3a4740]">{link.label}</span>
+              </Link>
+            ))}
+            {!memberId && (
+              <Link
+                href="/login"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-3 rounded-2xl bg-forest/[0.05] px-4 py-3.5 no-underline transition-colors active:bg-forest/10"
+              >
+                <span
+                  aria-hidden="true"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-paper-soft text-[13px] text-forest"
+                >
+                  ↪
+                </span>
+                <span className="text-[14px] text-[#3a4740]">登录</span>
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </div>
