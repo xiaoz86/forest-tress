@@ -160,18 +160,10 @@ export default async function Home() {
               <div className="mb-3 inline-block text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
                 连接 · 共振 · 关系网络
               </div>
-              <h3
-                className="mx-auto max-w-[560px] text-[clamp(1.2rem,2.8vw,1.65rem)] font-semibold leading-[1.5] tracking-[-0.005em] text-forest-deep"
-                style={{ fontFamily: 'var(--font-display)' }}
-              >
-                你做的事，
-                <br className="md:hidden" />
-                需要被同它共振的人看见。
-              </h3>
             </div>
 
             <div className="px-2 max-md:px-0">
-              <RelationNetwork graph={showcaseGraph} isMember={false} />
+              <RelationNetwork graph={showcaseGraph} isMember={false} animate />
             </div>
 
             <p className="mx-auto mt-6 max-w-[520px] text-center text-[13px] leading-[1.9] text-text-light">

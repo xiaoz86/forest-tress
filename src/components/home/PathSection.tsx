@@ -31,21 +31,18 @@ export default function PathSection() {
       className="bg-gradient-to-br from-forest-deep via-[#1f3a1f] to-forest-mid px-8 py-24 max-md:px-5 max-md:py-16"
     >
       <div className="mx-auto max-w-[1080px]">
-        <div className="mb-14 grid grid-cols-[1fr_0.85fr] items-end gap-10 max-md:grid-cols-1 max-md:gap-5">
-          <div>
-            <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-[rgba(238,242,235,0.62)]">
-              How Connection Grows
-            </p>
-            <h2
-              className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-white"
-              style={{ fontFamily: 'var(--font-serif)' }}
-            >
-              连接不必被设计得很用力。
-            </h2>
-          </div>
-          <p className="text-[14px] leading-[1.95] text-white/58">
-            我们只把每个人真实的节点放在森林里，再通过推荐、对话与共同实践，让关系沿着适合自己的速度生长。
+        <div className="mb-14 max-w-[860px]">
+          <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-[rgba(238,242,235,0.62)]">
+            How Connection Grows
           </p>
+          <h2
+            className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.25] tracking-[-0.03em] text-white"
+            style={{ fontFamily: 'var(--font-serif)' }}
+          >
+            连接不必用力，
+            <br />
+            让关系沿着适合自己的速度生长。
+          </h2>
         </div>
 
         <ol className="grid grid-cols-4 gap-8 max-lg:grid-cols-2 max-md:grid-cols-1 max-md:gap-7">

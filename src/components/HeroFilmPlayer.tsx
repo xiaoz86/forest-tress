@@ -49,13 +49,16 @@ export default function HeroFilmPlayer({ variant = 'hero' }: { variant?: Variant
           ref={triggerRef}
           type="button"
           onClick={openFilm}
-          className="grid h-[82px] w-[82px] place-items-center rounded-full border border-white/45 bg-white/[0.14] text-white backdrop-blur-[12px] transition-all hover:-translate-y-0.5 hover:bg-white/25"
+          className="inline-flex items-center gap-3.5 rounded-full border border-white/45 bg-white/[0.14] py-2.5 pl-2.5 pr-6 text-[14.5px] font-medium text-white backdrop-blur-[12px] transition-all hover:-translate-y-0.5 hover:bg-white/25"
           aria-label="观看附近森林理念片"
         >
           <span
             aria-hidden="true"
-            className="ml-[5px] block h-0 w-0 border-y-[9px] border-y-transparent border-l-[14px] border-l-white"
-          />
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-white/40 bg-white/10"
+          >
+            <span className="ml-[3px] block h-0 w-0 border-y-[7px] border-y-transparent border-l-[11px] border-l-white" />
+          </span>
+          观看理念片
         </button>
       ) : (
         <button
