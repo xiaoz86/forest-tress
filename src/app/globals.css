@@ -48,6 +48,16 @@
     animation: fadeIn 1s ease both;
   }
 
+  /*
+    轮播换页用：故意不加 fill-mode。
+    带 both 的话，后台标签页里浏览器会把动画冻在第 0 帧，
+    元素被按在 opacity:0 上——整块内容就隐形了。
+    不填充时未播放期间取元素本来的样式，最坏情况也只是没有淡入。
+  */
+  .animate-swap-in {
+    animation: fadeIn 0.55s ease;
+  }
+
   .animate-fade-in-delay-1 {
     animation: fadeIn 1s ease 0.3s both;
   }
