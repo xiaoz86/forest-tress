@@ -54,47 +54,45 @@ export default function RelationNetwork({
   animate = false,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [boxWidth, setBoxWidth] = useState(W);
+  // 全程在「容器的真实像素」里算。之前布局用 viewBox 单位、内边距用像素，
+  // 两套坐标来回换算，既容易算错，也没法在窄屏改容器比例。
+  const [box, setBox] = useState({ w: W, h: H });
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(entries => {
-      const w = entries[0]?.contentRect.width;
-      if (w) setBoxWidth(w);
+      const r = entries[0]?.contentRect;
+      if (r?.width && r?.height) setBox({ w: r.width, h: r.height });
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  const scale = nodeScale(boxWidth);
+  const scale = nodeScale(box.w);
   const sizeOf = (s: 'strong' | 'medium' | 'weak'): number =>
     Math.round((s === 'strong' ? 56 : s === 'medium' ? 48 : 40) * scale);
   const centerSize = Math.round(64 * scale);
 
-  // 容器 1 CSS px = 多少个 viewBox 单位。内边距按真实像素换算过来。
   // 坐标点就是头像圆心（名字挂在头像下面，不参与居中），
   // 所以上面只需留半个头像，下面要留半个头像加整块名字。
-  const unitPerPx = boxWidth ? W / boxWidth : 1;
   const pad = {
-    top: (centerSize / 2 + 10) * unitPerPx,
-    bottom: (centerSize / 2 + labelHeight(scale) + 10) * unitPerPx,
-    x: (LABEL_HALF_W * scale + 4) * unitPerPx,
+    top: centerSize / 2 + 10,
+    bottom: centerSize / 2 + labelHeight(scale) + 10,
+    x: LABEL_HALF_W * scale + 4,
   };
-  // 等比缩放，不能 x/y 各压各的：上下留白远大于左右，分开压会把圆压成
-  // 竖向扁的椭圆，顶部节点贴到中心去——「上海」就是这么盖到中心头像上的。
-  const availW = W - pad.x * 2;
-  const availH = H - pad.top - pad.bottom;
-  const fitScale = Math.min(availW / W, availH / H);
-  const offX = (W - W * fitScale) / 2;
-  const offY = pad.top + (availH - H * fitScale) / 2;
-  const fitX = (x: number): number => offX + x * fitScale;
-  const fitY = (y: number): number => offY + y * fitScale;
+  const availW = Math.max(40, box.w - pad.x * 2);
+  const availH = Math.max(40, box.h - pad.top - pad.bottom);
+  const cx = box.w / 2;
+  const cy = pad.top + availH / 2;
 
+  // layoutGraph 把节点摆在以短边算半径的圆上——盒子一宽，两侧就空着一大片。
+  // 这里取它的角度和相对半径，重新铺成一个填满可用区域的椭圆。
+  const R = 0.46 * Math.min(W, H); // layoutGraph 的最外圈半径
   const positions = layoutGraph(graph, W, H).map(p => ({
     ...p,
-    x: fitX(p.x),
-    y: fitY(p.y),
+    x: cx + ((p.x - W / 2) / R) * (availW / 2),
+    y: cy + ((p.y - H / 2) / R) * (availH / 2),
   }));
   const posById = new Map(positions.map(p => [p.id, p]));
 
@@ -181,11 +179,14 @@ export default function RelationNetwork({
   const edgeStroke = darkBg ? '#f5f5f0' : '#1a2e1a';
 
   return (
-    <div ref={containerRef} className="relative w-full" style={{ aspectRatio: `${W} / ${H}` }}>
-      {/* 节点用百分比定位，SVG 必须拉满同一个盒子才对得上：
-          meet 会在容器比例有亚像素误差时留边，线就和圆心差几像素。 */}
+    <div
+      ref={containerRef}
+      className="relative w-full aspect-[720/520] max-md:aspect-[5/6]"
+    >
+      {/* viewBox 直接用容器像素尺寸：1 单位 = 1 像素，
+          节点的 left/top 也是像素，两者天然对齐，不留换算误差。 */}
       <svg
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox={`0 0 ${box.w} ${box.h}`}
         preserveAspectRatio="none"
         className="absolute inset-0 block h-full w-full"
         role="img"
@@ -337,8 +338,8 @@ function NodeBubble({
       // 节点就整整偏出半个头像——线看起来接不到圆心。
       className="pointer-events-none absolute"
       style={{
-        left: `${(x / W) * 100}%`,
-        top: `${(y / H) * 100}%`,
+        left: `${x}px`,
+        top: `${y}px`,
         opacity: lit ? 1 : 0,
         // 从略小处浮现，像是刚长出来
         transform: `translate(-50%, -50%) scale(${lit ? 1 : 0.82})`,

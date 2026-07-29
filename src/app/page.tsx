@@ -56,8 +56,9 @@ export default async function Home() {
     .sort((a, b) => Number(!!b.doing) - Number(!!a.doing))
     .slice(0, 12);
 
-  const showcaseCenter =
-    visible.find(n => (n.name || '').toLowerCase() === 'doratest') || visible[0] || null;
+  // 关系网的中心＝最新加入的那棵树（查询已按 created_at 倒序），
+  // 所以每有人加入，这张图和下面那句说明都会自动跟着变
+  const showcaseCenter = visible[0] || null;
 
   // 把森林里的人都放进关系网，别只截前 6 个；上限 9 是为了以后人多时不至于挤成一团
   const showcaseGraph =
