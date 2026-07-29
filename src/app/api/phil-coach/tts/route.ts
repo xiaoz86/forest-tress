@@ -11,7 +11,10 @@ const WINDOW_MS = 5 * 60 * 1000;
 const MAX_PER_WINDOW = 60;
 const buckets = new Map<string, number[]>();
 
-const PHIL_COACH_VOICE = 'FunAudioLLM/CosyVoice2-0.5B:anna';
+// 默认官方音色 anna；配了 PHIL_COACH_TTS_VOICE 就换成克隆音色
+// （speech:xxx:yyy:zzz，由 scripts/clone-phil-voice.mjs 上传参考音频后得到）
+const DEFAULT_VOICE = 'FunAudioLLM/CosyVoice2-0.5B:anna';
+const PHIL_COACH_VOICE = process.env.PHIL_COACH_TTS_VOICE?.trim() || DEFAULT_VOICE;
 
 function rateLimited(ip: string): boolean {
   const now = Date.now();
