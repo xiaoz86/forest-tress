@@ -94,22 +94,49 @@ function appendTranscript(current: string, transcript: string): string {
   return mergeTranscript(current, transcript).text;
 }
 
-/** 声音的可视化：几根随音量跳动的竖条，让人看见自己在被听见 */
-function WaveBars({ level, active }: { level: number; active: boolean }) {
+/** 声音的可视化：几根随音量跳动的竖条，让人看见自己在被听见。
+ *  没声音时收成一排圆点，静止时也不显得是坏了。 */
+function WaveBars({
+  level,
+  active,
+  maxHeight = 32,
+  barWidth = 3,
+  barClassName = 'bg-coral-soft/85',
+}: {
+  level: number;
+  active: boolean;
+  maxHeight?: number;
+  barWidth?: number;
+  barClassName?: string;
+}) {
   const bars = [0.35, 0.6, 0.9, 1, 0.75, 0.5, 0.85, 0.65, 0.4];
   return (
-    <div className="flex h-8 items-center gap-[3px]" aria-hidden="true">
+    <div
+      className="flex items-center justify-center"
+      style={{ height: maxHeight, gap: barWidth }}
+      aria-hidden="true"
+    >
       {bars.map((weight, i) => {
-        const h = active ? Math.max(4, Math.min(32, 4 + level * 30 * weight)) : 4;
+        const h = active
+          ? Math.max(barWidth, Math.min(maxHeight, barWidth + level * (maxHeight - barWidth) * weight * 1.15))
+          : barWidth;
         return (
           <span
             key={i}
-            className="w-[3px] rounded-full bg-coral-soft/85 transition-[height] duration-100 ease-out"
-            style={{ height: `${h}px` }}
+            className={`rounded-full transition-[height] duration-100 ease-out ${barClassName}`}
+            style={{ width: barWidth, height: h }}
           />
         );
       })}
     </div>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current">
+      <path d="M6 6l12 12M18 6L6 18" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -894,42 +921,56 @@ export default function PhilCoachExperience() {
             }`}
           >
             {voiceActive ? (
-              /* 录音态：原地变成波形 + 计时，像 ChatGPT 那样不另开一块地方 */
-              <div className="flex items-center gap-4 px-4 py-4 max-sm:gap-3 max-sm:px-3">
-                <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full bg-coral-soft text-[#24140f]">
-                  {voiceIn.recording && (
-                    <span className="absolute inset-0 animate-ping rounded-full bg-coral-soft/35" />
-                  )}
-                  <span className="relative">
-                    <MicrophoneIcon />
-                  </span>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <WaveBars level={voiceIn.level} active={voiceIn.recording} />
-                  <div className="mt-1.5 text-[12.5px] text-white/55">
-                    {voiceIn.transcribing
-                      ? '正在把话变成字…'
-                      : voiceIn.requesting
-                        ? '正在打开麦克风…'
-                        : `在听着 · ${formatSeconds(voiceIn.elapsed)}`}
-                  </div>
-                </div>
+              /* 录音态：一整块都能点，再点一次就结束——手指不用去瞄小按钮 */
+              <div className="relative">
                 {!voiceIn.transcribing && (
                   <button
                     onClick={voiceIn.cancel}
                     type="button"
-                    className="shrink-0 text-[13px] text-white/45 transition-colors hover:text-white"
+                    aria-label="取消这段录音"
+                    title="取消"
+                    className="absolute right-2 top-2 z-10 grid h-11 w-11 place-items-center rounded-full text-white/30 transition-colors hover:bg-white/10 hover:text-white"
                   >
-                    取消
+                    <CloseIcon />
                   </button>
                 )}
                 <button
                   onClick={voiceIn.stop}
                   disabled={!voiceIn.recording}
                   type="button"
-                  className="shrink-0 rounded-full bg-coral-soft px-5 py-2 text-[13.5px] font-medium text-[#24140f] transition-opacity disabled:opacity-45"
+                  aria-label={voiceIn.recording ? '再次点击以完成录音' : '正在准备'}
+                  className="flex w-full flex-col items-center gap-5 px-4 py-10 disabled:cursor-default"
                 >
-                  完成
+                  <span
+                    className={`relative grid h-28 w-28 place-items-center rounded-full bg-coral-soft/90 ${
+                      voiceIn.transcribing ? 'animate-pulse' : ''
+                    }`}
+                  >
+                    {voiceIn.recording && (
+                      <span className="absolute inset-0 animate-ping rounded-full bg-coral-soft/25" />
+                    )}
+                    <span className="relative">
+                      <WaveBars
+                        level={voiceIn.level}
+                        active={voiceIn.recording}
+                        maxHeight={46}
+                        barWidth={5}
+                        barClassName="bg-[#24140f]/85"
+                      />
+                    </span>
+                  </span>
+                  <span className="text-center">
+                    <span className="block text-[14.5px] text-white/80">
+                      {voiceIn.transcribing
+                        ? '正在把话变成字…'
+                        : voiceIn.requesting
+                          ? '正在打开麦克风…'
+                          : `正在听 · ${formatSeconds(voiceIn.elapsed)}`}
+                    </span>
+                    {voiceIn.recording && (
+                      <span className="mt-1.5 block text-[12.5px] text-white/40">再次点击以完成</span>
+                    )}
+                  </span>
                 </button>
               </div>
             ) : (
