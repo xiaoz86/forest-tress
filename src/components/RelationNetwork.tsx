@@ -73,17 +73,23 @@ export default function RelationNetwork({
   const centerSize = Math.round(64 * scale);
 
   // 容器 1 CSS px = 多少个 viewBox 单位。内边距按真实像素换算过来。
-  // 注意：整块（头像 + 名字）是按整体居中的，所以上下各要留半块高，
-  // 而不是半个头像——按半个头像算，顶上那个节点会连名字一起顶出去。
+  // 坐标点就是头像圆心（名字挂在头像下面，不参与居中），
+  // 所以上面只需留半个头像，下面要留半个头像加整块名字。
   const unitPerPx = boxWidth ? W / boxWidth : 1;
-  const halfBlock = (centerSize + labelHeight(scale)) / 2;
   const pad = {
-    top: (halfBlock + 14) * unitPerPx,
-    bottom: (halfBlock + 10) * unitPerPx,
+    top: (centerSize / 2 + 10) * unitPerPx,
+    bottom: (centerSize / 2 + labelHeight(scale) + 10) * unitPerPx,
     x: (LABEL_HALF_W * scale + 4) * unitPerPx,
   };
-  const fitX = (x: number): number => pad.x + (x / W) * (W - pad.x * 2);
-  const fitY = (y: number): number => pad.top + (y / H) * (H - pad.top - pad.bottom);
+  // 等比缩放，不能 x/y 各压各的：上下留白远大于左右，分开压会把圆压成
+  // 竖向扁的椭圆，顶部节点贴到中心去——「上海」就是这么盖到中心头像上的。
+  const availW = W - pad.x * 2;
+  const availH = H - pad.top - pad.bottom;
+  const fitScale = Math.min(availW / W, availH / H);
+  const offX = (W - W * fitScale) / 2;
+  const offY = pad.top + (availH - H * fitScale) / 2;
+  const fitX = (x: number): number => offX + x * fitScale;
+  const fitY = (y: number): number => offY + y * fitScale;
 
   const positions = layoutGraph(graph, W, H).map(p => ({
     ...p,
@@ -118,21 +124,26 @@ export default function RelationNetwork({
     if (!el) return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 
-    // 已经在视野里就不重演——那会先闪一下再亮，比不动还难看
+    // 挂载时已经在视野里就不熄灭——那会先闪一下再亮，比不动还难看。
+    // 但观察器照装：滚开再回来时还要重播。
     const rect = el.getBoundingClientRect();
-    if (rect.top < window.innerHeight && rect.bottom > 0) return;
+    const visibleOnMount = rect.top < window.innerHeight && rect.bottom > 0;
 
     // 下一帧就熄灭，而不是等观察器回调——回调可能晚一拍，
     // 那会让人先看到完整的图、再突然黑掉重播。此刻元素还在视野外，熄灭看不见。
-    const raf = requestAnimationFrame(() => setLit(0));
+    const raf = visibleOnMount ? 0 : requestAnimationFrame(() => setLit(0));
 
     let timer: ReturnType<typeof setInterval> | null = null;
+    const stop = () => {
+      if (timer) clearInterval(timer);
+      timer = null;
+    };
     const start = () => {
       if (timer) return;
       timer = setInterval(() => {
         setLit(n => {
           if (n >= revealOrder.length) {
-            if (timer) clearInterval(timer);
+            stop();
             return n;
           }
           return n + 1;
@@ -140,19 +151,25 @@ export default function RelationNetwork({
       }, STEP_MS);
     };
 
+    // 完全滚出视野才归零，回来时重新长一遍；
+    // 用 0 而不是 0.25 做归零阈值，免得在屏幕边缘就被清空。
     const io = new IntersectionObserver(
       entries => {
-        if (entries.some(e => e.isIntersecting)) {
+        const entry = entries[entries.length - 1];
+        if (!entry) return;
+        if (entry.intersectionRatio >= 0.25) {
           start();
-          io.disconnect();
+        } else if (entry.intersectionRatio === 0) {
+          stop();
+          setLit(0);
         }
       },
-      { threshold: 0.25 },
+      { threshold: [0, 0.25] },
     );
     io.observe(el);
 
     return () => {
-      cancelAnimationFrame(raf);
+      if (raf) cancelAnimationFrame(raf);
       io.disconnect();
       if (timer) clearInterval(timer);
     };
@@ -165,9 +182,11 @@ export default function RelationNetwork({
 
   return (
     <div ref={containerRef} className="relative w-full" style={{ aspectRatio: `${W} / ${H}` }}>
+      {/* 节点用百分比定位，SVG 必须拉满同一个盒子才对得上：
+          meet 会在容器比例有亚像素误差时留边，线就和圆心差几像素。 */}
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="none"
         className="absolute inset-0 block h-full w-full"
         role="img"
         aria-label="关系网"
@@ -193,22 +212,30 @@ export default function RelationNetwork({
                     : 0.09;
               const sw =
                 e.strength === 'strong' ? 1.4 : e.strength === 'medium' ? 1.1 : 0.9;
-              const dash = e.strength === 'weak' ? '3 5' : undefined;
               // 两端都亮了，这条连接才长出来
               const on = isLit(e.source) && isLit(e.target);
+              // 从先亮的那端伸向后亮的那端——线是「谁伸手去够谁」，
+              // 而不是整条一起淡入，这样才有相遇的感觉
+              const aFirst = (rankById.get(e.source) ?? 0) <= (rankById.get(e.target) ?? 0);
+              const [from, to] = aFirst ? [a, b] : [b, a];
               return (
                 <line
                   key={`e-${i}`}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
+                  x1={from.x}
+                  y1={from.y}
+                  x2={to.x}
+                  y2={to.y}
                   strokeWidth={sw}
                   strokeOpacity={opacity}
-                  strokeDasharray={dash}
+                  // pathLength=1 把长度归一，dasharray=1 就是「整条线一段虚线」，
+                  // 再把 offset 从 1 收到 0，线就一点点长出来
+                  pathLength={1}
+                  strokeDasharray={1}
+                  strokeDashoffset={on ? 0 : 1}
                   style={{
-                    opacity: on ? 1 : 0,
-                    transition: 'opacity 700ms ease 160ms',
+                    transition: on
+                      ? 'stroke-dashoffset 780ms cubic-bezier(0.33, 1, 0.68, 1) 120ms'
+                      : 'none',
                   }}
                 />
               );
@@ -299,8 +326,16 @@ function NodeBubble({
       : 'font-medium text-text-secondary';
   const subCls = darkBg ? 'text-white/55' : 'text-text-light';
   return (
+    /*
+      定位的是「头像圆心」，名字用绝对定位挂在头像下面、不参与居中。
+      名字若参与居中，整块的中心会落在头像与名字之间的空隙上，
+      连线接的就是那个空隙——看起来就是线没接到圆心。
+    */
     <div
-      className="pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+      // 位移只写在下面的 inline transform 里。Tailwind v4 的 -translate-x-1/2
+      // 走的是 CSS translate 属性，和 transform 里的 translate 会叠加，
+      // 节点就整整偏出半个头像——线看起来接不到圆心。
+      className="pointer-events-none absolute"
       style={{
         left: `${(x / W) * 100}%`,
         top: `${(y / H) * 100}%`,
@@ -311,7 +346,7 @@ function NodeBubble({
       }}
     >
       <div
-        className={`pointer-events-auto transition-transform ${interactive ? 'hover:scale-[1.06]' : ''}`}
+        className={`pointer-events-auto relative transition-transform ${interactive ? 'hover:scale-[1.06]' : ''}`}
       >
         <Avatar
           name={name}
@@ -319,25 +354,27 @@ function NodeBubble({
           size={size}
           className={emphasized ? 'ring-2 ring-white' : ''}
         />
-      </div>
-      <div
-        className="pointer-events-none mt-1.5 text-center"
-        style={{ maxWidth: Math.round(96 * scale) }}
-      >
         <div
-          className={`truncate tracking-wide ${nameCls}`}
-          style={{ fontSize: nameFontSize(scale) }}
+          className="pointer-events-none absolute left-1/2 top-full mt-1.5 -translate-x-1/2 text-center"
+          // 按内容取宽，不是一律 96：短名字占死整块宽度时，
+          // 很容易横着撞到隔壁节点的头像
+          style={{ width: 'max-content', maxWidth: Math.round(96 * scale) }}
         >
-          {name}
-        </div>
-        {sublabel && (
           <div
-            className={`truncate ${subCls}`}
-            style={{ fontSize: cityFontSize(scale) }}
+            className={`truncate tracking-wide ${nameCls}`}
+            style={{ fontSize: nameFontSize(scale) }}
           >
-            {sublabel}
+            {name}
           </div>
-        )}
+          {sublabel && (
+            <div
+              className={`truncate ${subCls}`}
+              style={{ fontSize: cityFontSize(scale) }}
+            >
+              {sublabel}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
