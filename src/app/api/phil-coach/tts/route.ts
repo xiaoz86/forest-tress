@@ -11,10 +11,14 @@ const WINDOW_MS = 5 * 60 * 1000;
 const MAX_PER_WINDOW = 60;
 const buckets = new Map<string, number[]>();
 
-// 默认官方音色 anna；配了 PHIL_COACH_TTS_VOICE 就换成克隆音色
-// （speech:xxx:yyy:zzz，由 scripts/clone-phil-voice.mjs 上传参考音频后得到）
-const DEFAULT_VOICE = 'FunAudioLLM/CosyVoice2-0.5B:anna';
-const PHIL_COACH_VOICE = process.env.PHIL_COACH_TTS_VOICE?.trim() || DEFAULT_VOICE;
+// 两个音色：phil 是克隆音色（PHIL_COACH_TTS_VOICE，由 scripts/clone-phil-voice.mjs 上传后得到），
+// anna 是官方音色，留作备选。前端只能传这两个键名——绝不把任意字符串透传给上游。
+const ANNA_VOICE = 'FunAudioLLM/CosyVoice2-0.5B:anna';
+const VOICES: Record<string, string> = {
+  phil: process.env.PHIL_COACH_TTS_VOICE?.trim() || ANNA_VOICE,
+  anna: ANNA_VOICE,
+};
+const DEFAULT_VOICE_KEY = 'phil';
 
 function rateLimited(ip: string): boolean {
   const now = Date.now();
@@ -36,9 +40,12 @@ export async function POST(request: NextRequest) {
   if (rateLimited(ip)) return NextResponse.json({ error: 'too-many' }, { status: 429 });
 
   let text = '';
+  let voiceKey = DEFAULT_VOICE_KEY;
   try {
-    const body = (await request.json()) as { text?: unknown };
+    const body = (await request.json()) as { text?: unknown; voice?: unknown };
     text = typeof body.text === 'string' ? body.text.trim().slice(0, MAX_CHARS) : '';
+    // 认不出的键名一律回落到默认音色，不报错——朗读不该因为这个断掉
+    if (typeof body.voice === 'string' && body.voice in VOICES) voiceKey = body.voice;
   } catch {
     return NextResponse.json({ error: 'bad-json' }, { status: 400 });
   }
@@ -54,7 +61,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: 'FunAudioLLM/CosyVoice2-0.5B',
         input: text,
-        voice: PHIL_COACH_VOICE,
+        voice: VOICES[voiceKey],
         response_format: 'mp3',
         speed: 0.9,          // 稍慢，贴陪伴的语速
       }),

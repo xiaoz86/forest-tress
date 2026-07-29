@@ -345,7 +345,15 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
 }
 
 const TTS_PREF_KEY = 'nf_phil_read_aloud';
-export const PHIL_COACH_TTS_VOICE = { id: 'anna', label: '安然（女声）' } as const;
+const TTS_VOICE_KEY = 'nf_phil_tts_voice';
+
+/** 可选的嗓音。键名要和 /api/phil-coach/tts 里的白名单对上。 */
+export const PHIL_COACH_VOICES = [
+  { id: 'phil', label: 'phil-coach' },
+  { id: 'anna', label: 'anna' },
+] as const;
+export type PhilVoiceId = (typeof PHIL_COACH_VOICES)[number]['id'];
+const DEFAULT_VOICE_ID: PhilVoiceId = 'phil';
 
 /** 让 phil-coach 的回复用自然的嗓音读出来（服务端神经网络合成） */
 export function useServerSpeech() {
@@ -358,6 +366,26 @@ export function useServerSpeech() {
   });
   const [override, setOverride] = useState<boolean | null>(null);
   const enabled = override ?? storedPref;
+
+  const storedVoice = useSyncExternalStore(
+    noopSubscribe,
+    () => {
+      try {
+        return localStorage.getItem(TTS_VOICE_KEY) ?? DEFAULT_VOICE_ID;
+      } catch {
+        return DEFAULT_VOICE_ID;
+      }
+    },
+    () => DEFAULT_VOICE_ID as string,
+  );
+  const [voiceOverride, setVoiceOverride] = useState<PhilVoiceId | null>(null);
+  const voiceId: PhilVoiceId =
+    voiceOverride ??
+    (PHIL_COACH_VOICES.some(v => v.id === storedVoice) ? (storedVoice as PhilVoiceId) : DEFAULT_VOICE_ID);
+  const voiceIdRef = useRef<PhilVoiceId>(voiceId);
+  useEffect(() => {
+    voiceIdRef.current = voiceId;
+  }, [voiceId]);
   const [speaking, setSpeaking] = useState(false);
   const [loading, setLoading] = useState(false);
   const [playbackBlocked, setPlaybackBlocked] = useState(false);
@@ -397,6 +425,19 @@ export function useServerSpeech() {
     [stop],
   );
 
+  const setVoice = useCallback(
+    (id: PhilVoiceId) => {
+      setVoiceOverride(id);
+      try {
+        localStorage.setItem(TTS_VOICE_KEY, id);
+      } catch {
+        /* ignore */
+      }
+      stop();   // 换嗓音时把上一条掐掉，免得听到一半换了人
+    },
+    [stop],
+  );
+
   const speak = useCallback(
     async (text: string) => {
       const clean = text.replace(/\s+/g, ' ').trim();
@@ -411,7 +452,7 @@ export function useServerSpeech() {
         const res = await fetch('/api/phil-coach/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: clean }),
+          body: JSON.stringify({ text: clean, voice: voiceIdRef.current }),
         });
         if (!res.ok) throw new Error('tts');
         const blob = await res.blob();
@@ -471,6 +512,8 @@ export function useServerSpeech() {
   return {
     enabled,
     setEnabled,
+    voiceId,
+    setVoice,
     speaking,
     loading,
     playbackBlocked,

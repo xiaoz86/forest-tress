@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useSpeechInput } from '@/lib/voice';
 import {
+  PHIL_COACH_VOICES,
   useServerSpeech,
   useServerSpeechInput,
 } from '@/lib/voiceServer';
@@ -993,6 +994,7 @@ export default function PhilCoachExperience() {
                   className="w-full resize-none rounded-2xl border-0 bg-transparent px-4 pb-1 pt-3.5 text-[15px] leading-relaxed text-white placeholder:text-white/28 focus:outline-none disabled:opacity-55"
                 />
                 <div className="flex items-center justify-between gap-2 px-3 pb-3">
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                   {/* 朗读开关：和麦克风放在一起，说和听在同一排 */}
                   <button
                     onClick={() => voiceOut.setEnabled(!voiceOut.enabled)}
@@ -1016,6 +1018,22 @@ export default function PhilCoachExperience() {
                         : '语音回复 · 开'
                       : '语音回复 · 关'}
                   </button>
+                  {/* 换嗓音：只在开着朗读时出现，一颗按钮在两个嗓音之间轮换
+                      （手机宽度放不下两颗并排的音色） */}
+                  {voiceOut.enabled && (
+                    <button
+                      onClick={() => {
+                        const i = PHIL_COACH_VOICES.findIndex(v => v.id === voiceOut.voiceId);
+                        voiceOut.setVoice(PHIL_COACH_VOICES[(i + 1) % PHIL_COACH_VOICES.length].id);
+                      }}
+                      type="button"
+                      title="点一下换个嗓音"
+                      className="rounded-full px-2.5 py-1.5 text-[12px] text-white/45 transition-colors hover:bg-white/[0.06] hover:text-white"
+                    >
+                      {PHIL_COACH_VOICES.find(v => v.id === voiceOut.voiceId)?.label}
+                    </button>
+                  )}
+                  </div>
                   {voiceIn.supported && (
                     <button
                       onClick={voiceIn.start}
