@@ -157,8 +157,10 @@ export default async function Home() {
         {showcaseGraph && showcaseGraph.neighbors.length > 0 && showcaseCenter && (
           <div className="mx-auto mt-16 max-w-[860px]">
             <div className="mb-7 text-center">
-              <div className="mb-3 inline-block text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
-                连接 · 共振 · 关系网络
+              <div className="inline-block text-[12px] font-bold uppercase leading-[1.8] tracking-[0.2em] text-forest">
+                连接 · 共振
+                <br />
+                关系网络
               </div>
             </div>
 
