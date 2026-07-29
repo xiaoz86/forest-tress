@@ -19,6 +19,13 @@ const W = 720;
 const H = 520;
 const STEP_MS = 380;
 
+// layoutGraph 只保证圆心落在画布内，没算头像半径和名字占的位置，
+// 于是顶部节点会顶出容器压到上面的标题。这里把整张图收进内边距：
+// 上留头像半径，下再多留一行名字加城市，左右留名字的一半宽度。
+const PAD = { top: 52, bottom: 68, x: 58 };
+const fitX = (x: number): number => PAD.x + (x / W) * (W - PAD.x * 2);
+const fitY = (y: number): number => PAD.top + (y / H) * (H - PAD.top - PAD.bottom);
+
 const STRENGTH_ORDER: Record<'strong' | 'medium' | 'weak', number> = {
   strong: 0,
   medium: 1,
@@ -31,7 +38,11 @@ export default function RelationNetwork({
   darkBg = false,
   animate = false,
 }: Props) {
-  const positions = layoutGraph(graph, W, H);
+  const positions = layoutGraph(graph, W, H).map(p => ({
+    ...p,
+    x: fitX(p.x),
+    y: fitY(p.y),
+  }));
   const posById = new Map(positions.map(p => [p.id, p]));
 
   const centerId = graph.center.id || '__center__';
