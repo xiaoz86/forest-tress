@@ -33,12 +33,12 @@ export default function PathSection() {
       <div className="mx-auto max-w-[1080px]">
         <div className="mb-14 grid grid-cols-[1fr_0.85fr] items-end gap-10 max-md:grid-cols-1 max-md:gap-5">
           <div>
-            <p className="mb-4 text-[11px] font-medium uppercase tracking-[3px] text-coral-soft">
+            <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-[rgba(238,242,235,0.62)]">
               How Connection Grows
             </p>
             <h2
-              className="text-[clamp(1.6rem,3.6vw,2.4rem)] font-semibold leading-[1.4] tracking-[-0.01em] text-white"
-              style={{ fontFamily: 'var(--font-display)' }}
+              className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-white"
+              style={{ fontFamily: 'var(--font-serif)' }}
             >
               连接不必被设计得很用力。
             </h2>

@@ -24,21 +24,21 @@ const VALUES = [
 
 export default function ValueSection() {
   return (
-    <section className="bg-[#faf8f2] px-8 py-24 max-md:px-5 max-md:py-16">
+    <section className="px-8 py-24 max-md:px-5 max-md:py-16">
       <div className="mx-auto max-w-[1080px]">
         <div className="mb-14 text-center">
-          <p className="mb-4 text-[11px] font-medium uppercase tracking-[3px] text-coral">
+          <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
             What Happens Here
           </p>
           <h2
-            className="mx-auto max-w-[680px] text-[clamp(1.6rem,3.6vw,2.4rem)] font-semibold leading-[1.4] tracking-[-0.01em] text-forest-deep"
-            style={{ fontFamily: 'var(--font-display)' }}
+            className="mx-auto max-w-[680px] text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-ink"
+            style={{ fontFamily: 'var(--font-serif)' }}
           >
             不是再认识更多人，
             <br />
             而是遇见真正与你有关的人。
           </h2>
-          <p className="mx-auto mt-6 max-w-[620px] text-[14px] leading-[1.95] text-text-light">
+          <p className="mx-auto mt-6 max-w-[620px] text-[14px] leading-[1.95] text-ink-soft">
             每个人都可以带着一件正在发生的事来到这里。不必先包装成一个完整答案，只需要真实地说出：我正在做什么，我关心什么，我此刻需要什么。
           </p>
         </div>
@@ -51,18 +51,18 @@ export default function ValueSection() {
               </span>
               <div
                 className="mt-5 text-[1.6rem] text-forest-mid"
-                style={{ fontFamily: 'var(--font-display)' }}
+                style={{ fontFamily: 'var(--font-serif)' }}
                 aria-hidden="true"
               >
                 {v.symbol}
               </div>
               <h3 className="mt-4 text-[1.15rem] font-semibold text-forest-deep">{v.title}</h3>
-              <p className="mt-3 text-[13.5px] leading-[1.85] text-text-light">{v.body}</p>
+              <p className="mt-3 text-[13.5px] leading-[1.85] text-ink-soft">{v.body}</p>
             </article>
           ))}
         </div>
 
-        <p className="mt-14 text-center text-[13.5px] italic text-text-light">
+        <p className="mt-14 text-center text-[13.5px] italic text-ink-soft">
           一段真实的自我介绍，比一张精致的名片更容易让关系开始。
         </p>
       </div>

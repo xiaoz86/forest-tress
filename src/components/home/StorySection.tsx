@@ -32,21 +32,21 @@ export default function StorySection({ children }: { children?: ReactNode }) {
   const [lead, ...rest] = STORIES;
 
   return (
-    <section id="stories" className="bg-[#faf8f2] px-8 py-24 max-md:px-5 max-md:py-16">
+    <section id="stories" className="px-8 py-24 max-md:px-5 max-md:py-16">
       <div className="mx-auto max-w-[1080px]">
         <div className="mb-12 grid grid-cols-[1fr_0.85fr] items-end gap-10 max-md:grid-cols-1 max-md:gap-5">
           <div>
-            <p className="mb-4 text-[11px] font-medium uppercase tracking-[3px] text-coral">
+            <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
               Stories in the Forest
             </p>
             <h2
-              className="text-[clamp(1.6rem,3.6vw,2.4rem)] font-semibold leading-[1.4] tracking-[-0.01em] text-forest-deep"
-              style={{ fontFamily: 'var(--font-display)' }}
+              className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-ink"
+              style={{ fontFamily: 'var(--font-serif)' }}
             >
               有些连接，已经开始发生。
             </h2>
           </div>
-          <p className="text-[14px] leading-[1.95] text-text-light">
+          <p className="text-[14px] leading-[1.95] text-ink-soft">
             不是每次相遇都要变成合作。被认真听见、找到可以交流的人，本身也是附近重新出现的方式。
           </p>
         </div>
@@ -59,12 +59,12 @@ export default function StorySection({ children }: { children?: ReactNode }) {
               </span>
               <blockquote
                 className="mt-6 text-[clamp(1.05rem,2.1vw,1.3rem)] font-normal leading-[1.85] text-forest-deep"
-                style={{ fontFamily: 'var(--font-display)' }}
+                style={{ fontFamily: 'var(--font-serif)' }}
               >
                 「{lead.quote}」
               </blockquote>
             </div>
-            <footer className="mt-8 text-[12.5px] text-text-light">{lead.footer}</footer>
+            <footer className="mt-8 text-[12.5px] text-ink-soft">{lead.footer}</footer>
           </article>
 
           <div className="grid grid-rows-2 gap-5">
@@ -77,11 +77,11 @@ export default function StorySection({ children }: { children?: ReactNode }) {
                   <span className="text-[10.5px] font-medium tracking-[0.2em] text-moss/80">
                     {s.type}
                   </span>
-                  <blockquote className="mt-5 text-[14px] leading-[1.9] text-text-secondary">
+                  <blockquote className="mt-5 text-[14px] leading-[1.9] text-ink-soft">
                     「{s.quote}」
                   </blockquote>
                 </div>
-                <footer className="mt-6 text-[12px] text-text-light">{s.footer}</footer>
+                <footer className="mt-6 text-[12px] text-ink-soft">{s.footer}</footer>
               </article>
             ))}
           </div>

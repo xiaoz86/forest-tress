@@ -25,6 +25,23 @@
   --color-text-primary: #2a2a2a;
   --color-text-secondary: #5a5a5a;
   --color-text-light: #8a8a8a;
+
+  /*
+    纸感色板（首页与导航用）。
+    比上面那套更哑光、更接近印刷品；单独命名而不是覆盖旧 token，
+    因为 phil-coach / creators 等页还依赖原来的对比关系。
+  */
+  --color-paper: #f5f1e8;
+  --color-paper-soft: #faf8f2;
+  --color-ink: #243229;
+  --color-ink-soft: #5c675f;
+  --color-forest: #2f513d;
+  --color-forest-dark: #1e3528;
+  --color-moss-muted: #81927d;
+  --color-sage-muted: #b9c4b2;
+  --color-mist-muted: #dde4da;
+  --color-sand: #dfd1bd;
+  --color-clay: #b87c5e;
 }
 
 @layer base {
@@ -35,7 +52,11 @@
   body {
     font-family: var(--font-sans);
     color: var(--color-text-primary);
-    background: var(--color-warm-cream);
+    /* 纸底 + 两点极淡的晕染，避免大面积纯色显得像后台界面 */
+    background:
+      radial-gradient(circle at 12% 12%, rgba(185, 196, 178, 0.32), transparent 28%),
+      radial-gradient(circle at 86% 8%, rgba(223, 209, 189, 0.35), transparent 27%),
+      var(--color-paper);
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

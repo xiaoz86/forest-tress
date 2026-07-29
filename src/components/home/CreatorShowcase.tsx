@@ -68,12 +68,17 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
     >
-      <div className="grid grid-cols-[1.12fr_0.88fr] items-stretch gap-5 max-lg:grid-cols-1">
+      {/*
+        高度写死，不让内容撑。每个人的自我介绍长短差很多，
+        若卡片各自撑高，轮播一换就把下面整页顶上顶下。
+        超出的部分一律 line-clamp 截断。
+      */}
+      <div className="grid h-[560px] grid-cols-[1.12fr_0.88fr] items-stretch gap-5 max-lg:h-auto max-lg:grid-cols-1">
         {/* 左：重点创造者 */}
         <Link
           href={`/creators/${featured.id}`}
           key={featured.id}
-          className="group relative min-h-[520px] animate-swap-in overflow-hidden rounded-[34px] p-9 text-cream no-underline max-md:min-h-[440px] max-md:p-7"
+          className="group relative h-full animate-swap-in overflow-hidden rounded-[34px] p-9 text-cream no-underline max-lg:h-[520px] max-md:h-[480px] max-md:p-7"
           style={{
             background:
               'linear-gradient(180deg, rgba(26,46,34,.03) 0%, rgba(20,38,28,.92) 82%), radial-gradient(circle at 72% 24%, rgba(206,221,201,.36), transparent 22%), linear-gradient(145deg, #899c88 0%, #526b59 48%, #253f2e 100%)',
@@ -110,12 +115,12 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
               </p>
               <h3
                 className="mt-2 text-[clamp(1.7rem,3.4vw,2.3rem)] font-medium leading-[1.3] text-white"
-                style={{ fontFamily: 'var(--font-display)' }}
+                style={{ fontFamily: 'var(--font-serif)' }}
               >
                 {featured.name}
               </h3>
               {featured.doing && (
-                <p className="mt-4 max-w-[440px] text-[14.5px] leading-[1.9] text-white/78">
+                <p className="mt-4 line-clamp-3 max-w-[440px] text-[14.5px] leading-[1.9] text-white/78">
                   {featured.doing}
                 </p>
               )}
@@ -136,7 +141,7 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
               {featured.seeking && (
                 <div className="mt-6 flex items-center justify-between gap-5 border-t border-white/15 pt-5 text-[12px] text-white/60 max-md:flex-col max-md:items-start max-md:gap-2">
                   <span className="shrink-0">正在寻找</span>
-                  <strong className="text-right text-[14px] font-medium text-white max-md:text-left">
+                  <strong className="line-clamp-2 text-right text-[14px] font-medium text-white max-md:text-left">
                     {featured.seeking}
                   </strong>
                 </div>
@@ -146,26 +151,26 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
         </Link>
 
         {/* 右：另外两位不同方向的人 + AI 推荐提示 */}
-        <div className="grid grid-rows-[1fr_1fr_auto] gap-4">
+        <div className="grid min-h-0 grid-rows-[1fr_1fr_auto] gap-4">
           {sideNodes.map(node => (
             <Link
               key={node.id}
               href={`/creators/${node.id}`}
-              className="group grid animate-swap-in grid-cols-[auto_1fr_auto] items-start gap-5 rounded-[26px] border border-forest-deep/[0.11] bg-[rgba(250,248,242,0.7)] p-7 no-underline transition-all hover:-translate-y-1 hover:bg-[rgba(250,248,242,0.95)] hover:shadow-[0_18px_44px_rgba(42,59,47,0.08)] max-md:p-6"
+              className="group grid animate-swap-in grid-cols-[auto_1fr_auto] h-full items-start gap-5 rounded-[26px] max-lg:h-[176px] border border-forest-deep/[0.11] bg-[rgba(250,248,242,0.7)] p-7 no-underline transition-all hover:-translate-y-1 hover:bg-[rgba(250,248,242,0.95)] hover:shadow-[0_18px_44px_rgba(42,59,47,0.08)] max-md:p-6"
             >
               <Avatar name={node.name} url={node.avatarUrl} size={52} />
-              <div className="min-w-0">
+              <div className="min-w-0 overflow-hidden">
                 <h3
                   className="text-[clamp(1.25rem,2.4vw,1.6rem)] font-medium leading-tight text-forest-deep"
-                  style={{ fontFamily: 'var(--font-display)' }}
+                  style={{ fontFamily: 'var(--font-serif)' }}
                 >
                   {node.name}
                 </h3>
-                <p className="mt-1 text-[12.5px] text-text-light">
+                <p className="mt-1 text-[12.5px] text-ink-soft">
                   {[node.topics[0], node.city].filter(Boolean).join(' · ')}
                 </p>
                 {node.doing && (
-                  <p className="mt-3 line-clamp-3 text-[13.5px] leading-[1.8] text-text-secondary">
+                  <p className="mt-3 line-clamp-3 text-[13.5px] leading-[1.8] text-ink-soft">
                     {node.doing}
                   </p>
                 )}
@@ -186,16 +191,16 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
 
           {/* AI 推荐：收成一条轻提示，不做成功能面板 */}
           {sideNodes.length > 0 && (
-            <div className="grid grid-cols-[auto_1fr] items-center gap-3.5 rounded-[22px] bg-forest-mid/[0.92] px-5 py-4 text-cream">
+            <div className="grid grid-cols-[auto_1fr] items-center gap-3.5 rounded-[22px] bg-forest px-5 py-4 text-cream max-lg:h-[92px]">
               <span
                 aria-hidden="true"
                 className="grid h-10 w-10 place-items-center rounded-full border border-white/18 bg-white/[0.08] text-white"
               >
                 ✦
               </span>
-              <div className="min-w-0">
+              <div className="min-w-0 overflow-hidden">
                 <b className="block text-[13px] font-semibold">一次可能值得开始的相遇</b>
-                <p className="mt-1 text-[11.5px] leading-[1.6] text-white/62">
+                <p className="mt-1 line-clamp-2 text-[11.5px] leading-[1.6] text-white/62">
                   {featured.name} 与 {sideNodes[0].name} 都在
                   {featured.topics[0] ? `关注「${featured.topics[0]}」` : '做真实的事'}
                   ，森林会把这样的两个人放到彼此附近。

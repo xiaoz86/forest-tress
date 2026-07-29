@@ -4,7 +4,14 @@ import { useRef } from 'react';
 
 const HERO_FILM_SRC = '/hero-film.mp4?v=20260627-1';
 
-export default function HeroFilmPlayer() {
+/**
+ * hero  —— 深底上的描边胶囊（原样式）
+ * paper —— 纸底上的浅色胶囊
+ * glass —— 贴在图上的圆形玻璃钮，只有一个播放三角
+ */
+type Variant = 'hero' | 'paper' | 'glass';
+
+export default function HeroFilmPlayer({ variant = 'hero' }: { variant?: Variant } = {}) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -37,18 +44,42 @@ export default function HeroFilmPlayer() {
 
   return (
     <>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={openFilm}
-        className="inline-flex items-center gap-3 rounded-full border border-white/30 bg-black/10 px-6 py-3.5 text-[15px] font-medium text-white/86 backdrop-blur-sm transition-colors hover:border-white/55 hover:bg-white/10 hover:text-white"
-        aria-label="观看附近森林理念片"
-      >
-        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-white/35" aria-hidden="true">
-          <span className="ml-0.5 block h-0 w-0 border-y-[5px] border-y-transparent border-l-[8px] border-l-current" />
-        </span>
-        观看理念片
-      </button>
+      {variant === 'glass' ? (
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={openFilm}
+          className="grid h-[82px] w-[82px] place-items-center rounded-full border border-white/45 bg-white/[0.14] text-white backdrop-blur-[12px] transition-all hover:-translate-y-0.5 hover:bg-white/25"
+          aria-label="观看附近森林理念片"
+        >
+          <span
+            aria-hidden="true"
+            className="ml-[5px] block h-0 w-0 border-y-[9px] border-y-transparent border-l-[14px] border-l-white"
+          />
+        </button>
+      ) : (
+        <button
+          ref={triggerRef}
+          type="button"
+          onClick={openFilm}
+          className={
+            variant === 'paper'
+              ? 'inline-flex min-h-[48px] items-center gap-3 rounded-full border border-forest/15 bg-paper-soft/70 px-6 text-[14.5px] font-medium text-forest transition-all hover:-translate-y-0.5 hover:bg-paper-soft'
+              : 'inline-flex items-center gap-3 rounded-full border border-white/30 bg-black/10 px-6 py-3.5 text-[15px] font-medium text-white/86 backdrop-blur-sm transition-colors hover:border-white/55 hover:bg-white/10 hover:text-white'
+          }
+          aria-label="观看附近森林理念片"
+        >
+          <span
+            className={`flex h-8 w-8 items-center justify-center rounded-full border ${
+              variant === 'paper' ? 'border-forest/30' : 'border-white/35'
+            }`}
+            aria-hidden="true"
+          >
+            <span className="ml-0.5 block h-0 w-0 border-y-[5px] border-y-transparent border-l-[8px] border-l-current" />
+          </span>
+          观看理念片
+        </button>
+      )}
 
       <dialog
           ref={dialogRef}

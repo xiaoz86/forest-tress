@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
-import HeroFilmPlayer from '@/components/HeroFilmPlayer';
 import HeroVideo from '@/components/HeroVideo';
 import JoinSection from '@/components/JoinSection';
 import RelationNetwork from '@/components/RelationNetwork';
@@ -99,10 +98,14 @@ export default async function Home() {
 
           <div className="mx-auto mb-7 h-px w-12 animate-fade-in-delay-2 bg-white/35" />
 
-          <p className="mx-auto mb-16 max-w-[620px] animate-fade-in-delay-2 text-[clamp(0.95rem,1.6vw,1.1rem)] leading-[2] text-white/70">
+          <p className="mx-auto mb-6 max-w-[620px] animate-fade-in-delay-2 text-[clamp(0.95rem,1.6vw,1.1rem)] leading-[2] text-white/70">
             我们既发现自己的无限可能，也被看见
             <br />
             在相遇中共同创造与成长
+          </p>
+
+          <p className="mx-auto mb-16 max-w-[560px] animate-fade-in-delay-2 text-[13.5px] leading-[1.9] text-white/50">
+            让正在独立做事的人，找到真正同行的伙伴。
           </p>
 
           <div className="mb-14 flex animate-fade-in-delay-3 flex-wrap justify-center gap-x-8 gap-y-4">
@@ -124,11 +127,10 @@ export default async function Home() {
           <div className="flex animate-fade-in-delay-4 flex-wrap items-center justify-center gap-4">
             <a
               href="#entrances"
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-br from-coral-soft to-warmth px-9 py-4 text-base font-bold text-forest-deep no-underline shadow-[0_4px_24px_rgba(212,160,160,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(212,160,160,0.45)]"
+              className="inline-flex min-h-[52px] min-w-[168px] items-center justify-center gap-2 rounded-full bg-[#efc39d] px-9 text-base font-medium text-[#243026] no-underline shadow-[0_14px_34px_rgba(0,0,0,0.18)] transition-all hover:-translate-y-0.5 hover:bg-[#f5ceb0]"
             >
               走进这片森林
             </a>
-            <HeroFilmPlayer />
           </div>
         </div>
 
@@ -155,8 +157,8 @@ export default async function Home() {
         {showcaseGraph && showcaseGraph.neighbors.length > 0 && showcaseCenter && (
           <div className="mx-auto mt-16 max-w-[860px]">
             <div className="mb-7 text-center">
-              <div className="mb-3 inline-block text-[11px] font-medium uppercase tracking-[3px] text-coral">
-                正在发生
+              <div className="mb-3 inline-block text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
+                连接 · 共振 · 关系网络
               </div>
               <h3
                 className="mx-auto max-w-[560px] text-[clamp(1.2rem,2.8vw,1.65rem)] font-semibold leading-[1.5] tracking-[-0.005em] text-forest-deep"
@@ -193,9 +195,9 @@ export default async function Home() {
       {/* 行动 — 种下你的种子 */}
       <section
         id="join"
-        className="relative overflow-hidden bg-gradient-to-b from-[#faf8f2] via-[#f5f5ee] to-[#f0ede4] px-8 py-28 max-md:px-5 max-md:py-20"
+        className="relative overflow-hidden bg-gradient-to-b from-paper-soft via-paper to-[#efe9dc] px-8 py-28 max-md:px-5 max-md:py-20"
       >
-        <div className="pointer-events-none absolute left-1/2 top-0 h-px w-[min(760px,78vw)] -translate-x-1/2 bg-gradient-to-r from-transparent via-forest-deep/10 to-transparent" />
+        <div className="pointer-events-none absolute left-1/2 top-0 h-px w-[min(760px,78vw)] -translate-x-1/2 bg-gradient-to-r from-transparent via-forest/15 to-transparent" />
         <div className="relative">
           <JoinSection />
         </div>

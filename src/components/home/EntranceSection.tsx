@@ -36,21 +36,21 @@ const ENTRANCES = [
 
 export default function EntranceSection() {
   return (
-    <section id="entrances" className="bg-white px-8 py-24 max-md:px-5 max-md:py-16">
+    <section id="entrances" className="bg-paper-soft/60 px-8 py-24 max-md:px-5 max-md:py-16">
       <div className="mx-auto max-w-[1080px]">
         <div className="mb-12 grid grid-cols-[1fr_0.85fr] items-end gap-10 max-md:grid-cols-1 max-md:gap-5">
           <div>
-            <p className="mb-4 text-[11px] font-medium uppercase tracking-[3px] text-coral">
+            <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
               Four Ways In
             </p>
             <h2
-              className="text-[clamp(1.6rem,3.6vw,2.4rem)] font-semibold leading-[1.4] tracking-[-0.01em] text-forest-deep"
-              style={{ fontFamily: 'var(--font-display)' }}
+              className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-ink"
+              style={{ fontFamily: 'var(--font-serif)' }}
             >
               从适合你的那条小径进入。
             </h2>
           </div>
-          <p className="text-[14px] leading-[1.95] text-text-light">
+          <p className="text-[14px] leading-[1.95] text-ink-soft">
             你可以先回到自己，也可以先去认识正在生长的人。不必先理解整片森林，才知道自己想做什么。
           </p>
         </div>
@@ -60,18 +60,18 @@ export default function EntranceSection() {
             <Link
               key={e.href}
               href={e.href}
-              className="group flex flex-col justify-between rounded-[26px] border border-forest-deep/[0.10] bg-[#faf8f2] p-9 no-underline transition-all hover:-translate-y-1 hover:border-forest-deep/20 hover:shadow-[0_18px_44px_rgba(42,59,47,0.07)] max-md:p-7"
+              className="group flex flex-col justify-between rounded-[26px] border border-forest-deep/[0.10] bg-paper-soft p-9 no-underline transition-all hover:-translate-y-1 hover:border-forest-deep/20 hover:shadow-[0_18px_44px_rgba(42,59,47,0.07)] max-md:p-7"
             >
               <div>
                 <div
                   className="text-[1.5rem] text-forest-mid"
-                  style={{ fontFamily: 'var(--font-display)' }}
+                  style={{ fontFamily: 'var(--font-serif)' }}
                   aria-hidden="true"
                 >
                   {e.icon}
                 </div>
                 <h3 className="mt-4 text-[1.2rem] font-semibold text-forest-deep">{e.title}</h3>
-                <p className="mt-3 text-[13.5px] leading-[1.85] text-text-light">{e.body}</p>
+                <p className="mt-3 text-[13.5px] leading-[1.85] text-ink-soft">{e.body}</p>
               </div>
               <span className="mt-8 inline-flex items-center gap-1.5 text-[13px] font-medium text-forest-mid">
                 {e.cta}
