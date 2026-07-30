@@ -88,11 +88,11 @@ export default async function Home() {
           aria-hidden="true"
           className="absolute inset-0 hidden h-full w-full object-cover motion-reduce:block"
         />
-        <div className="absolute inset-0 bg-black/45" />
+        <div className="absolute inset-0 bg-black/52" />
 
         <div className="relative z-[2] max-w-[1000px]">
           <h1
-            className="mb-6 animate-fade-in font-serif text-[clamp(2.05rem,5vw,3.7rem)] font-bold leading-[1.35] tracking-wide text-white"
+            className="mb-6 animate-fade-in font-serif text-[clamp(2.2rem,5.8vw,4.3rem)] font-bold leading-[1.3] tracking-wide text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.42)]"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             连接万千
@@ -102,13 +102,13 @@ export default async function Home() {
 
           <div className="mx-auto mb-7 h-px w-12 animate-fade-in-delay-2 bg-white/35" />
 
-          <p className="mx-auto mb-6 max-w-[620px] animate-fade-in-delay-2 text-[clamp(1.05rem,1.9vw,1.32rem)] leading-[1.95] text-white/85">
+          <p className="mx-auto mb-6 max-w-[680px] animate-fade-in-delay-2 text-[clamp(1.18rem,2.2vw,1.55rem)] font-medium leading-[1.9] text-white/92 [text-shadow:0_1px_14px_rgba(0,0,0,0.4)]">
             我们既发现自己的无限可能，也被看见
             <br />
             在相遇中共同创造与成长
           </p>
 
-          <p className="mx-auto mb-16 max-w-[560px] animate-fade-in-delay-2 text-[15px] leading-[1.9] text-white/62">
+          <p className="mx-auto mb-16 max-w-[580px] animate-fade-in-delay-2 text-[16.5px] leading-[1.9] text-white/75 [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]">
             让正在独立做事的人，找到真正同行的伙伴。
           </p>
 
