@@ -90,9 +90,9 @@ export default async function Home() {
         />
         <div className="absolute inset-0 bg-black/45" />
 
-        <div className="relative z-[2] max-w-[820px]">
+        <div className="relative z-[2] max-w-[1000px]">
           <h1
-            className="mb-6 animate-fade-in font-serif text-[clamp(2rem,5vw,3.4rem)] font-bold leading-[1.4] tracking-wide text-white"
+            className="mb-6 animate-fade-in font-serif text-[clamp(2.05rem,5vw,3.7rem)] font-bold leading-[1.35] tracking-wide text-white"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             连接万千
@@ -102,13 +102,13 @@ export default async function Home() {
 
           <div className="mx-auto mb-7 h-px w-12 animate-fade-in-delay-2 bg-white/35" />
 
-          <p className="mx-auto mb-6 max-w-[620px] animate-fade-in-delay-2 text-[clamp(0.95rem,1.6vw,1.1rem)] leading-[2] text-white/70">
+          <p className="mx-auto mb-6 max-w-[620px] animate-fade-in-delay-2 text-[clamp(1.05rem,1.9vw,1.32rem)] leading-[1.95] text-white/85">
             我们既发现自己的无限可能，也被看见
             <br />
             在相遇中共同创造与成长
           </p>
 
-          <p className="mx-auto mb-16 max-w-[560px] animate-fade-in-delay-2 text-[13.5px] leading-[1.9] text-white/50">
+          <p className="mx-auto mb-16 max-w-[560px] animate-fade-in-delay-2 text-[15px] leading-[1.9] text-white/62">
             让正在独立做事的人，找到真正同行的伙伴。
           </p>
 

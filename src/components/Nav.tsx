@@ -50,7 +50,7 @@ export default function Nav() {
     : { href: '#join', label: '种下一棵树', type: 'anchor' };
 
   const ctaClass =
-    'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-forest px-6 text-[14px] font-medium text-white no-underline shadow-[0_14px_28px_rgba(47,81,61,0.18)] transition-all hover:-translate-y-0.5 hover:bg-forest-dark';
+    'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-forest px-6 text-[15px] font-medium text-white no-underline shadow-[0_14px_28px_rgba(47,81,61,0.18)] transition-all hover:-translate-y-0.5 hover:bg-forest-dark';
 
   return (
     <div
@@ -78,7 +78,7 @@ export default function Nav() {
           附近森林
         </Link>
 
-        <div className="flex items-center gap-7 text-[14px] text-[#445148] max-lg:hidden">
+        <div className="flex items-center gap-7 text-[15.5px] font-medium text-[#33403a] max-lg:hidden">
           {baseLinks.map(link => (
             <Link
               key={link.href}
@@ -94,7 +94,7 @@ export default function Nav() {
           {!memberId && (
             <Link
               href="/login"
-              className="text-[13.5px] text-ink-soft no-underline transition-colors hover:text-forest max-md:hidden"
+              className="text-[15px] font-medium text-[#33403a]/80 no-underline transition-colors hover:text-forest max-md:hidden"
             >
               登录
             </Link>
@@ -151,7 +151,7 @@ export default function Nav() {
                 >
                   {link.icon}
                 </span>
-                <span className="text-[14px] text-[#3a4740]">{link.label}</span>
+                <span className="text-[15px] font-medium text-[#33403a]">{link.label}</span>
               </Link>
             ))}
             {!memberId && (
@@ -166,7 +166,7 @@ export default function Nav() {
                 >
                   ↪
                 </span>
-                <span className="text-[14px] text-[#3a4740]">登录</span>
+                <span className="text-[15px] font-medium text-[#33403a]">登录</span>
               </Link>
             )}
           </div>
