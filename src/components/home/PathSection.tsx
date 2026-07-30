@@ -1,7 +1,8 @@
+import PathSteps, { type Step } from './PathSteps';
 // [4] 加入后会获得什么 —— 把「连接怎么长出来」拆成四步，
 // 让人知道种下节点之后会发生什么，而不是留在想象里。
 
-const STEPS = [
+const STEPS: Step[] = [
   {
     n: '01',
     title: '种下节点',
@@ -45,20 +46,7 @@ export default function PathSection() {
           </h2>
         </div>
 
-        <ol className="grid grid-cols-4 gap-8 max-lg:grid-cols-2 max-md:grid-cols-1 max-md:gap-7">
-          {STEPS.map(s => (
-            <li key={s.n} className="relative">
-              <div className="mb-5 flex items-center gap-3">
-                <span className="text-[13px] font-medium tracking-[0.14em] text-coral-soft/90">
-                  {s.n}
-                </span>
-                <span aria-hidden="true" className="h-px flex-1 bg-white/12" />
-              </div>
-              <h3 className="text-[1.05rem] font-semibold text-white">{s.title}</h3>
-              <p className="mt-3 text-[13px] leading-[1.85] text-white/55">{s.body}</p>
-            </li>
-          ))}
-        </ol>
+        <PathSteps steps={STEPS} />
       </div>
     </section>
   );
