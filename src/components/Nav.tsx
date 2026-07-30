@@ -50,7 +50,7 @@ export default function Nav() {
     : { href: '#join', label: '种下一棵树', type: 'anchor' };
 
   const ctaClass =
-    'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-full bg-forest px-6 text-[15px] font-medium text-white no-underline shadow-[0_14px_28px_rgba(47,81,61,0.18)] transition-all hover:-translate-y-0.5 hover:bg-forest-dark';
+    'inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-forest px-6 text-[16px] font-medium text-white no-underline shadow-[0_14px_28px_rgba(47,81,61,0.18)] transition-all hover:-translate-y-0.5 hover:bg-forest-dark';
 
   return (
     <div
@@ -59,10 +59,10 @@ export default function Nav() {
         menuOpen ? 'rounded-[26px]' : 'rounded-[999px]'
       }`}
     >
-      <nav className="flex h-[68px] items-center justify-between gap-6 pl-6 pr-3.5 max-md:h-[62px] max-md:pl-4">
+      <nav className="flex h-[72px] items-center justify-between gap-5 pl-6 pr-3.5 max-md:h-[62px] max-md:pl-4">
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-2.5 font-serif text-[19px] font-bold text-forest-dark no-underline"
+          className="flex shrink-0 items-center gap-2.5 font-serif text-[21px] font-bold text-forest-dark no-underline"
         >
           <svg viewBox="0 0 28 28" fill="none" width="26" height="26" aria-hidden="true">
             <path
@@ -78,7 +78,7 @@ export default function Nav() {
           附近森林
         </Link>
 
-        <div className="flex items-center gap-7 text-[15.5px] font-medium text-[#33403a] max-lg:hidden">
+        <div className="flex items-center gap-6 text-[17px] font-medium text-[#2f3d36] max-lg:hidden">
           {baseLinks.map(link => (
             <Link
               key={link.href}
@@ -94,7 +94,7 @@ export default function Nav() {
           {!memberId && (
             <Link
               href="/login"
-              className="text-[15px] font-medium text-[#33403a]/80 no-underline transition-colors hover:text-forest max-md:hidden"
+              className="text-[16px] font-medium text-[#33403a]/85 no-underline transition-colors hover:text-forest max-md:hidden"
             >
               登录
             </Link>
