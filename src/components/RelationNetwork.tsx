@@ -17,7 +17,7 @@ type Props = {
 
 const W = 720;
 const H = 520;
-const STEP_MS = 380;
+const STEP_MS = 620;   // 一个节点亮一次的间隔，慢下来才像「长出来」而不是「刷出来」
 
 const STRENGTH_ORDER: Record<'strong' | 'medium' | 'weak', number> = {
   strong: 0,
@@ -235,7 +235,7 @@ export default function RelationNetwork({
                   strokeDashoffset={on ? 0 : 1}
                   style={{
                     transition: on
-                      ? 'stroke-dashoffset 780ms cubic-bezier(0.33, 1, 0.68, 1) 120ms'
+                      ? 'stroke-dashoffset 1150ms cubic-bezier(0.33, 1, 0.68, 1) 220ms'
                       : 'none',
                   }}
                 />
@@ -343,7 +343,7 @@ function NodeBubble({
         opacity: lit ? 1 : 0,
         // 从略小处浮现，像是刚长出来
         transform: `translate(-50%, -50%) scale(${lit ? 1 : 0.82})`,
-        transition: 'opacity 520ms ease, transform 520ms cubic-bezier(0.22, 1, 0.36, 1)',
+        transition: 'opacity 660ms ease, transform 660ms cubic-bezier(0.22, 1, 0.36, 1)',
       }}
     >
       <div
