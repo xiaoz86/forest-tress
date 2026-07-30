@@ -38,21 +38,16 @@ export default function EntranceSection() {
   return (
     <section id="entrances" className="bg-paper-soft/60 px-8 py-24 max-md:px-5 max-md:py-16">
       <div className="mx-auto max-w-[1080px]">
-        <div className="mb-12 grid grid-cols-[1fr_0.85fr] items-end gap-10 max-md:grid-cols-1 max-md:gap-5">
-          <div>
-            <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
-              Four Ways In
-            </p>
-            <h2
-              className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-ink"
-              style={{ fontFamily: 'var(--font-serif)' }}
-            >
-              从适合你的那条小径进入。
-            </h2>
-          </div>
-          <p className="text-[14px] leading-[1.95] text-ink-soft">
-            你可以先回到自己，也可以先去认识正在生长的人。不必先理解整片森林，才知道自己想做什么。
+        <div className="mb-12 max-w-[860px]">
+          <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
+            Four Ways In
           </p>
+          <h2
+            className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-ink"
+            style={{ fontFamily: 'var(--font-serif)' }}
+          >
+            从适合你的那条小径进入。
+          </h2>
         </div>
 
         <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1 max-md:gap-4">

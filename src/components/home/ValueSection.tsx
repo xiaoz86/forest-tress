@@ -38,9 +38,6 @@ export default function ValueSection() {
             <br />
             而是遇见真正与你有关的人。
           </h2>
-          <p className="mx-auto mt-6 max-w-[620px] text-[14px] leading-[1.95] text-ink-soft">
-            每个人都可以带着一件正在发生的事来到这里。不必先包装成一个完整答案，只需要真实地说出：我正在做什么，我关心什么，我此刻需要什么。
-          </p>
         </div>
 
         <div className="grid grid-cols-3 gap-5 max-md:grid-cols-1 max-md:gap-4">
@@ -61,10 +58,6 @@ export default function ValueSection() {
             </article>
           ))}
         </div>
-
-        <p className="mt-14 text-center text-[13.5px] italic text-ink-soft">
-          一段真实的自我介绍，比一张精致的名片更容易让关系开始。
-        </p>
       </div>
     </section>
   );
