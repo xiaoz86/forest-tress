@@ -202,23 +202,21 @@ export default function PhilCoachExperience() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const pendingVoiceContextRef = useRef<VoiceAnalysis | null>(null);
   const retryVoiceContextRef = useRef<VoiceAnalysis | null>(null);
-  // 语音：实时听写 / 录音后识别 / 听它说
+  // 录音时的实时字幕（仅显示用）。真正发出去的文字以服务端转写为准——
+  // 系统听写只负责让人「看见自己正在被听到」，说错了也不影响结果。
+  const [caption, setCaption] = useState('');
   const liveVoice = useSpeechInput(text => {
-    const currentDraft = draftRef.current;
-    const merged = mergeTranscript(currentDraft, text);
-    draftRef.current = merged.text;
-    setDraft(merged.text);
-    setVoiceInputNotice(
-      merged.complete
-        ? ''
-        : currentDraft.length >= 1200
-          ? '输入框已到 1200 字，后面的实时听写没有加入。请点击完成。'
-          : '输入框已到 1200 字，最后一句只有前面一部分被加入。请点击完成。',
-    );
-    pendingVoiceContextRef.current = null;
+    setCaption(current => appendTranscript(current, text));
   });
   const voiceIn = useServerSpeechInput(result => {
+    setCaption('');
     const currentDraft = draftRef.current;
+    // 语音直达：输入框是空的，说明这段话就是要说给它的——转写完直接发送，
+    // 不再回填输入框等第二次点击。输入框里已有文字时保持旧行为（追加、可改）。
+    if (!currentDraft.trim()) {
+      void sendVoiceMessage(result.text.trim().slice(0, 1200), result.voiceContext);
+      return;
+    }
     const merged = mergeTranscript(currentDraft, result.text);
     draftRef.current = merged.text;
     setDraft(merged.text);
@@ -240,9 +238,31 @@ export default function PhilCoachExperience() {
   const conversationReady = identityReady && importState !== 'importing';
   // 录音/识别进行中：输入框原地切换成波形态
   const voiceActive = voiceIn.requesting || voiceIn.recording || voiceIn.transcribing;
-  const displayedDraft = liveVoice.interim
-    ? appendTranscript(draft, liveVoice.interim)
-    : draft;
+  const displayedDraft = draft;
+  // 实时字幕 = 已定稿的句子 + 正在说的半句
+  const liveCaption = appendTranscript(caption, liveVoice.interim);
+  // 语音直达模式：输入框是空的（录音期间 draft 不变，判定稳定）
+  const voiceDirect = !draft.trim();
+  // 字幕只在系统听写可用时开。微信里 Web Speech 不存在；
+  // iOS Safari 上 SpeechRecognition 和 MediaRecorder 抢同一路音频会互相掐断，宁可不开。
+  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const captionsEligible = liveVoice.supported && !liveVoice.inWeChat && !isIOS;
+
+  // 三个入口统一包一层：字幕跟着录音一起起停，且字幕失败不影响录音
+  const startVoice = () => {
+    setCaption('');
+    void voiceIn.start();
+    if (captionsEligible) liveVoice.start();
+  };
+  const finishVoice = () => {
+    liveVoice.cancel();   // 定稿以服务端转写为准，字幕直接丢弃
+    voiceIn.stop();
+  };
+  const cancelVoice = () => {
+    liveVoice.cancel();
+    setCaption('');
+    voiceIn.cancel();
+  };
 
   useEffect(() => {
     draftRef.current = draft;
@@ -271,7 +291,7 @@ export default function PhilCoachExperience() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [session?.thread.length, loading, error]);
+  }, [session?.thread.length, loading, error, voiceIn.transcribing]);
 
   // 开着朗读时，把最新一条回复念出来（同一条不重复念）
   useEffect(() => {
@@ -483,21 +503,12 @@ export default function PhilCoachExperience() {
     return 'ok';
   }
 
-  async function submit() {
-    if (
-      !path ||
-      !session ||
-      loading ||
-      liveVoice.listening ||
-      voiceIn.requesting ||
-      voiceIn.recording ||
-      voiceIn.transcribing
-    ) return;
-    const answer = draft.trim();
-    if (!answer) return;
-    const capturedVoiceContext = pendingVoiceContextRef.current;
-    const voiceContext = capturedVoiceContext;
-    pendingVoiceContextRef.current = null;
+  /** 发送核心：submit（手动）与 sendVoiceMessage（语音直达）共用 */
+  async function deliverMessage(
+    answer: string,
+    voiceContext: VoiceAnalysis | null,
+  ): Promise<boolean> {
+    if (!path || !session || loading) return false;
 
     const nextThread: ThreadItem[] = [...session.thread, { kind: 'me', text: answer }];
     setSession({ ...session, thread: nextThread });
@@ -520,6 +531,34 @@ export default function PhilCoachExperience() {
       setError('刚才这段没有送出去。可以稍后再试，或先把它留给自己。');
     } finally {
       setLoading(false);
+    }
+    return true;
+  }
+
+  async function submit() {
+    if (
+      loading ||
+      liveVoice.listening ||
+      voiceIn.requesting ||
+      voiceIn.recording ||
+      voiceIn.transcribing
+    ) return;
+    const answer = draft.trim();
+    if (!answer) return;
+    const voiceContext = pendingVoiceContextRef.current;
+    pendingVoiceContextRef.current = null;
+    await deliverMessage(answer, voiceContext);
+  }
+
+  /** 语音直达：转写完成后直接发送；发不出去时退回输入框，话不能丢 */
+  async function sendVoiceMessage(answer: string, voiceContext: VoiceAnalysis | null) {
+    if (!answer) return;
+    const delivered = await deliverMessage(answer, voiceContext);
+    if (!delivered) {
+      const merged = mergeTranscript(draftRef.current, answer);
+      draftRef.current = merged.text;
+      setDraft(merged.text);
+      pendingVoiceContextRef.current = voiceContext;
     }
   }
 
@@ -869,6 +908,17 @@ export default function PhilCoachExperience() {
               </div>
             ),
           )}
+          {/* 语音直达：转写还没回来时先把气泡放上屏——等待发生在对话里，而不是输入框里 */}
+          {voiceIn.transcribing && voiceDirect && (
+            <div className="max-w-[86%] self-end">
+              <div className="mb-1 text-right text-[10px] uppercase tracking-[0.2em] text-white/28">
+                我
+              </div>
+              <div className="animate-pulse whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-coral-soft/45 px-5 py-3.5 text-[15px] leading-[1.9] text-[#20140f]/75">
+                {liveCaption || '正在把这段话变成文字…'}
+              </div>
+            </div>
+          )}
           {loading && (
             <div className="max-w-[86%] self-start">
               <div className="mb-1 text-[10px] tracking-[0.2em] text-white/28">
@@ -890,9 +940,6 @@ export default function PhilCoachExperience() {
           )}
           {voiceIn.error && (
             <div role="alert" className="mb-3 text-[12px] text-coral-soft/90">{voiceIn.error}</div>
-          )}
-          {liveVoice.error && (
-            <div role="alert" className="mb-3 text-[12px] text-coral-soft/90">{liveVoice.error}</div>
           )}
           {voiceInputNotice && (
             <div role="status" className="mb-3 text-[12px] text-coral-soft/90">
@@ -926,7 +973,7 @@ export default function PhilCoachExperience() {
               <div className="relative">
                 {!voiceIn.transcribing && (
                   <button
-                    onClick={voiceIn.cancel}
+                    onClick={cancelVoice}
                     type="button"
                     aria-label="取消这段录音"
                     title="取消"
@@ -936,7 +983,7 @@ export default function PhilCoachExperience() {
                   </button>
                 )}
                 <button
-                  onClick={voiceIn.stop}
+                  onClick={finishVoice}
                   disabled={!voiceIn.recording}
                   type="button"
                   aria-label={voiceIn.recording ? '再次点击以完成录音' : '正在准备'}
@@ -963,13 +1010,22 @@ export default function PhilCoachExperience() {
                   <span className="text-center">
                     <span className="block text-[14.5px] text-white/80">
                       {voiceIn.transcribing
-                        ? '正在把话变成字…'
+                        ? voiceDirect
+                          ? '正在变成文字，随后就发给它…'
+                          : '正在把话变成字…'
                         : voiceIn.requesting
                           ? '正在打开麦克风…'
                           : `正在听 · ${formatSeconds(voiceIn.elapsed)}`}
                     </span>
                     {voiceIn.recording && (
-                      <span className="mt-1.5 block text-[12.5px] text-white/40">再次点击以完成</span>
+                      <span className="mt-1.5 block text-[12.5px] text-white/40">
+                        {voiceDirect ? '再次点击，说完直接发给它' : '再次点击以完成'}
+                      </span>
+                    )}
+                    {voiceIn.recording && liveCaption && (
+                      <span className="mx-auto mt-3 line-clamp-2 block max-w-[480px] px-2 text-[13.5px] leading-[1.8] text-white/60">
+                        {liveCaption}
+                      </span>
                     )}
                   </span>
                 </button>
@@ -1036,7 +1092,7 @@ export default function PhilCoachExperience() {
                   </div>
                   {voiceIn.supported && (
                     <button
-                      onClick={voiceIn.start}
+                      onClick={startVoice}
                       disabled={loading || displayedDraft.length >= 1200}
                       type="button"
                       aria-label="用说的"
