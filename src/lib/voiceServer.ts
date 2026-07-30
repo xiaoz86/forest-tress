@@ -14,8 +14,11 @@ export type VoiceInputResult = {
 const MAX_RECORDING_MS = 55_000;
 const VOICE_SAMPLE_RATE = 16_000;
 const MAX_WAV_BYTES = 1_950_000;
-const PARTIAL_MS = 2500;        // 字幕刷新间隔：再短就是在重复转同一段音频
-const PARTIAL_FIRST_MS = 1200;  // 第一次早发，别让人盯着空框等一个完整周期
+const PARTIAL_MS = 1200;        // 字幕刷新间隔：只转新增那一段，所以可以压得很短
+const PARTIAL_FIRST_MS = 900;   // 第一次早发，别让人盯着空框等一个完整周期
+const MIN_SEG_S = 0.9;          // 比这还短转不出东西，白花一次请求
+const MAX_SEG_S = 4.0;          // 一直没停顿也得切，否则字迟迟不出
+const QUIET_RMS = 0.02;         // 低于这个音量算「停顿」，可以在这里下刀
 
 function writeAscii(view: DataView, offset: number, value: string) {
   for (let index = 0; index < value.length; index += 1) {
@@ -74,11 +77,10 @@ function encodeVoiceWav(source: AudioBuffer): Blob {
  * iOS 的 mp4 却把索引写在结尾，录到一半截出来根本解不开——
  * 而实时字幕要的正是「录到一半」。裸 PCM 没有容器，任何时刻都能编出完整的 WAV。
  */
-function encodePcmWav(chunks: Float32Array[], sampleRate: number): Blob {
-  const total = chunks.reduce((n, c) => n + c.length, 0);
+function encodePcmWav(flat: Float32Array, sampleRate: number): Blob {
   const ratio = sampleRate / VOICE_SAMPLE_RATE;
   const maxSamples = Math.floor((MAX_WAV_BYTES - 44) / 2);
-  const outputLength = Math.min(Math.floor(total / ratio), maxSamples);
+  const outputLength = Math.min(Math.floor(flat.length / ratio), maxSamples);
 
   const wav = new ArrayBuffer(44 + outputLength * 2);
   const view = new DataView(wav);
@@ -96,18 +98,45 @@ function encodePcmWav(chunks: Float32Array[], sampleRate: number): Blob {
   writeAscii(view, 36, 'data');
   view.setUint32(40, outputLength * 2, true);
 
-  // 先拍平再按下标取样：逐样本去遍历分片会退化成 O(样本数 × 分片数)
-  const flat = new Float32Array(total);
-  let offset = 0;
-  for (const c of chunks) {
-    flat.set(c, offset);
-    offset += c.length;
-  }
   for (let index = 0; index < outputLength; index += 1) {
     const clamped = Math.max(-1, Math.min(1, flat[Math.floor(index * ratio)] || 0));
     view.setInt16(44 + index * 2, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
   }
   return new Blob([wav], { type: 'audio/wav' });
+}
+
+/** 把分片里 [from, to) 这段拍平成一条。逐样本遍历分片会退化成 O(样本数 × 分片数)。 */
+function flattenRange(chunks: Float32Array[], from: number, to: number): Float32Array {
+  const out = new Float32Array(Math.max(0, to - from));
+  let cursor = 0;   // 当前分片起点在全局的下标
+  let filled = 0;
+  for (const c of chunks) {
+    const start = Math.max(from, cursor);
+    const end = Math.min(to, cursor + c.length);
+    if (end > start) {
+      out.set(c.subarray(start - cursor, end - cursor), filled);
+      filled += end - start;
+    }
+    cursor += c.length;
+    if (cursor >= to) break;
+  }
+  return out;
+}
+
+/**
+ * 在这一段的尾部找一个「安静处」当切点，从后往前找第一个足够静的窗口。
+ * 找不到就先不切（返回 null），除非整段已经长到 MAX_SEG_S——
+ * 那说明这人一口气说了很久，再等下去就没有「实时」可言了，硬切。
+ */
+function findQuietCut(flat: Float32Array, rate: number): number | null {
+  const minSamples = Math.floor(MIN_SEG_S * rate);
+  const win = Math.max(1, Math.floor(0.03 * rate));   // 30ms 一个窗口
+  for (let end = flat.length; end - win >= minSamples; end -= win) {
+    let sum = 0;
+    for (let i = end - win; i < end; i += 1) sum += flat[i] * flat[i];
+    if (Math.sqrt(sum / win) < QUIET_RMS) return end;
+  }
+  return flat.length / rate >= MAX_SEG_S ? flat.length : null;
 }
 
 async function qwenCompatibleAudio(blob: Blob): Promise<Blob> {
@@ -185,6 +214,8 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   const partialTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const partialFirstRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const partialBusyRef = useRef(false);
+  // 已经转完并接进字幕的进度：文字 + 已消费到第几个样本
+  const committedRef = useRef({ text: '', samples: 0 });
 
   useEffect(() => {
     onResultRef.current = onResult;
@@ -210,6 +241,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     }
     tapRef.current = null;
     pcmRef.current = [];
+    committedRef.current = { text: '', samples: 0 };
     partialBusyRef.current = false;
     try {
       void audioCtxRef.current?.close();
@@ -221,24 +253,46 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     setElapsed(0);
   }, []);
 
-  /** 把已经录到的这段送去转写，回来的文字当字幕。失败就静默——字幕没了不影响录音。 */
+  /**
+   * 只把「还没转过的那一段」送去转写，转好就接在已定的字幕后面。
+   * 早先是每次重转整段音频：录得越久每次越慢越贵，间隔只能放到 2.5 秒，
+   * 字就总是一大块一大块地跳出来。改成增量之后每次请求恒定地小，
+   * 间隔可以压到 1.2 秒，说一句出一句。
+   *
+   * 切点一定要落在停顿上——从词中间切开，两半都会转错。
+   * 找不到停顿就先不切，等到 MAX_SEG_S 再硬切（总不能一直不出字）。
+   */
   const pushPartial = useCallback(async (generation: number) => {
     if (partialBusyRef.current) return;      // 上一次还没回来就跳过这一轮
     const chunks = pcmRef.current;
     const rate = pcmRateRef.current;
     if (!rate || !chunks.length) return;
-    const samples = chunks.reduce((n, c) => n + c.length, 0);
-    if (samples / rate < 0.8) return;        // 太短转不出东西，白花一次请求
+
+    const total = chunks.reduce((n, c) => n + c.length, 0);
+    const from = committedRef.current.samples;
+    const tail = total - from;
+    if (tail / rate < MIN_SEG_S) return;     // 太短转不出东西，白花一次请求
+
+    const flat = flattenRange(chunks, from, total);
+    const cut = findQuietCut(flat, rate);
+    if (cut === null) return;                // 还没到停顿、也没到硬切长度
+
     partialBusyRef.current = true;
     try {
       const fd = new FormData();
-      fd.append('audio', encodePcmWav(chunks, rate), 'partial.wav');
+      fd.append('audio', encodePcmWav(flat.subarray(0, cut), rate), 'partial.wav');
       fd.append('partial', '1');
       const res = await fetch('/api/phil-coach/voice', { method: 'POST', body: fd });
       const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (generationRef.current !== generation) return;
-      if (res.ok && typeof json.text === 'string' && json.text.trim()) {
-        setPartial(json.text.trim());
+      if (res.ok && typeof json.text === 'string') {
+        const piece = json.text.trim();
+        // 这一段无论有没有转出字，都算翻过去了——否则会一直卡在同一段上重转
+        committedRef.current = {
+          text: piece ? `${committedRef.current.text}${piece}` : committedRef.current.text,
+          samples: from + cut,
+        };
+        if (piece) setPartial(committedRef.current.text);
       }
     } catch {
       /* 字幕是锦上添花，掉了就掉了 */
@@ -280,6 +334,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       // 这份只为「录到一半也能编出完整 WAV」，好每隔几秒转一次当字幕。
       pcmRef.current = [];
       pcmRateRef.current = ctx.sampleRate;
+      committedRef.current = { text: '', samples: 0 };
       const tap = ctx.createScriptProcessor(4096, 1, 1);
       tap.onaudioprocess = e => {
         pcmRef.current.push(new Float32Array(e.inputBuffer.getChannelData(0)));
