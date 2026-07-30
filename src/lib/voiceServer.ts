@@ -249,12 +249,10 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
 
   const startMeter = useCallback((stream: MediaStream, withPartials: boolean, generation: number) => {
     try {
-      const Ctx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!Ctx) return;
-      const ctx = new Ctx();
-      audioCtxRef.current = ctx;
+      const ctx = audioCtxRef.current;
+      if (!ctx) return;
+      // iOS 上就算在手势里建好，拿到麦克风这一等也可能把它挂起；再推一次
+      if (ctx.state === 'suspended') void ctx.resume().catch(() => undefined);
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 512;
@@ -352,10 +350,26 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     setError('');
     setPartial('');
     setRequesting(true);
+    // AudioContext 必须在这里同步建起来：等 getUserMedia 回来就脱离了用户手势，
+    // iOS Safari / 微信会给一个 suspended 的上下文——分析器读不到数据（波形一直是
+    // 静止的圆点），ScriptProcessor 也不触发（攒不到 PCM，实时字幕永远发不出去）。
+    try {
+      const Ctx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (Ctx) {
+        const ctx = new Ctx();
+        audioCtxRef.current = ctx;
+        void ctx.resume().catch(() => undefined);
+      }
+    } catch {
+      /* 没有音量表和字幕也不影响录音 */
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (generationRef.current !== generation) {
         stream.getTracks().forEach(track => track.stop());
+        stopMeter();   // 上面提前建好的 AudioContext 要收掉，别泄漏
         return;
       }
       setRequesting(false);
@@ -442,7 +456,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       setRequesting(false);
       setRecording(false);
     }
-  }, [cleanup, startMeter]);
+  }, [cleanup, startMeter, stopMeter]);
 
   const stop = useCallback(() => {
     try {
