@@ -156,6 +156,19 @@ function MicrophoneIcon() {
   );
 }
 
+/** 直达入口的声波图标：几条竖线，和「听写」的麦克风区分开 */
+function VoiceWaveIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current">
+      <path
+        d="M5 10v4M8.5 7.5v9M12 9.5v5M15.5 5.5v13M19 10v4"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function SpeakerIcon({ waves = true, className = 'h-4 w-4' }: { waves?: boolean; className?: string }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className={`${className} shrink-0 fill-none stroke-current`}>
@@ -202,6 +215,11 @@ export default function PhilCoachExperience() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const pendingVoiceContextRef = useRef<VoiceAnalysis | null>(null);
   const retryVoiceContextRef = useRef<VoiceAnalysis | null>(null);
+  // 两种语音方式，意图由用户按的按钮决定，不再用「输入框空不空」猜
+  // （猜的结果是两种界面撞在一起）：
+  // dictate = 说话变文字，先进输入框，可改再发；direct = 说完直接发给它。
+  const [voiceMode, setVoiceMode] = useState<'dictate' | 'direct' | null>(null);
+  const voiceModeRef = useRef<'dictate' | 'direct' | null>(null);
   // 录音时的实时字幕（仅显示用）。真正发出去的文字以服务端转写为准——
   // 系统听写只负责让人「看见自己正在被听到」，说错了也不影响结果。
   const [caption, setCaption] = useState('');
@@ -210,13 +228,14 @@ export default function PhilCoachExperience() {
   });
   const voiceIn = useServerSpeechInput(result => {
     setCaption('');
-    const currentDraft = draftRef.current;
-    // 语音直达：输入框是空的，说明这段话就是要说给它的——转写完直接发送，
-    // 不再回填输入框等第二次点击。输入框里已有文字时保持旧行为（追加、可改）。
-    if (!currentDraft.trim()) {
+    const mode = voiceModeRef.current;
+    voiceModeRef.current = null;
+    setVoiceMode(null);
+    if (mode === 'direct') {
       void sendVoiceMessage(result.text.trim().slice(0, 1200), result.voiceContext);
       return;
     }
+    const currentDraft = draftRef.current;
     const merged = mergeTranscript(currentDraft, result.text);
     draftRef.current = merged.text;
     setDraft(merged.text);
@@ -236,20 +255,27 @@ export default function PhilCoachExperience() {
   const path = session ? getPhilPath(session.pathId) : undefined;
   const hasConversation = Boolean(session?.thread.length);
   const conversationReady = identityReady && importState !== 'importing';
-  // 录音/识别进行中：输入框原地切换成波形态
-  const voiceActive = voiceIn.requesting || voiceIn.recording || voiceIn.transcribing;
-  const displayedDraft = draft;
   // 实时字幕 = 已定稿的句子 + 正在说的半句
   const liveCaption = appendTranscript(caption, liveVoice.interim);
-  // 语音直达模式：输入框是空的（录音期间 draft 不变，判定稳定）
-  const voiceDirect = !draft.trim();
+  const voiceBusy = voiceIn.requesting || voiceIn.recording || voiceIn.transcribing;
+  // 直达：大面板只管「正在录」这一段，录音一停立即退场——
+  // 等待由对话里的占位气泡承担，面板再留着就是同一状态出现两遍，
+  // 还会把气泡顶出视野。
+  const voicePanel = voiceMode === 'direct' && (voiceIn.requesting || voiceIn.recording);
+  // 听写：输入框不让位，字实时进输入框；底部按钮行换成一条紧凑控制条。
+  const dictating = voiceMode === 'dictate' && voiceBusy;
+  // 听写录音中把字幕拼进输入框给人看；定稿以服务端转写为准，回来后才真正写入
+  const displayedDraft =
+    dictating && liveCaption ? appendTranscript(draft, liveCaption) : draft;
   // 字幕只在系统听写可用时开。微信里 Web Speech 不存在；
   // iOS Safari 上 SpeechRecognition 和 MediaRecorder 抢同一路音频会互相掐断，宁可不开。
   const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
   const captionsEligible = liveVoice.supported && !liveVoice.inWeChat && !isIOS;
 
   // 三个入口统一包一层：字幕跟着录音一起起停，且字幕失败不影响录音
-  const startVoice = () => {
+  const startVoice = (mode: 'dictate' | 'direct') => {
+    voiceModeRef.current = mode;
+    setVoiceMode(mode);
     setCaption('');
     void voiceIn.start();
     if (captionsEligible) liveVoice.start();
@@ -261,6 +287,8 @@ export default function PhilCoachExperience() {
   const cancelVoice = () => {
     liveVoice.cancel();
     setCaption('');
+    voiceModeRef.current = null;
+    setVoiceMode(null);
     voiceIn.cancel();
   };
 
@@ -909,7 +937,7 @@ export default function PhilCoachExperience() {
             ),
           )}
           {/* 语音直达：转写还没回来时先把气泡放上屏——等待发生在对话里，而不是输入框里 */}
-          {voiceIn.transcribing && voiceDirect && (
+          {voiceIn.transcribing && voiceMode === 'direct' && (
             <div className="max-w-[86%] self-end">
               <div className="mb-1 text-right text-[10px] uppercase tracking-[0.2em] text-white/28">
                 我
@@ -963,12 +991,12 @@ export default function PhilCoachExperience() {
           )}
           <div
             className={`relative rounded-2xl border transition-colors ${
-              voiceActive
+              voicePanel || dictating
                 ? 'border-coral-soft/55 bg-coral-soft/[0.07]'
                 : 'border-white/12 bg-white/[0.04] focus-within:border-coral-soft/50'
             }`}
           >
-            {voiceActive ? (
+            {voicePanel ? (
               /* 录音态：一整块都能点，再点一次就结束——手指不用去瞄小按钮 */
               <div className="relative">
                 {!voiceIn.transcribing && (
@@ -1009,17 +1037,13 @@ export default function PhilCoachExperience() {
                   </span>
                   <span className="text-center">
                     <span className="block text-[14.5px] text-white/80">
-                      {voiceIn.transcribing
-                        ? voiceDirect
-                          ? '正在变成文字，随后就发给它…'
-                          : '正在把话变成字…'
-                        : voiceIn.requesting
-                          ? '正在打开麦克风…'
-                          : `正在听 · ${formatSeconds(voiceIn.elapsed)}`}
+                      {voiceIn.requesting
+                        ? '正在打开麦克风…'
+                        : `正在听 · ${formatSeconds(voiceIn.elapsed)}`}
                     </span>
                     {voiceIn.recording && (
                       <span className="mt-1.5 block text-[12.5px] text-white/40">
-                        {voiceDirect ? '再次点击，说完直接发给它' : '再次点击以完成'}
+                        再次点击，说完直接发给它
                       </span>
                     )}
                     {voiceIn.recording && liveCaption && (
@@ -1044,11 +1068,48 @@ export default function PhilCoachExperience() {
                     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit();
                   }}
                   disabled={loading}
+                  readOnly={dictating}
                   rows={3}
                   maxLength={1200}
-                  placeholder="照此刻真实的样子说就好…"
+                  placeholder={dictating ? '说吧，字会出现在这里…' : '照此刻真实的样子说就好…'}
                   className="w-full resize-none rounded-2xl border-0 bg-transparent px-4 pb-1 pt-3.5 text-[15px] leading-relaxed text-white placeholder:text-white/28 focus:outline-none disabled:opacity-55"
                 />
+                {dictating ? (
+                  /* 听写中：按钮行原地变一条紧凑控制条——输入框不让位，字在上面实时出现 */
+                  <div className="flex items-center gap-3 px-3 pb-3">
+                    {!voiceIn.transcribing && (
+                      <button
+                        onClick={cancelVoice}
+                        type="button"
+                        aria-label="取消听写"
+                        title="取消"
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+                      >
+                        <CloseIcon />
+                      </button>
+                    )}
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <WaveBars level={voiceIn.level} active={voiceIn.recording} maxHeight={20} />
+                      <span className="truncate text-[12.5px] text-coral-soft/90">
+                        {voiceIn.transcribing
+                          ? '正在把话变成字…'
+                          : voiceIn.requesting
+                            ? '正在打开麦克风…'
+                            : `正在听 · ${formatSeconds(voiceIn.elapsed)}`}
+                      </span>
+                    </div>
+                    <button
+                      onClick={finishVoice}
+                      disabled={!voiceIn.recording}
+                      type="button"
+                      aria-label="完成听写"
+                      title="完成"
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-coral-soft text-[#24140f] transition-opacity disabled:opacity-45"
+                    >
+                      <span aria-hidden="true" className="block h-3.5 w-3.5 rounded-[3px] bg-current" />
+                    </button>
+                  </div>
+                ) : (
                 <div className="flex items-center justify-between gap-2 px-3 pb-3">
                   <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                   {/* 朗读开关：和麦克风放在一起，说和听在同一排 */}
@@ -1091,18 +1152,32 @@ export default function PhilCoachExperience() {
                   )}
                   </div>
                   {voiceIn.supported && (
-                    <button
-                      onClick={startVoice}
-                      disabled={loading || displayedDraft.length >= 1200}
-                      type="button"
-                      aria-label="用说的"
-                      title="用说的"
-                      className="grid h-10 w-10 place-items-center rounded-full border border-white/14 bg-white/[0.05] text-white/70 transition-colors hover:bg-white/12 hover:text-white disabled:opacity-40"
-                    >
-                      <MicrophoneIcon />
-                    </button>
+                    /* 两个语音入口，像 Gemini：🎤 听写进输入框（可改再发），声波直达（说完就发） */
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        onClick={() => startVoice('dictate')}
+                        disabled={loading || voiceBusy || displayedDraft.length >= 1200}
+                        type="button"
+                        aria-label="说话变文字"
+                        title="说话变文字，先进输入框，可改再发"
+                        className="grid h-10 w-10 place-items-center rounded-full border border-white/14 bg-white/[0.05] text-white/70 transition-colors hover:bg-white/12 hover:text-white disabled:opacity-40"
+                      >
+                        <MicrophoneIcon />
+                      </button>
+                      <button
+                        onClick={() => startVoice('direct')}
+                        disabled={loading || voiceBusy}
+                        type="button"
+                        aria-label="说完直接发给它"
+                        title="按一下开始说，说完直接发给它"
+                        className="grid h-10 w-10 place-items-center rounded-full bg-coral-soft/90 text-[#24140f] transition-colors hover:bg-coral-soft disabled:opacity-40"
+                      >
+                        <VoiceWaveIcon />
+                      </button>
+                    </div>
                   )}
                 </div>
+                )}
               </>
             )}
           </div>
