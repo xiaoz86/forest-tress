@@ -255,8 +255,17 @@ export default function PhilCoachExperience() {
   const path = session ? getPhilPath(session.pathId) : undefined;
   const hasConversation = Boolean(session?.thread.length);
   const conversationReady = identityReady && importState !== 'importing';
-  // 实时字幕 = 已定稿的句子 + 正在说的半句
-  const liveCaption = appendTranscript(caption, liveVoice.interim);
+  // 字幕有两条路，按环境择一：
+  // 浏览器听写（Web Speech）逐字出、几乎零延迟，但微信里没有这个 API，
+  // iOS Safari 上它还会和 MediaRecorder 抢同一路音频、互相掐断。
+  // 那两处改走服务端分段转写：每 3.2 秒把已录到的音频转一次，字照样进输入框，
+  // 只是以段为单位刷新。
+  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const useWebSpeechCaptions = liveVoice.supported && !liveVoice.inWeChat && !isIOS;
+  // 实时字幕 = 已定稿的句子 + 正在说的半句；服务端那条路整段替换
+  const liveCaption = useWebSpeechCaptions
+    ? appendTranscript(caption, liveVoice.interim)
+    : voiceIn.partial;
   const voiceBusy = voiceIn.requesting || voiceIn.recording || voiceIn.transcribing;
   // 直达：大面板只管「正在录」这一段，录音一停立即退场——
   // 等待由对话里的占位气泡承担，面板再留着就是同一状态出现两遍，
@@ -267,18 +276,14 @@ export default function PhilCoachExperience() {
   // 听写录音中把字幕拼进输入框给人看；定稿以服务端转写为准，回来后才真正写入
   const displayedDraft =
     dictating && liveCaption ? appendTranscript(draft, liveCaption) : draft;
-  // 字幕只在系统听写可用时开。微信里 Web Speech 不存在；
-  // iOS Safari 上 SpeechRecognition 和 MediaRecorder 抢同一路音频会互相掐断，宁可不开。
-  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const captionsEligible = liveVoice.supported && !liveVoice.inWeChat && !isIOS;
-
   // 三个入口统一包一层：字幕跟着录音一起起停，且字幕失败不影响录音
   const startVoice = (mode: 'dictate' | 'direct') => {
     voiceModeRef.current = mode;
     setVoiceMode(mode);
     setCaption('');
-    void voiceIn.start();
-    if (captionsEligible) liveVoice.start();
+    // Web Speech 在跑就不必再花钱做分段转写
+    void voiceIn.start({ partials: !useWebSpeechCaptions });
+    if (useWebSpeechCaptions) liveVoice.start();
   };
   const finishVoice = () => {
     liveVoice.cancel();   // 定稿以服务端转写为准，字幕直接丢弃

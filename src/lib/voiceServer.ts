@@ -14,6 +14,8 @@ export type VoiceInputResult = {
 const MAX_RECORDING_MS = 55_000;
 const VOICE_SAMPLE_RATE = 16_000;
 const MAX_WAV_BYTES = 1_950_000;
+const PARTIAL_MS = 2500;        // 字幕刷新间隔：再短就是在重复转同一段音频
+const PARTIAL_FIRST_MS = 1200;  // 第一次早发，别让人盯着空框等一个完整周期
 
 function writeAscii(view: DataView, offset: number, value: string) {
   for (let index = 0; index < value.length; index += 1) {
@@ -63,6 +65,48 @@ function encodeVoiceWav(source: AudioBuffer): Blob {
     view.setInt16(44 + index * 2, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
   }
 
+  return new Blob([wav], { type: 'audio/wav' });
+}
+
+/**
+ * 从录音期间攒下的裸 PCM 直接编 WAV。
+ * 为什么不用 MediaRecorder 的分段数据：webm 的分片拼起来还能解，
+ * iOS 的 mp4 却把索引写在结尾，录到一半截出来根本解不开——
+ * 而实时字幕要的正是「录到一半」。裸 PCM 没有容器，任何时刻都能编出完整的 WAV。
+ */
+function encodePcmWav(chunks: Float32Array[], sampleRate: number): Blob {
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const ratio = sampleRate / VOICE_SAMPLE_RATE;
+  const maxSamples = Math.floor((MAX_WAV_BYTES - 44) / 2);
+  const outputLength = Math.min(Math.floor(total / ratio), maxSamples);
+
+  const wav = new ArrayBuffer(44 + outputLength * 2);
+  const view = new DataView(wav);
+  writeAscii(view, 0, 'RIFF');
+  view.setUint32(4, 36 + outputLength * 2, true);
+  writeAscii(view, 8, 'WAVE');
+  writeAscii(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, VOICE_SAMPLE_RATE, true);
+  view.setUint32(28, VOICE_SAMPLE_RATE * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeAscii(view, 36, 'data');
+  view.setUint32(40, outputLength * 2, true);
+
+  // 先拍平再按下标取样：逐样本去遍历分片会退化成 O(样本数 × 分片数)
+  const flat = new Float32Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    flat.set(c, offset);
+    offset += c.length;
+  }
+  for (let index = 0; index < outputLength; index += 1) {
+    const clamped = Math.max(-1, Math.min(1, flat[Math.floor(index * ratio)] || 0));
+    view.setInt16(44 + index * 2, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
+  }
   return new Blob([wav], { type: 'audio/wav' });
 }
 
@@ -132,6 +176,15 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   const audioCtxRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
+  // 实时字幕（服务端分段转写）：iOS Safari 与微信里没有 Web Speech，
+  // 只能靠这条路把字送进输入框
+  const [partial, setPartial] = useState('');
+  const pcmRef = useRef<Float32Array[]>([]);
+  const pcmRateRef = useRef(0);
+  const tapRef = useRef<ScriptProcessorNode | null>(null);
+  const partialTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const partialFirstRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const partialBusyRef = useRef(false);
 
   useEffect(() => {
     onResultRef.current = onResult;
@@ -142,6 +195,22 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     }
+    if (partialTimerRef.current) {
+      clearInterval(partialTimerRef.current);
+      partialTimerRef.current = null;
+    }
+    if (partialFirstRef.current) {
+      clearTimeout(partialFirstRef.current);
+      partialFirstRef.current = null;
+    }
+    try {
+      tapRef.current?.disconnect();
+    } catch {
+      /* ignore */
+    }
+    tapRef.current = null;
+    pcmRef.current = [];
+    partialBusyRef.current = false;
     try {
       void audioCtxRef.current?.close();
     } catch {
@@ -152,7 +221,33 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     setElapsed(0);
   }, []);
 
-  const startMeter = useCallback((stream: MediaStream) => {
+  /** 把已经录到的这段送去转写，回来的文字当字幕。失败就静默——字幕没了不影响录音。 */
+  const pushPartial = useCallback(async (generation: number) => {
+    if (partialBusyRef.current) return;      // 上一次还没回来就跳过这一轮
+    const chunks = pcmRef.current;
+    const rate = pcmRateRef.current;
+    if (!rate || !chunks.length) return;
+    const samples = chunks.reduce((n, c) => n + c.length, 0);
+    if (samples / rate < 0.8) return;        // 太短转不出东西，白花一次请求
+    partialBusyRef.current = true;
+    try {
+      const fd = new FormData();
+      fd.append('audio', encodePcmWav(chunks, rate), 'partial.wav');
+      fd.append('partial', '1');
+      const res = await fetch('/api/phil-coach/voice', { method: 'POST', body: fd });
+      const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (generationRef.current !== generation) return;
+      if (res.ok && typeof json.text === 'string' && json.text.trim()) {
+        setPartial(json.text.trim());
+      }
+    } catch {
+      /* 字幕是锦上添花，掉了就掉了 */
+    } finally {
+      partialBusyRef.current = false;
+    }
+  }, []);
+
+  const startMeter = useCallback((stream: MediaStream, withPartials: boolean, generation: number) => {
     try {
       const Ctx =
         window.AudioContext ||
@@ -181,10 +276,34 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         rafRef.current = requestAnimationFrame(tick);
       };
       rafRef.current = requestAnimationFrame(tick);
+
+      if (!withPartials) return;
+      // 并行抓一份裸 PCM：MediaRecorder 那份是给最终定稿用的，
+      // 这份只为「录到一半也能编出完整 WAV」，好每隔几秒转一次当字幕。
+      pcmRef.current = [];
+      pcmRateRef.current = ctx.sampleRate;
+      const tap = ctx.createScriptProcessor(4096, 1, 1);
+      tap.onaudioprocess = e => {
+        pcmRef.current.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+      };
+      const mute = ctx.createGain();
+      mute.gain.value = 0;              // 不静音就会把麦克风原样播出来
+      source.connect(tap);
+      tap.connect(mute);
+      mute.connect(ctx.destination);    // ScriptProcessor 不接终点不会跑
+      tapRef.current = tap;
+      // 第一次早一点发：等满一个 3.2 秒周期再加上网络往返，
+      // 人要盯着空框将近 5 秒才看见第一个字，那就不像「实时」了。
+      partialFirstRef.current = setTimeout(() => {
+        void pushPartial(generation);
+      }, PARTIAL_FIRST_MS);
+      partialTimerRef.current = setInterval(() => {
+        void pushPartial(generation);
+      }, PARTIAL_MS);
     } catch {
       /* 没有音量表也不影响录音 */
     }
-  }, []);
+  }, [pushPartial]);
 
   const cleanup = useCallback(() => {
     if (maxTimerRef.current) {
@@ -225,12 +344,13 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
 
   useEffect(() => cancel, [cancel]);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (options?: { partials?: boolean }) => {
     if (busyRef.current) return;
     busyRef.current = true;
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     setError('');
+    setPartial('');
     setRequesting(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -240,7 +360,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       }
       setRequesting(false);
       streamRef.current = stream;
-      startMeter(stream);
+      startMeter(stream, options?.partials !== false, generation);
       const mimeType = pickMimeType();
       const rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       chunksRef.current = [];
@@ -281,6 +401,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
                 : '这段没能转成文字，可以直接打字，或再说一次。',
             );
           } else {
+            setPartial('');
             onResultRef.current({
               text: json.text.trim(),
               voiceContext: normalizeVoiceAnalysis(json.voiceContext),
@@ -339,7 +460,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
 
   return {
     supported, requesting, recording, transcribing, error,
-    level, elapsed,
+    level, elapsed, partial,
     start, stop, toggle, cancel,
   };
 }
