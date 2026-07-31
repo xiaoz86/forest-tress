@@ -263,11 +263,10 @@ export default function PhilCoachExperience() {
   const conversationReady = identityReady && importState !== 'importing';
   // 字幕两条路：浏览器听写（Web Speech）逐字出、几乎零延迟；
   // 服务端分段转写以短语为单位刷新，但哪儿都能用。
-  // 只要浏览器有这个 API 就先试 Web Speech——手机浏览器同样试。
-  // 不写死排除 iOS：那儿 SpeechRecognition 有时会和 MediaRecorder 抢麦、
-  // 悄悄什么都不给，但也有能用的版本，与其一刀切不如让下面的看门狗判定。
-  // 微信没有这个 API，直接走服务端。
-  const useWebSpeechCaptions = liveVoice.supported && !liveVoice.inWeChat;
+  // iPhone / iPad 上 Web Speech 与 MediaRecorder 会争用麦克风，既可能弹两次授权，
+  // 也可能让两边都拿不到完整声音。Apple 移动设备与微信只开一条服务端录音链路；
+  // 其余浏览器保留低延迟的 Web Speech 字幕。
+  const useWebSpeechCaptions = liveVoice.supported && !liveVoice.inWeChat && !liveVoice.inIOS;
   // 实时字幕：谁有内容就显示谁。
   // 不能按 useWebSpeechCaptions 固定挑一边——看门狗把浏览器听写换成服务端之后，
   // 显示源不跟着切的话，请求照发、字却永远不出现。
@@ -289,7 +288,11 @@ export default function PhilCoachExperience() {
     setCaption('');
     captionSeenRef.current = false;
     // Web Speech 在跑就先不花钱做分段转写，等看门狗判定
-    void voiceIn.start({ partials: !useWebSpeechCaptions });
+    void voiceIn.start({
+      partials: !useWebSpeechCaptions,
+      // 灰色麦克风只是听写，不需要等较慢的语气分析；直达模式才保留声音观察。
+      analysis: mode === 'direct',
+    });
     if (!useWebSpeechCaptions) return;
     liveVoice.start();
     // 看门狗：给浏览器听写一点时间证明它真的在工作。到点还一个字都没有，

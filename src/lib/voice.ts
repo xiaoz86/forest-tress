@@ -49,9 +49,17 @@ export function isWeChatBrowser(): boolean {
   return /MicroMessenger/i.test(navigator.userAgent);
 }
 
+/** iPhone / iPad（含伪装成 Mac 的 iPadOS）不要同时占用两条麦克风链路。 */
+export function isIOSBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/i.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 export function useSpeechInput(onText: (text: string) => void) {
   const rawSupported = useClientFlag(() => Boolean(getRecognitionCtor()));
   const inWeChat = useClientFlag(isWeChatBrowser);
+  const inIOS = useClientFlag(isIOSBrowser);
   // 微信里即使有 API 也拿不到麦克风，视为不可用，改为引导去浏览器打开
   const supported = rawSupported && !inWeChat;
   const [listening, setListening] = useState(false);
@@ -309,7 +317,7 @@ export function useSpeechInput(onText: (text: string) => void) {
     else start();
   }, [listening, start, stop]);
 
-  return { supported, inWeChat, listening, stopping, interim, error, start, stop, toggle, cancel };
+  return { supported, inWeChat, inIOS, listening, stopping, interim, error, start, stop, toggle, cancel };
 }
 
 const VOICE_PREF_KEY = 'nf_phil_read_aloud';

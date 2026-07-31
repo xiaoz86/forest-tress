@@ -121,7 +121,11 @@ type SenseVoiceResult =
   | { kind: 'empty' }
   | { kind: 'upstream-error' };
 
-async function transcribeWithSenseVoice(file: File, key: string): Promise<SenseVoiceResult> {
+async function transcribeWithSenseVoice(
+  file: File,
+  key: string,
+  timeoutMs = 20_000,
+): Promise<SenseVoiceResult> {
   const ext = file.type.includes('mp4') || file.type.includes('m4a')
     ? 'm4a'
     : file.type.includes('mpeg') || file.type.includes('mp3')
@@ -137,7 +141,7 @@ async function transcribeWithSenseVoice(file: File, key: string): Promise<SenseV
     method: 'POST',
     headers: { Authorization: `Bearer ${key}` },
     body: upstream,
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
@@ -159,11 +163,13 @@ export async function POST(request: NextRequest) {
 
   let file: File | null = null;
   let partial = false;
+  let analysisRequested = true;
   try {
     const form = await request.formData();
     const f = form.get('audio');
     if (f instanceof File) file = f;
     partial = form.get('partial') === '1';
+    analysisRequested = form.get('analysis') !== '0';
   } catch {
     return NextResponse.json({ error: 'bad-form' }, { status: 400 });
   }
@@ -181,39 +187,48 @@ export async function POST(request: NextRequest) {
   // 又慢又贵），录到一半的半句话也不该被当成情绪线索。
   if (partial) {
     try {
-      const r = await transcribeWithSenseVoice(file, key);
-      return r.kind === 'ok'
-        ? NextResponse.json({ text: r.text, voiceContext: null, source: 'partial' })
-        : NextResponse.json({ text: '', voiceContext: null, source: 'partial' });
+      const r = await transcribeWithSenseVoice(file, key, 6_000);
+      if (r.kind === 'ok') {
+        return NextResponse.json({ text: r.text, voiceContext: null, source: 'partial' });
+      }
+      return NextResponse.json(
+        { error: r.kind === 'empty' ? 'partial-empty' : 'transcribe-failed' },
+        { status: r.kind === 'empty' ? 422 : 502 },
+      );
     } catch {
-      return NextResponse.json({ text: '', voiceContext: null, source: 'partial' });
+      return NextResponse.json({ error: 'transcribe-failed' }, { status: 502 });
     }
   }
 
   try {
-    const analysis = (await isQwenCompatibleWav(file))
-      ? await analyzeWithQwen(file, key)
-      : null;
-    if (analysis) {
+    // 专用 ASR 负责忠实文字；Qwen 只在「说完直达」时并发补充声音观察。
+    // 灰色麦克风会传 analysis=0，因此不再为了听写多等一次 30 秒的分析调用。
+    const canAnalyze = analysisRequested && await isQwenCompatibleWav(file);
+    const [fallback, analysis] = await Promise.all([
+      transcribeWithSenseVoice(file, key),
+      canAnalyze ? analyzeWithQwen(file, key) : Promise.resolve(null),
+    ]);
+
+    if (fallback.kind === 'ok') {
       return NextResponse.json({
-        text: analysis.transcript,
-        voiceContext: analysis,
-        source: 'qwen3-omni',
+        text: fallback.text,
+        voiceContext: analysis ? { ...analysis, transcript: fallback.text } : null,
+        source: analysis ? 'sensevoice+qwen3-omni' : 'sensevoice',
       });
     }
 
-    const fallback = await transcribeWithSenseVoice(file, key);
-    if (fallback.kind === 'upstream-error') {
-      return NextResponse.json({ error: 'transcribe-failed' }, { status: 502 });
+    // SenseVoice 偶发失败时仍可用 Qwen 的逐字字段兜底，但不再把它放在首选位置。
+    if (analysis?.transcript) {
+      return NextResponse.json({
+        text: analysis.transcript,
+        voiceContext: analysis,
+        source: 'qwen3-omni-fallback',
+      });
     }
-    if (fallback.kind === 'empty') {
-      return NextResponse.json({ error: 'empty-result' }, { status: 422 });
-    }
-    return NextResponse.json({
-      text: fallback.text,
-      voiceContext: null,
-      source: 'sensevoice',
-    });
+    return NextResponse.json(
+      { error: fallback.kind === 'empty' ? 'empty-result' : 'transcribe-failed' },
+      { status: fallback.kind === 'empty' ? 422 : 502 },
+    );
   } catch (err) {
     console.error('[phil-voice] failed', err);
     return NextResponse.json({ error: 'transcribe-failed' }, { status: 502 });

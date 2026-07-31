@@ -14,11 +14,13 @@ export type VoiceInputResult = {
 const MAX_RECORDING_MS = 55_000;
 const VOICE_SAMPLE_RATE = 16_000;
 const MAX_WAV_BYTES = 1_950_000;
-const PARTIAL_MS = 1200;        // 字幕刷新间隔：只转新增那一段，所以可以压得很短
-const PARTIAL_FIRST_MS = 900;   // 第一次早发，别让人盯着空框等一个完整周期
-const MIN_SEG_S = 0.9;          // 比这还短转不出东西，白花一次请求
-const MAX_SEG_S = 4.0;          // 一直没停顿也得切，否则字迟迟不出
+const PARTIAL_MS = 900;         // 字幕刷新间隔：只转新增那一段，所以可以压得很短
+const PARTIAL_FIRST_MS = 700;   // 第一次早发，别让人盯着空框等一个完整周期
+const PARTIAL_TIMEOUT_MS = 7_000;
+const MIN_SEG_S = 0.7;          // 太短的片段容易只有半个音节，先和后面合起来
+const MAX_SEG_S = 2.6;          // 一直没停顿也得切，否则字迟迟不出
 const QUIET_RMS = 0.02;         // 低于这个音量算「停顿」，可以在这里下刀
+const RECORDING_TAIL_MS = 300;  // 点完成后给手机录音编码器留住最后几个字
 
 function writeAscii(view: DataView, offset: number, value: string) {
   for (let index = 0; index < value.length; index += 1) {
@@ -139,6 +141,20 @@ function findQuietCut(flat: Float32Array, rate: number): number | null {
   return flat.length / rate >= MAX_SEG_S ? flat.length : null;
 }
 
+/** 最终识别若明显只少了尾句，保留实时字幕里已经识别出的完整版本。 */
+function preferCompleteTranscript(finalText: string, partialText: string): string {
+  const finalValue = finalText.trim();
+  const partialValue = partialText.trim();
+  if (!partialValue) return finalValue;
+  if (!finalValue) return partialValue;
+  const compact = (value: string) => value.replace(/[\s，。！？、；：,.!?;:]/g, '');
+  const finalCompact = compact(finalValue);
+  const partialCompact = compact(partialValue);
+  return partialCompact.startsWith(finalCompact) && partialCompact.length > finalCompact.length
+    ? partialValue
+    : finalValue;
+}
+
 async function qwenCompatibleAudio(blob: Blob): Promise<Blob> {
   if (typeof AudioContext === 'undefined') return blob;
   let context: AudioContext | null = null;
@@ -214,8 +230,11 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   const partialTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const partialFirstRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const partialBusyRef = useRef(false);
+  const partialRequestRef = useRef<AbortController | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const genRef = useRef(0);
+  const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stoppingRef = useRef(false);
   // 已经转完并接进字幕的进度：文字 + 已消费到第几个样本
   const committedRef = useRef({ text: '', samples: 0 });
 
@@ -236,6 +255,12 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       clearTimeout(partialFirstRef.current);
       partialFirstRef.current = null;
     }
+    if (finishTimerRef.current) {
+      clearTimeout(finishTimerRef.current);
+      finishTimerRef.current = null;
+    }
+    partialRequestRef.current?.abort();
+    partialRequestRef.current = null;
     try {
       tapRef.current?.disconnect();
     } catch {
@@ -245,6 +270,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     pcmRef.current = [];
     committedRef.current = { text: '', samples: 0 };
     partialBusyRef.current = false;
+    stoppingRef.current = false;
     try {
       void audioCtxRef.current?.close();
     } catch {
@@ -280,25 +306,36 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     if (cut === null) return;                // 还没到停顿、也没到硬切长度
 
     partialBusyRef.current = true;
+    const controller = new AbortController();
+    partialRequestRef.current = controller;
+    const timeout = setTimeout(() => controller.abort(), PARTIAL_TIMEOUT_MS);
     try {
       const fd = new FormData();
       fd.append('audio', encodePcmWav(flat.subarray(0, cut), rate), 'partial.wav');
       fd.append('partial', '1');
-      const res = await fetch('/api/phil-coach/voice', { method: 'POST', body: fd });
+      const res = await fetch('/api/phil-coach/voice', {
+        method: 'POST',
+        body: fd,
+        signal: controller.signal,
+      });
       const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (generationRef.current !== generation) return;
       if (res.ok && typeof json.text === 'string') {
         const piece = json.text.trim();
-        // 这一段无论有没有转出字，都算翻过去了——否则会一直卡在同一段上重转
-        committedRef.current = {
-          text: piece ? `${committedRef.current.text}${piece}` : committedRef.current.text,
-          samples: from + cut,
-        };
-        if (piece) setPartial(committedRef.current.text);
+        // 空结果不能把这段音频消费掉。把它和下一小段一起重试，避免永久缺词。
+        if (piece) {
+          committedRef.current = {
+            text: `${committedRef.current.text}${piece}`,
+            samples: from + cut,
+          };
+          setPartial(committedRef.current.text);
+        }
       }
     } catch {
       /* 字幕是锦上添花，掉了就掉了 */
     } finally {
+      clearTimeout(timeout);
+      if (partialRequestRef.current === controller) partialRequestRef.current = null;
       partialBusyRef.current = false;
     }
   }, []);
@@ -399,6 +436,38 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     chunksRef.current = [];
   }, [stopMeter]);
 
+  /**
+   * 手机点下「完成」时，声音与编码数据还会晚几十到几百毫秒抵达。
+   * 先立即切到整理状态，再给尾音一个很短的缓冲，最后主动冲出编码数据。
+   */
+  const requestStop = useCallback((tailMs = RECORDING_TAIL_MS) => {
+    const recorder = recRef.current;
+    if (!recorder || recorder.state === 'inactive' || stoppingRef.current) return;
+    stoppingRef.current = true;
+    if (maxTimerRef.current) {
+      clearTimeout(maxTimerRef.current);
+      maxTimerRef.current = null;
+    }
+    setRecording(false);
+    setTranscribing(true);
+    finishTimerRef.current = setTimeout(() => {
+      finishTimerRef.current = null;
+      try {
+        recorder.requestData();
+      } catch {
+        /* Safari 某些版本不接受显式 flush，stop 仍会给最后一个 dataavailable */
+      }
+      try {
+        recorder.stop();
+      } catch {
+        cleanup();
+        busyRef.current = false;
+        setTranscribing(false);
+        setError('这段录音没有顺利结束，可以再说一次。');
+      }
+    }, Math.max(0, tailMs));
+  }, [cleanup]);
+
   const cancel = useCallback(() => {
     generationRef.current += 1;
     busyRef.current = false;
@@ -422,9 +491,10 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
 
   useEffect(() => cancel, [cancel]);
 
-  const start = useCallback(async (options?: { partials?: boolean }) => {
+  const start = useCallback(async (options?: { partials?: boolean; analysis?: boolean }) => {
     if (busyRef.current) return;
     busyRef.current = true;
+    stoppingRef.current = false;
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     setError('');
@@ -464,9 +534,18 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       rec.onstop = async () => {
         const type = rec.mimeType || 'audio/webm';
         const blob = new Blob(chunksRef.current, { type });
+        // 优先保留 Web Audio 抓到的完整 PCM：省掉停止后的 decode，也避开 iOS
+        // MediaRecorder 偶发漏掉最后一小段容器数据的问题。拿不到 PCM 才退回 blob。
+        const pcmChunks = pcmRef.current.slice();
+        const pcmRate = pcmRateRef.current;
+        const pcmSamples = pcmChunks.reduce((total, chunk) => total + chunk.length, 0);
+        const partialTextAtStop = committedRef.current.text;
+        const pcmBlob = pcmRate && pcmSamples > pcmRate / 4
+          ? encodePcmWav(flattenRange(pcmChunks, 0, pcmSamples), pcmRate)
+          : null;
         cleanup();
         if (generationRef.current !== generation) return;
-        if (blob.size < 1200) {
+        if ((!pcmBlob || pcmBlob.size < 1200) && blob.size < 1200) {
           setError('好像没录到声音，再说一次试试。');
           setTranscribing(false);
           busyRef.current = false;
@@ -475,10 +554,13 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         setTranscribing(true);
         let controller: AbortController | null = null;
         try {
-          const uploadBlob = await qwenCompatibleAudio(blob);
+          const uploadBlob = pcmBlob && pcmBlob.size >= 1200
+            ? pcmBlob
+            : await qwenCompatibleAudio(blob);
           if (generationRef.current !== generation) return;
           const fd = new FormData();
           fd.append('audio', uploadBlob, uploadBlob.type === 'audio/wav' ? 'speech.wav' : 'speech');
+          fd.append('analysis', options?.analysis === false ? '0' : '1');
           controller = new AbortController();
           requestRef.current = controller;
           const res = await fetch('/api/phil-coach/voice', {
@@ -489,21 +571,37 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
           if (generationRef.current !== generation) return;
           if (!res.ok || typeof json.text !== 'string') {
-            setError(
-              json.error === 'too-many'
-                ? '说得有点频繁，歇一会儿再试。'
-                : '这段没能转成文字，可以直接打字，或再说一次。',
-            );
+            if (partialTextAtStop && options?.analysis === false) {
+              setPartial('');
+              onResultRef.current({ text: partialTextAtStop, voiceContext: null });
+              setError('完整整理没有成功，已保留刚才听到的文字，请检查后再发送。');
+            } else {
+              setError(
+                json.error === 'too-many'
+                  ? '说得有点频繁，歇一会儿再试。'
+                  : '这段没能转成文字，可以直接打字，或再说一次。',
+              );
+            }
           } else {
+            const text = options?.analysis === false
+              ? preferCompleteTranscript(json.text, partialTextAtStop)
+              : json.text.trim();
+            const voiceContext = normalizeVoiceAnalysis(json.voiceContext);
             setPartial('');
             onResultRef.current({
-              text: json.text.trim(),
-              voiceContext: normalizeVoiceAnalysis(json.voiceContext),
+              text,
+              voiceContext: voiceContext ? { ...voiceContext, transcript: text } : null,
             });
           }
         } catch {
           if (generationRef.current === generation) {
-            setError('网络不太顺，这段没送出去。');
+            if (partialTextAtStop && options?.analysis === false) {
+              setPartial('');
+              onResultRef.current({ text: partialTextAtStop, voiceContext: null });
+              setError('网络不太顺，已保留刚才听到的文字，请检查后再发送。');
+            } else {
+              setError('网络不太顺，这段没送出去。');
+            }
           }
         } finally {
           if (requestRef.current === controller) requestRef.current = null;
@@ -517,8 +615,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       recRef.current = rec;
       setRecording(true);
       maxTimerRef.current = setTimeout(() => {
-        if (rec.state === 'recording') rec.stop();
-        setRecording(false);
+        requestStop(0);
       }, MAX_RECORDING_MS);
     } catch (e) {
       if (generationRef.current !== generation) return;
@@ -536,16 +633,11 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       setRequesting(false);
       setRecording(false);
     }
-  }, [cleanup, startMeter, stopMeter]);
+  }, [cleanup, requestStop, startMeter, stopMeter]);
 
   const stop = useCallback(() => {
-    try {
-      recRef.current?.stop();
-    } catch {
-      /* ignore */
-    }
-    setRecording(false);
-  }, []);
+    requestStop();
+  }, [requestStop]);
 
   const toggle = useCallback(() => {
     if (recording) stop();
