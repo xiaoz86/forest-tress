@@ -28,56 +28,13 @@ function writeAscii(view: DataView, offset: number, value: string) {
   }
 }
 
-/** 把浏览器的 WebM / iOS MP4 压成 Qwen 接受的 16kHz 单声道 WAV。 */
-function encodeVoiceWav(source: AudioBuffer): Blob {
-  const maxSamples = Math.floor((MAX_WAV_BYTES - 44) / 2);
-  const outputLength = Math.min(
-    Math.ceil(source.duration * VOICE_SAMPLE_RATE),
-    maxSamples,
-  );
-  const wav = new ArrayBuffer(44 + outputLength * 2);
-  const view = new DataView(wav);
-
-  writeAscii(view, 0, 'RIFF');
-  view.setUint32(4, 36 + outputLength * 2, true);
-  writeAscii(view, 8, 'WAVE');
-  writeAscii(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, VOICE_SAMPLE_RATE, true);
-  view.setUint32(28, VOICE_SAMPLE_RATE * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeAscii(view, 36, 'data');
-  view.setUint32(40, outputLength * 2, true);
-
-  const channels = Array.from(
-    { length: source.numberOfChannels },
-    (_, index) => source.getChannelData(index),
-  );
-  const sourceStep = source.sampleRate / VOICE_SAMPLE_RATE;
-  for (let index = 0; index < outputLength; index += 1) {
-    const position = index * sourceStep;
-    const before = Math.min(Math.floor(position), source.length - 1);
-    const after = Math.min(before + 1, source.length - 1);
-    const mix = position - before;
-    const sample = channels.reduce(
-      (sum, channel) => sum + channel[before] + (channel[after] - channel[before]) * mix,
-      0,
-    ) / channels.length;
-    const clamped = Math.max(-1, Math.min(1, sample));
-    view.setInt16(44 + index * 2, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
-  }
-
-  return new Blob([wav], { type: 'audio/wav' });
-}
-
 /**
- * 从录音期间攒下的裸 PCM 直接编 WAV。
- * 为什么不用 MediaRecorder 的分段数据：webm 的分片拼起来还能解，
- * iOS 的 mp4 却把索引写在结尾，录到一半截出来根本解不开——
- * 而实时字幕要的正是「录到一半」。裸 PCM 没有容器，任何时刻都能编出完整的 WAV。
+ * 把攒下的裸 PCM 编成 WAV。实时字幕和最终定稿都走这一条。
+ * 不用 MediaRecorder 有两个原因：一是它的分段数据截不出中途可解的音频
+ * （webm 勉强能拼，iOS 的 mp4 把索引写在结尾，录到一半根本解不开），
+ * 二是 iOS Safari 上同一条音轨被它和 AudioContext 同时读时，
+ * AudioContext 会被饿死——波形不动、字幕全是静音。裸 PCM 没有容器，
+ * 任何时刻都能编出完整 WAV，也让采音口只剩一个。
  */
 function encodePcmWav(flat: Float32Array, sampleRate: number): Blob {
   const ratio = sampleRate / VOICE_SAMPLE_RATE;
@@ -155,41 +112,9 @@ function preferCompleteTranscript(finalText: string, partialText: string): strin
     : finalValue;
 }
 
-async function qwenCompatibleAudio(blob: Blob): Promise<Blob> {
-  if (typeof AudioContext === 'undefined') return blob;
-  let context: AudioContext | null = null;
-  try {
-    context = new AudioContext();
-    const source = await context.decodeAudioData(await blob.arrayBuffer());
-    return encodeVoiceWav(source);
-  } catch {
-    return blob;
-  } finally {
-    if (context) void context.close().catch(() => undefined);
-  }
-}
-
 const noopSubscribe = () => () => {};
 function useClientFlag(probe: () => boolean): boolean {
   return useSyncExternalStore(noopSubscribe, probe, () => false);
-}
-
-function pickMimeType(): string {
-  if (typeof MediaRecorder === 'undefined') return '';
-  const candidates = [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/mp4',          // iOS Safari / 微信 iOS 走这个
-    'audio/mpeg',
-  ];
-  for (const t of candidates) {
-    try {
-      if (MediaRecorder.isTypeSupported(t)) return t;
-    } catch {
-      /* ignore */
-    }
-  }
-  return '';
 }
 
 /**
@@ -201,14 +126,19 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     () =>
       typeof navigator !== 'undefined' &&
       Boolean(navigator.mediaDevices?.getUserMedia) &&
-      typeof MediaRecorder !== 'undefined',
+      // 采音改走 Web Audio，所以看的是它有没有，而不是 MediaRecorder
+      typeof window !== 'undefined' &&
+      Boolean(
+        window.AudioContext ||
+          (window as unknown as { webkitAudioContext?: unknown }).webkitAudioContext,
+      ),
   );
   const [requesting, setRequesting] = useState(false);
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [error, setError] = useState('');
-  const recRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<BlobPart[]>([]);
+  /** 停止时要跑的收口逻辑（闭包住这一轮的 generation 与 options） */
+  const finalizeRef = useRef<(() => Promise<void>) | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const maxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestRef = useRef<AbortController | null>(null);
@@ -219,7 +149,6 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   const [level, setLevel] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const rafRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
   // 实时字幕（服务端分段转写）：iOS Safari 与微信里没有 Web Speech，
   // 只能靠这条路把字送进输入框
@@ -243,10 +172,6 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   }, [onResult]);
 
   const stopMeter = useCallback(() => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
     if (partialTimerRef.current) {
       clearInterval(partialTimerRef.current);
       partialTimerRef.current = null;
@@ -363,38 +288,26 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       // iOS 上就算在手势里建好，拿到麦克风这一等也可能把它挂起；再推一次
       if (ctx.state === 'suspended') void ctx.resume().catch(() => undefined);
       const source = ctx.createMediaStreamSource(stream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      analyser.smoothingTimeConstant = 0.75;
-      source.connect(analyser);
-      const buf = new Uint8Array(analyser.frequencyBinCount);
-      startedAtRef.current = Date.now();
-      const tick = () => {
-        analyser.getByteTimeDomainData(buf);
-        let sum = 0;
-        for (let i = 0; i < buf.length; i += 1) {
-          const v = (buf[i] - 128) / 128;
-          sum += v * v;
-        }
-        const rms = Math.sqrt(sum / buf.length);
-        // 放大到易感知的范围，并留一点底噪门限
-        setLevel(Math.min(1, Math.max(0, (rms - 0.01) * 6)));
-        setElapsed(Math.floor((Date.now() - startedAtRef.current) / 1000));
-        rafRef.current = requestAnimationFrame(tick);
-      };
-      rafRef.current = requestAnimationFrame(tick);
-
-      // 裸 PCM 一律抓：抓着不费什么，但真到要中途补启分段转写时，
-      // 前面这几秒的音频就还在——否则字幕会从半截开始。
       sourceRef.current = source;
-      // 并行抓一份裸 PCM：MediaRecorder 那份是给最终定稿用的，
-      // 这份只为「录到一半也能编出完整 WAV」，好每隔几秒转一次当字幕。
+      startedAtRef.current = Date.now();
       pcmRef.current = [];
       pcmRateRef.current = ctx.sampleRate;
       committedRef.current = { text: '', samples: 0 };
+
       const tap = ctx.createScriptProcessor(4096, 1, 1);
+      // 音量表和录音都从这一个回调出：
+      // 早先电平表挂在 requestAnimationFrame 上，可页面一进后台、iOS 上键盘弹起
+      // 或手指在滚动时，rAF 都会被节流甚至停掉——波形就直挺挺躺在那儿，
+      // 让人以为没录上。音频回调走的是音频线程，只要有声音进来就会响。
       tap.onaudioprocess = e => {
-        pcmRef.current.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+        const data = e.inputBuffer.getChannelData(0);
+        pcmRef.current.push(new Float32Array(data));
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 1) sum += data[i] * data[i];
+        const rms = Math.sqrt(sum / data.length);
+        // 放大到易感知的范围，并留一点底噪门限
+        setLevel(Math.min(1, Math.max(0, (rms - 0.01) * 6)));
+        setElapsed(Math.floor((Date.now() - startedAtRef.current) / 1000));
       };
       const mute = ctx.createGain();
       mute.gain.value = 0;              // 不静音就会把麦克风原样播出来
@@ -432,8 +345,6 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       /* ignore */
     }
     streamRef.current = null;
-    recRef.current = null;
-    chunksRef.current = [];
   }, [stopMeter]);
 
   /**
@@ -441,8 +352,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
    * 先立即切到整理状态，再给尾音一个很短的缓冲，最后主动冲出编码数据。
    */
   const requestStop = useCallback((tailMs = RECORDING_TAIL_MS) => {
-    const recorder = recRef.current;
-    if (!recorder || recorder.state === 'inactive' || stoppingRef.current) return;
+    if (!finalizeRef.current || stoppingRef.current) return;
     stoppingRef.current = true;
     if (maxTimerRef.current) {
       clearTimeout(maxTimerRef.current);
@@ -450,39 +360,21 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     }
     setRecording(false);
     setTranscribing(true);
+    // 手机点下「完成」时，最后一点声音还在路上，等一小会儿再收口
     finishTimerRef.current = setTimeout(() => {
       finishTimerRef.current = null;
-      try {
-        recorder.requestData();
-      } catch {
-        /* Safari 某些版本不接受显式 flush，stop 仍会给最后一个 dataavailable */
-      }
-      try {
-        recorder.stop();
-      } catch {
-        cleanup();
-        busyRef.current = false;
-        setTranscribing(false);
-        setError('这段录音没有顺利结束，可以再说一次。');
-      }
+      const finalize = finalizeRef.current;
+      finalizeRef.current = null;
+      void finalize?.();
     }, Math.max(0, tailMs));
-  }, [cleanup]);
+  }, []);
 
   const cancel = useCallback(() => {
     generationRef.current += 1;
     busyRef.current = false;
     requestRef.current?.abort();
     requestRef.current = null;
-    const recorder = recRef.current;
-    if (recorder) {
-      recorder.ondataavailable = null;
-      recorder.onstop = null;
-      try {
-        if (recorder.state !== 'inactive') recorder.stop();
-      } catch {
-        /* ignore */
-      }
-    }
+    finalizeRef.current = null;
     cleanup();
     setRequesting(false);
     setRecording(false);
@@ -525,27 +417,37 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       setRequesting(false);
       streamRef.current = stream;
       startMeter(stream, options?.partials !== false, generation);
-      const mimeType = pickMimeType();
-      const rec = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      chunksRef.current = [];
-      rec.ondataavailable = e => {
-        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
-      };
-      rec.onstop = async () => {
-        const type = rec.mimeType || 'audio/webm';
-        const blob = new Blob(chunksRef.current, { type });
-        // 优先保留 Web Audio 抓到的完整 PCM：省掉停止后的 decode，也避开 iOS
-        // MediaRecorder 偶发漏掉最后一小段容器数据的问题。拿不到 PCM 才退回 blob。
+      // 只用 Web Audio 采音，不再挂 MediaRecorder。
+      // iOS Safari 上同一条音轨被两个消费者同时读时，AudioContext 会被饿死——
+      // 表现就是波形全程静止、实时字幕拿到的全是静音，而 MediaRecorder 那边一切正常。
+      // 定稿本来就已经优先用这份 PCM，索性让它成为唯一的采音口：
+      // 顺带省掉停止后的 decode，也不再有 iOS mp4「索引写在结尾」的麻烦。
+      finalizeRef.current = async () => {
         const pcmChunks = pcmRef.current.slice();
         const pcmRate = pcmRateRef.current;
         const pcmSamples = pcmChunks.reduce((total, chunk) => total + chunk.length, 0);
         const partialTextAtStop = committedRef.current.text;
-        const pcmBlob = pcmRate && pcmSamples > pcmRate / 4
-          ? encodePcmWav(flattenRange(pcmChunks, 0, pcmSamples), pcmRate)
-          : null;
+        const committedSamples = committedRef.current.samples;
+        // 听写：字幕已经把前面绝大部分转完了，收口时只补最后那一小段没转的，
+        // 不必把整段重转一遍——那正是「点完停止还要干等」的来源。
+        // 直达不走这条：那段话要直接发出去，且语气观察需要完整音频。
+        const tailOnly = options?.analysis === false && !!partialTextAtStop && pcmRate > 0;
+        const uploadFlat = pcmRate
+          ? flattenRange(pcmChunks, tailOnly ? committedSamples : 0, pcmSamples)
+          : new Float32Array(0);
+        const enoughAudio = uploadFlat.length > pcmRate / 4;
+        const pcmBlob = enoughAudio ? encodePcmWav(uploadFlat, pcmRate) : null;
         cleanup();
         if (generationRef.current !== generation) return;
-        if ((!pcmBlob || pcmBlob.size < 1200) && blob.size < 1200) {
+        // 尾巴短到没东西可转：字幕本身就是结果，一个字都不用等
+        if (tailOnly && !pcmBlob) {
+          setPartial('');
+          onResultRef.current({ text: partialTextAtStop, voiceContext: null });
+          setTranscribing(false);
+          busyRef.current = false;
+          return;
+        }
+        if (!pcmBlob || pcmBlob.size < 1200) {
           setError('好像没录到声音，再说一次试试。');
           setTranscribing(false);
           busyRef.current = false;
@@ -554,13 +456,11 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         setTranscribing(true);
         let controller: AbortController | null = null;
         try {
-          const uploadBlob = pcmBlob && pcmBlob.size >= 1200
-            ? pcmBlob
-            : await qwenCompatibleAudio(blob);
-          if (generationRef.current !== generation) return;
           const fd = new FormData();
-          fd.append('audio', uploadBlob, uploadBlob.type === 'audio/wav' ? 'speech.wav' : 'speech');
+          fd.append('audio', pcmBlob, 'speech.wav');
           fd.append('analysis', options?.analysis === false ? '0' : '1');
+          // 补尾走轻量转写：不做语气观察，也不占正式配额
+          if (tailOnly) fd.append('partial', '1');
           controller = new AbortController();
           requestRef.current = controller;
           const res = await fetch('/api/phil-coach/voice', {
@@ -583,9 +483,12 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
               );
             }
           } else {
-            const text = options?.analysis === false
-              ? preferCompleteTranscript(json.text, partialTextAtStop)
-              : json.text.trim();
+            const text = tailOnly
+              // 只转了尾巴，接在字幕后面就是完整的一段
+              ? `${partialTextAtStop}${json.text.trim()}`.trim()
+              : options?.analysis === false
+                ? preferCompleteTranscript(json.text, partialTextAtStop)
+                : json.text.trim();
             const voiceContext = normalizeVoiceAnalysis(json.voiceContext);
             setPartial('');
             onResultRef.current({
@@ -611,8 +514,6 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           }
         }
       };
-      rec.start();
-      recRef.current = rec;
       setRecording(true);
       maxTimerRef.current = setTimeout(() => {
         requestStop(0);
