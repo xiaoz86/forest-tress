@@ -37,6 +37,8 @@ type Session = {
 const OPENING_INDEX_KEY = 'nf_phil_opening_index';
 /** 当前这段对话的暂存键：登录/注册跳走再回来，对话还在（只在本次浏览会话内，关掉标签页即散） */
 const DRAFT_SESSION_KEY = 'nf_phil_session';
+/** 给浏览器听写多久证明它真的在工作；到点没出字就退回服务端分段转写 */
+const CAPTION_WATCHDOG_MS = 2500;
 
 function saveSession(s: Session | null) {
   try {
@@ -223,7 +225,11 @@ export default function PhilCoachExperience() {
   // 录音时的实时字幕（仅显示用）。真正发出去的文字以服务端转写为准——
   // 系统听写只负责让人「看见自己正在被听到」，说错了也不影响结果。
   const [caption, setCaption] = useState('');
+  // 浏览器听写到底有没有真的出字——看门狗据此决定要不要退回服务端
+  const captionSeenRef = useRef(false);
+  const captionWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const liveVoice = useSpeechInput(text => {
+    captionSeenRef.current = true;
     setCaption(current => appendTranscript(current, text));
   });
   const voiceIn = useServerSpeechInput(result => {
@@ -255,17 +261,17 @@ export default function PhilCoachExperience() {
   const path = session ? getPhilPath(session.pathId) : undefined;
   const hasConversation = Boolean(session?.thread.length);
   const conversationReady = identityReady && importState !== 'importing';
-  // 字幕有两条路，按环境择一：
-  // 浏览器听写（Web Speech）逐字出、几乎零延迟，但微信里没有这个 API，
-  // iOS Safari 上它还会和 MediaRecorder 抢同一路音频、互相掐断。
-  // 那两处改走服务端分段转写：每 3.2 秒把已录到的音频转一次，字照样进输入框，
-  // 只是以段为单位刷新。
-  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const useWebSpeechCaptions = liveVoice.supported && !liveVoice.inWeChat && !isIOS;
-  // 实时字幕 = 已定稿的句子 + 正在说的半句；服务端那条路整段替换
-  const liveCaption = useWebSpeechCaptions
-    ? appendTranscript(caption, liveVoice.interim)
-    : voiceIn.partial;
+  // 字幕两条路：浏览器听写（Web Speech）逐字出、几乎零延迟；
+  // 服务端分段转写以短语为单位刷新，但哪儿都能用。
+  // 只要浏览器有这个 API 就先试 Web Speech——手机浏览器同样试。
+  // 不写死排除 iOS：那儿 SpeechRecognition 有时会和 MediaRecorder 抢麦、
+  // 悄悄什么都不给，但也有能用的版本，与其一刀切不如让下面的看门狗判定。
+  // 微信没有这个 API，直接走服务端。
+  const useWebSpeechCaptions = liveVoice.supported && !liveVoice.inWeChat;
+  // 实时字幕：谁有内容就显示谁。
+  // 不能按 useWebSpeechCaptions 固定挑一边——看门狗把浏览器听写换成服务端之后，
+  // 显示源不跟着切的话，请求照发、字却永远不出现。
+  const liveCaption = appendTranscript(caption, liveVoice.interim) || voiceIn.partial;
   const voiceBusy = voiceIn.requesting || voiceIn.recording || voiceIn.transcribing;
   // 直达：大面板只管「正在录」这一段，录音一停立即退场——
   // 等待由对话里的占位气泡承担，面板再留着就是同一状态出现两遍，
@@ -281,15 +287,28 @@ export default function PhilCoachExperience() {
     voiceModeRef.current = mode;
     setVoiceMode(mode);
     setCaption('');
-    // Web Speech 在跑就不必再花钱做分段转写
+    captionSeenRef.current = false;
+    // Web Speech 在跑就先不花钱做分段转写，等看门狗判定
     void voiceIn.start({ partials: !useWebSpeechCaptions });
-    if (useWebSpeechCaptions) liveVoice.start();
+    if (!useWebSpeechCaptions) return;
+    liveVoice.start();
+    // 看门狗：给浏览器听写一点时间证明它真的在工作。到点还一个字都没有，
+    // 就当它被掐断了——收掉它，接上服务端分段转写。PCM 从开录就在攒，
+    // 所以字幕会从头出，不会从半截开始。
+    if (captionWatchdogRef.current) clearTimeout(captionWatchdogRef.current);
+    captionWatchdogRef.current = setTimeout(() => {
+      if (captionSeenRef.current) return;
+      liveVoice.cancel();
+      voiceIn.armPartials();
+    }, CAPTION_WATCHDOG_MS);
   };
   const finishVoice = () => {
+    if (captionWatchdogRef.current) clearTimeout(captionWatchdogRef.current);
     liveVoice.cancel();   // 定稿以服务端转写为准，字幕直接丢弃
     voiceIn.stop();
   };
   const cancelVoice = () => {
+    if (captionWatchdogRef.current) clearTimeout(captionWatchdogRef.current);
     liveVoice.cancel();
     setCaption('');
     voiceModeRef.current = null;
@@ -300,6 +319,13 @@ export default function PhilCoachExperience() {
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
+
+  // 半句话（interim）也算浏览器听写还活着。
+  // 只认定稿的话，连续说话的人前几秒往往只有 interim，看门狗会误判成「装死」，
+  // 白白退回服务端、多花一串请求。
+  useEffect(() => {
+    if (liveVoice.interim) captionSeenRef.current = true;
+  }, [liveVoice.interim]);
 
   // 挂载时恢复上一次未走完的对话（去登录/注册回来后，聊过的内容不会丢）
   useEffect(() => {

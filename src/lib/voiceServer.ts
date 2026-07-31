@@ -214,6 +214,8 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   const partialTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const partialFirstRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const partialBusyRef = useRef(false);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const genRef = useRef(0);
   // 已经转完并接进字幕的进度：文字 + 已消费到第几个样本
   const committedRef = useRef({ text: '', samples: 0 });
 
@@ -301,6 +303,22 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     }
   }, []);
 
+  /** 起转写定时器：第一次早一点发，之后按固定间隔。 */
+  const beginPartials = useCallback(
+    (generation: number) => {
+      if (partialTimerRef.current) return;
+      // 第一次早一点发：等满一个完整周期再加上网络往返，
+      // 人要盯着空框好几秒才看见第一个字，那就不像「实时」了。
+      partialFirstRef.current = setTimeout(() => {
+        void pushPartial(generation);
+      }, PARTIAL_FIRST_MS);
+      partialTimerRef.current = setInterval(() => {
+        void pushPartial(generation);
+      }, PARTIAL_MS);
+    },
+    [pushPartial],
+  );
+
   const startMeter = useCallback((stream: MediaStream, withPartials: boolean, generation: number) => {
     try {
       const ctx = audioCtxRef.current;
@@ -329,7 +347,9 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       };
       rafRef.current = requestAnimationFrame(tick);
 
-      if (!withPartials) return;
+      // 裸 PCM 一律抓：抓着不费什么，但真到要中途补启分段转写时，
+      // 前面这几秒的音频就还在——否则字幕会从半截开始。
+      sourceRef.current = source;
       // 并行抓一份裸 PCM：MediaRecorder 那份是给最终定稿用的，
       // 这份只为「录到一半也能编出完整 WAV」，好每隔几秒转一次当字幕。
       pcmRef.current = [];
@@ -345,18 +365,23 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       tap.connect(mute);
       mute.connect(ctx.destination);    // ScriptProcessor 不接终点不会跑
       tapRef.current = tap;
-      // 第一次早一点发：等满一个 3.2 秒周期再加上网络往返，
-      // 人要盯着空框将近 5 秒才看见第一个字，那就不像「实时」了。
-      partialFirstRef.current = setTimeout(() => {
-        void pushPartial(generation);
-      }, PARTIAL_FIRST_MS);
-      partialTimerRef.current = setInterval(() => {
-        void pushPartial(generation);
-      }, PARTIAL_MS);
+      genRef.current = generation;
+      if (withPartials) beginPartials(generation);
     } catch {
       /* 没有音量表也不影响录音 */
     }
-  }, [pushPartial]);
+  }, [beginPartials]);
+
+  /**
+   * 中途补启分段转写。
+   * 给 Web Speech 兜底用：先让浏览器听写试，几秒内没出字（iOS 上它会和
+   * MediaRecorder 抢麦、悄悄什么都不给）就调这个接上，PCM 一直在攒，
+   * 所以字幕从头开始而不是从半截。
+   */
+  const armPartials = useCallback(() => {
+    if (partialTimerRef.current || !pcmRateRef.current) return;
+    beginPartials(genRef.current);
+  }, [beginPartials]);
 
   const cleanup = useCallback(() => {
     if (maxTimerRef.current) {
@@ -529,7 +554,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
 
   return {
     supported, requesting, recording, transcribing, error,
-    level, elapsed, partial,
+    level, elapsed, partial, armPartials,
     start, stop, toggle, cancel,
   };
 }
