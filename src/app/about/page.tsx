@@ -188,91 +188,6 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* === 社群连接 === */}
-      <section id="community" className="py-24 px-10 bg-white max-md:py-16 max-md:px-5">
-        <div className="text-center max-w-[760px] mx-auto mb-12">
-          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">社群连接</div>
-          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-5">
-            让线上相遇，<br />继续走向真实的附近
-          </h2>
-          <p className="text-[15.5px] text-text-secondary leading-[2]">
-            附近森林生态社区的生长社群，面向已经注册、正在使用或持续关注附近森林作品的朋友。这里也是超级创造者彼此走近的一处附近：不只认识名字，也让想法、经验与资源开始流动。
-          </p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-5 max-w-[980px] mx-auto mb-20 max-md:grid-cols-1 max-md:mb-14">
-          {[
-            {
-              title: '真实联结',
-              description: '认识真实的人，交流彼此当下正在经历、思考与创造的事。',
-            },
-            {
-              title: '共享想法',
-              description: '把一个灵感或问题带进来，听见不同视角，也遇见可能的共创伙伴。',
-            },
-            {
-              title: '一起养成作品',
-              description: '欢迎分享使用 PhilCoach 及附近森林其他作品的真实体验，让每一条反馈成为作品继续生长的养分。',
-            },
-          ].map((item, i) => (
-            <div key={item.title} className="rounded-lg border border-moss/10 bg-warm-cream/70 px-7 py-8">
-              <div className="mb-4 flex items-center gap-3 text-[11px] font-semibold tracking-[0.18em] text-moss uppercase">
-                <span className="h-px w-7 bg-coral-soft/60" />
-                {String(i + 1).padStart(2, '0')}
-              </div>
-              <h3 className="font-serif text-lg font-bold text-forest-deep mb-2">{item.title}</h3>
-              <p className="text-[14px] text-text-secondary leading-[1.8]">{item.description}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="text-center max-w-[720px] mx-auto mb-10">
-          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">联系我们</div>
-          <h3 className="font-serif text-[clamp(1.45rem,3vw,1.9rem)] font-bold text-forest-deep leading-[1.4] mb-4">
-            从一次真实的招呼开始
-          </h3>
-          <p className="text-[15px] text-text-secondary leading-[1.9]">
-            想进一步了解、加入社群，或把使用中的感受告诉我们，可以添加两位创始人的微信。
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-7 max-w-[820px] mx-auto max-md:grid-cols-1">
-          <figure className="rounded-xl border border-moss/10 bg-warm-cream/55 p-7 text-center max-md:p-5">
-            <figcaption className="mb-5">
-              <div className="font-serif text-[1.15rem] font-bold text-forest-deep">创始人 · 小 Z</div>
-              <div className="mt-1 text-[12px] tracking-[0.08em] text-text-light">微信联系</div>
-            </figcaption>
-            <Image
-              src="/community/founder-xiaoz-wechat.png"
-              alt="用于添加小 Z 为好友的微信二维码"
-              width={888}
-              height={1131}
-              sizes="(max-width: 768px) calc(100vw - 80px), 340px"
-              className="mx-auto h-auto w-full max-w-[340px] rounded-[18px]"
-              unoptimized
-            />
-            <p className="mt-4 text-[13px] text-text-secondary">微信扫码，添加为好友</p>
-          </figure>
-
-          <figure className="rounded-xl border border-moss/10 bg-warm-cream/55 p-7 text-center max-md:p-5">
-            <figcaption className="mb-5">
-              <div className="font-serif text-[1.15rem] font-bold text-forest-deep">创始人 · Wendy</div>
-              <div className="mt-1 text-[12px] tracking-[0.08em] text-text-light">微信联系</div>
-            </figcaption>
-            <Image
-              src="/community/founder-wendy-wechat.jpg"
-              alt="用于添加 Wendy 为好友的微信二维码"
-              width={888}
-              height={1134}
-              sizes="(max-width: 768px) calc(100vw - 80px), 340px"
-              className="mx-auto h-auto w-full max-w-[340px] rounded-[18px]"
-              unoptimized
-            />
-            <p className="mt-4 text-[13px] text-text-secondary">微信扫码，添加为好友</p>
-          </figure>
-        </div>
-      </section>
-
       {/* === 连接故事 === */}
       <section id="voices" className="py-24 px-10 bg-gradient-to-br from-forest-deep via-[#1f3a1f] to-forest-mid relative overflow-hidden max-md:py-16 max-md:px-5">
         <div className="absolute inset-0 bg-[linear-gradient(160deg,rgba(255,255,255,0.045),transparent_42%,rgba(232,201,160,0.045))] pointer-events-none" />
@@ -390,6 +305,65 @@ export default function AboutPage() {
           <div className="inline-block px-7 py-3.5 bg-white/70 rounded-lg font-serif text-[1rem] font-semibold text-forest-deep border border-moss/10 mt-4">
             在一个越来越容易让人孤立的世界里，重新织起一张有温度的网。
           </div>
+        </div>
+      </section>
+
+      {/* === 社群联结 === */}
+      <section id="community" className="py-24 px-10 bg-white max-md:py-16 max-md:px-5">
+        <div className="text-center max-w-[780px] mx-auto mb-14">
+          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">社群联结</div>
+          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-8">
+            附近森林生态社区生长社群
+          </h2>
+          <div className="text-left text-[15.5px] text-text-secondary leading-[2]">
+            <p className="mb-5">
+              附近森林生态社区生长社群，是给已经注册、正在使用附近森林，或愿意一起陪伴社区最新作品成长的朋友们，一个让超级创造者彼此相聚、慢慢走近的附近社群。
+            </p>
+            <p className="mb-5">
+              我们希望，这里既是一处让大家走近附近、交流与联结的地方，也是一处可以自在共享想法💡的地方。
+            </p>
+            <p>
+              同时，我们也期待听见大家使用 PhilCoach 等社区作品时，任何真实的体验与反馈。
+            </p>
+          </div>
+        </div>
+
+        <div className="text-center max-w-[720px] mx-auto mb-10">
+          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">联系我们</div>
+          <h3 className="font-serif text-[clamp(1.45rem,3vw,1.9rem)] font-bold text-forest-deep leading-[1.4] mb-4">
+            从一次真实的招呼开始
+          </h3>
+          <p className="text-[15px] text-text-secondary leading-[1.9]">
+            想进一步了解、加入社群，或把使用中的感受告诉我们，可以添加两位创始人的微信。
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-7 max-w-[820px] mx-auto max-md:grid-cols-1">
+          <figure className="rounded-xl border border-moss/10 bg-warm-cream/55 p-7 text-center max-md:p-5">
+            <Image
+              src="/community/founder-xiaoz-wechat.png"
+              alt="用于添加小 Z 为好友的微信二维码"
+              width={888}
+              height={1131}
+              sizes="(max-width: 768px) calc(100vw - 80px), 340px"
+              className="mx-auto h-auto w-full max-w-[340px] rounded-[18px]"
+              unoptimized
+            />
+            <p className="mt-4 text-[13px] text-text-secondary">微信扫码，添加为好友</p>
+          </figure>
+
+          <figure className="rounded-xl border border-moss/10 bg-warm-cream/55 p-7 text-center max-md:p-5">
+            <Image
+              src="/community/founder-wendy-wechat.jpg"
+              alt="用于添加 Wendy 为好友的微信二维码"
+              width={888}
+              height={1134}
+              sizes="(max-width: 768px) calc(100vw - 80px), 340px"
+              className="mx-auto h-auto w-full max-w-[340px] rounded-[18px]"
+              unoptimized
+            />
+            <p className="mt-4 text-[13px] text-text-secondary">微信扫码，添加为好友</p>
+          </figure>
         </div>
       </section>
 
