@@ -19,9 +19,14 @@ export type VoiceInputResult = {
 const MAX_RECORDING_MS = 55_000;
 const VOICE_SAMPLE_RATE = 16_000;
 const MAX_WAV_BYTES = 1_950_000;
-const PARTIAL_MS = 900;         // 字幕刷新间隔：只转新增那一段，所以可以压得很短
+const PARTIAL_MS = 600;         // 派发间隔。请求是重叠的，所以可以比一次往返短得多
 const PARTIAL_FIRST_MS = 700;   // 第一次早发，别让人盯着空框等一个完整周期
 const PARTIAL_TIMEOUT_MS = 7_000;
+// 这条链路每次请求固定要一两秒，且与音频长短无关（实测 15KB 与 78KB 同样耗时）。
+// 串行就是「录 0.7 秒 + 等 2 秒」，字每三秒才蹦一大块；重叠发出之后，
+// 滞后仍是一次往返，但每 0.7 秒就能接上一段，字是连着出来的。
+const MAX_INFLIGHT_PARTIALS = 3;
+const STOP_DRAIN_MS = 5_000;    // 收口时最多等在途的分段这么久
 const MIN_SEG_S = 0.7;          // 太短的片段容易只有半个音节，先和后面合起来
 const MAX_SEG_S = 1.6;          // 一直没停顿也得切，否则字迟迟不出
 // 「安静」得相对于当前环境来判断。固定阈值在有底噪的地方永远够不着，
@@ -197,8 +202,14 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   const tapRef = useRef<ScriptProcessorNode | null>(null);
   const partialTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const partialFirstRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const partialBusyRef = useRef(false);
-  const partialRequestRef = useRef<AbortController | null>(null);
+  const partialControllersRef = useRef(new Set<AbortController>());
+  const partialsClosedRef = useRef(true);
+  const inflightRef = useRef(new Set<Promise<void>>());
+  // 流水线的账本：派发到第几个样本、下一个序号、该接第几号、以及乱序到货的结果
+  const dispatchedRef = useRef(0);
+  const seqRef = useRef(0);
+  const commitSeqRef = useRef(0);
+  const pendingRef = useRef(new Map<number, { raw: string; end: number }>());
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const genRef = useRef(0);
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -216,7 +227,23 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     onResultRef.current = onResult;
   }, [onResult]);
 
-  const stopMeter = useCallback(() => {
+  /** 清空流水线账本。收口时要晚一步做——字幕得先被读走。 */
+  const resetPartialState = useCallback(() => {
+    pendingRef.current.clear();
+    inflightRef.current.clear();
+    seqRef.current = 0;
+    commitSeqRef.current = 0;
+    dispatchedRef.current = 0;
+    committedRef.current = { text: '', seamText: '', samples: 0 };
+  }, []);
+
+  /**
+   * keepPartials：正常收口时用。在途的分段还在路上，
+   * 掐掉它们就等于把已经说出口的话丢了——收口逻辑会等它们回来再定稿。
+   * 取消录音才是真掐断。
+   */
+  const stopMeter = useCallback((keepPartials = false) => {
+    partialsClosedRef.current = true;      // 不再派发新的分段
     if (partialTimerRef.current) {
       clearInterval(partialTimerRef.current);
       partialTimerRef.current = null;
@@ -233,8 +260,11 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       clearTimeout(polishTimerRef.current);
       polishTimerRef.current = null;
     }
-    partialRequestRef.current?.abort();
-    partialRequestRef.current = null;
+    if (!keepPartials) {
+      partialControllersRef.current.forEach(c => c.abort());
+      partialControllersRef.current.clear();
+      resetPartialState();
+    }
     polishRequestRef.current?.abort();
     polishRequestRef.current = null;
     polishBusyRef.current = false;
@@ -246,8 +276,6 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     }
     tapRef.current = null;
     pcmRef.current = [];
-    committedRef.current = { text: '', seamText: '', samples: 0 };
-    partialBusyRef.current = false;
     stoppingRef.current = false;
     try {
       void audioCtxRef.current?.close();
@@ -257,7 +285,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     audioCtxRef.current = null;
     setLevel(0);
     setElapsed(0);
-  }, []);
+  }, [resetPartialState]);
 
   /**
    * 停顿时把已经攒下的字幕整段顺一遍：同音错字、切点补出来的假句号，
@@ -320,69 +348,119 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   );
 
   /**
-   * 只把「还没转过的那一段」送去转写，转好就接在已定的字幕后面。
-   * 早先是每次重转整段音频：录得越久每次越慢越贵，间隔只能放到 2.5 秒，
-   * 字就总是一大块一大块地跳出来。改成增量之后每次请求恒定地小，
-   * 间隔可以压到 1.2 秒，说一句出一句。
+   * 一段音频转成文字。失败重试一次——流水线里丢掉一段就是永久缺词，
+   * 而重试的代价只是这一小段晚到，后面的段还在自己的路上飞。
+   */
+  const transcribeSegment = useCallback(
+    async (blob: Blob, generation: number, attempt = 0): Promise<string> => {
+      const controller = new AbortController();
+      partialControllersRef.current.add(controller);
+      const timeout = setTimeout(() => controller.abort(), PARTIAL_TIMEOUT_MS);
+      try {
+        const fd = new FormData();
+        fd.append('audio', blob, 'partial.wav');
+        fd.append('partial', '1');
+        const res = await fetch('/api/phil-coach/voice', {
+          method: 'POST',
+          body: fd,
+          signal: controller.signal,
+        });
+        const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        if (res.ok && typeof json.text === 'string') return json.text.trim();
+        if (res.status === 422) return '';        // 这一小段本来就是静音，重试也还是空的
+        throw new Error('partial-failed');
+      } catch {
+        if (attempt === 0 && !partialsClosedRef.current && generationRef.current === generation) {
+          return transcribeSegment(blob, generation, 1);
+        }
+        return '';
+      } finally {
+        clearTimeout(timeout);
+        partialControllersRef.current.delete(controller);
+      }
+    },
+    [],
+  );
+
+  /**
+   * 按派发顺序把结果接进字幕。
+   * 请求是重叠发出的，回来的顺序不一定和说话顺序一致；
+   * 谁先到就先拼，话会被打乱，所以先攒着，轮到谁才接谁。
+   */
+  const drainPending = useCallback(
+    (generation: number) => {
+      let grew = false;
+      for (;;) {
+        const entry = pendingRef.current.get(commitSeqRef.current);
+        if (!entry) break;
+        pendingRef.current.delete(commitSeqRef.current);
+        commitSeqRef.current += 1;
+        if (entry.raw) {
+          committedRef.current = {
+            // 接缝处的句末标点是转写补的，不代表这句说完了——去掉才接得上下一句
+            text: `${committedRef.current.text}${trimSeamPunctuation(entry.raw)}`,
+            // 同时留一份「标点原样」的：接缝标点确实经常是错的，
+            // 但纠错万一没跑成，有错标点也远好过一整段没有标点。
+            seamText: `${committedRef.current.seamText}${entry.raw}`,
+            samples: entry.end,
+          };
+          grew = true;
+        } else {
+          // 空结果（静音，或两次都没转出来）只推进进度，不动文字
+          committedRef.current = { ...committedRef.current, samples: entry.end };
+        }
+      }
+      if (grew) {
+        setPartial(committedRef.current.text);
+        scheduleLivePolish(generation);
+      }
+    },
+    [scheduleLivePolish],
+  );
+
+  /**
+   * 把「还没派发过的那一段」送去转写，不等上一段回来。
+   *
+   * 这条链路每次请求固定要一两秒，且与音频长短无关——
+   * 所以「把音频切得更短」并不会让字更快出现，能改善的只有出字的密度。
+   * 重叠发出之后，滞后仍是一次往返，但每 0.7 秒就能接上一段。
    *
    * 切点一定要落在停顿上——从词中间切开，两半都会转错。
    * 找不到停顿就先不切，等到 MAX_SEG_S 再硬切（总不能一直不出字）。
    */
-  const pushPartial = useCallback(async (generation: number) => {
-    if (partialBusyRef.current) return;      // 上一次还没回来就跳过这一轮
-    const chunks = pcmRef.current;
-    const rate = pcmRateRef.current;
-    if (!rate || !chunks.length) return;
+  const pushPartial = useCallback(
+    (generation: number) => {
+      if (partialsClosedRef.current) return;
+      if (inflightRef.current.size >= MAX_INFLIGHT_PARTIALS) return;
+      const chunks = pcmRef.current;
+      const rate = pcmRateRef.current;
+      if (!rate || !chunks.length) return;
 
-    const total = chunks.reduce((n, c) => n + c.length, 0);
-    const from = committedRef.current.samples;
-    const tail = total - from;
-    if (tail / rate < MIN_SEG_S) return;     // 太短转不出东西，白花一次请求
+      const total = chunks.reduce((n, c) => n + c.length, 0);
+      const from = dispatchedRef.current;
+      if ((total - from) / rate < MIN_SEG_S) return;   // 太短转不出东西，白花一次请求
 
-    const flat = flattenRange(chunks, from, total);
-    const cut = findQuietCut(flat, rate);
-    if (cut === null) return;                // 还没到停顿、也没到硬切长度
+      const flat = flattenRange(chunks, from, total);
+      const cut = findQuietCut(flat, rate);
+      if (cut === null) return;                        // 还没到停顿、也没到硬切长度
 
-    partialBusyRef.current = true;
-    const controller = new AbortController();
-    partialRequestRef.current = controller;
-    const timeout = setTimeout(() => controller.abort(), PARTIAL_TIMEOUT_MS);
-    try {
-      const fd = new FormData();
-      fd.append('audio', encodePcmWav(flat.subarray(0, cut), rate), 'partial.wav');
-      fd.append('partial', '1');
-      const res = await fetch('/api/phil-coach/voice', {
-        method: 'POST',
-        body: fd,
-        signal: controller.signal,
-      });
-      const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      if (generationRef.current !== generation) return;
-      if (res.ok && typeof json.text === 'string') {
-        const raw = json.text.trim();
-        // 接缝处的句末标点是转写补的，不代表这句说完了——去掉才接得上下一句
-        const piece = trimSeamPunctuation(raw);
-        // 空结果不能把这段音频消费掉。把它和下一小段一起重试，避免永久缺词。
-        if (piece) {
-          committedRef.current = {
-            text: `${committedRef.current.text}${piece}`,
-            // 同时留一份「标点原样」的：接缝标点确实经常是错的，
-            // 但纠错万一没跑成，有错标点也远好过一整段没有标点。
-            seamText: `${committedRef.current.seamText}${raw}`,
-            samples: from + cut,
-          };
-          setPartial(committedRef.current.text);
-          scheduleLivePolish(generation);
-        }
-      }
-    } catch {
-      /* 字幕是锦上添花，掉了就掉了 */
-    } finally {
-      clearTimeout(timeout);
-      if (partialRequestRef.current === controller) partialRequestRef.current = null;
-      partialBusyRef.current = false;
-    }
-  }, [scheduleLivePolish]);
+      const seq = seqRef.current;
+      seqRef.current += 1;
+      const end = from + cut;
+      dispatchedRef.current = end;
+      const blob = encodePcmWav(flat.subarray(0, cut), rate);
+
+      const task = (async () => {
+        const raw = await transcribeSegment(blob, generation);
+        if (generationRef.current !== generation) return;
+        pendingRef.current.set(seq, { raw, end });
+        drainPending(generation);
+      })();
+      inflightRef.current.add(task);
+      void task.finally(() => inflightRef.current.delete(task));
+    },
+    [transcribeSegment, drainPending],
+  );
 
   /** 起转写定时器：第一次早一点发，之后按固定间隔。 */
   const beginPartials = useCallback(
@@ -411,7 +489,8 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       startedAtRef.current = Date.now();
       pcmRef.current = [];
       pcmRateRef.current = ctx.sampleRate;
-      committedRef.current = { text: '', seamText: '', samples: 0 };
+      resetPartialState();
+      partialsClosedRef.current = false;
 
       const tap = ctx.createScriptProcessor(4096, 1, 1);
       // 音量表和录音都从这一个回调出：
@@ -439,7 +518,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     } catch {
       /* 没有音量表也不影响录音 */
     }
-  }, [beginPartials]);
+  }, [beginPartials, resetPartialState]);
 
   /**
    * 中途补启分段转写。
@@ -452,12 +531,12 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     beginPartials(genRef.current);
   }, [beginPartials]);
 
-  const cleanup = useCallback(() => {
+  const cleanup = useCallback((keepPartials = false) => {
     if (maxTimerRef.current) {
       clearTimeout(maxTimerRef.current);
       maxTimerRef.current = null;
     }
-    stopMeter();
+    stopMeter(keepPartials);
     try {
       streamRef.current?.getTracks().forEach(t => t.stop());
     } catch {
@@ -546,22 +625,53 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         const pcmChunks = pcmRef.current.slice();
         const pcmRate = pcmRateRef.current;
         const pcmSamples = pcmChunks.reduce((total, chunk) => total + chunk.length, 0);
-        const partialTextAtStop = committedRef.current.text;
-        const seamTextAtStop = committedRef.current.seamText;
-        const committedSamples = committedRef.current.samples;
-        // 听写：字幕已经把前面绝大部分转完了，收口时只补最后那一小段没转的，
+        const dictation = options?.analysis === false;
+        // 听写：字幕已经把前面绝大部分转完了，收口时只补「还没派发出去」的那一小段，
         // 不必把整段重转一遍——那正是「点完停止还要干等」的来源。
         // 直达不走这条：那段话要直接发出去，且语气观察需要完整音频。
-        const tailOnly = options?.analysis === false && !!partialTextAtStop && pcmRate > 0;
+        const tailOnly = dictation && pcmRate > 0 && dispatchedRef.current > 0;
         const uploadFlat = pcmRate
-          ? flattenRange(pcmChunks, tailOnly ? committedSamples : 0, pcmSamples)
+          ? flattenRange(pcmChunks, tailOnly ? dispatchedRef.current : 0, pcmSamples)
           : new Float32Array(0);
         const enoughAudio = uploadFlat.length > pcmRate / 4;
         const pcmBlob = enoughAudio ? encodePcmWav(uploadFlat, pcmRate) : null;
-        cleanup();
+        // 在途的分段还在路上，别掐——那是已经说出口的话
+        cleanup(dictation);
         if (generationRef.current !== generation) return;
+
+        // 尾巴和在途分段是并行的：先把尾巴发出去，再回头等在途的，
+        // 于是收口只等一次往返，而不是「等完在途，再等尾巴」两次。
+        let tailPromise: Promise<Response> | null = null;
+        let tailController: AbortController | null = null;
+        if (pcmBlob && pcmBlob.size >= 1200) {
+          const fd = new FormData();
+          fd.append('audio', pcmBlob, 'speech.wav');
+          fd.append('analysis', dictation ? '0' : '1');
+          // 补尾走轻量转写：不做语气观察，也不占正式配额
+          if (tailOnly) fd.append('partial', '1');
+          tailController = new AbortController();
+          requestRef.current = tailController;
+          setTranscribing(true);
+          tailPromise = fetch('/api/phil-coach/voice', {
+            method: 'POST',
+            body: fd,
+            signal: tailController.signal,
+          });
+          void tailPromise.catch(() => undefined);   // 真正的处理在下面，这里只防未捕获
+        }
+        if (tailOnly) {
+          await Promise.race([
+            Promise.allSettled([...inflightRef.current]),
+            new Promise(resolve => setTimeout(resolve, STOP_DRAIN_MS)),
+          ]);
+          if (generationRef.current !== generation) return;
+        }
+        const partialTextAtStop = committedRef.current.text;
+        const seamTextAtStop = committedRef.current.seamText;
+        resetPartialState();
+
         // 尾巴短到没东西可转：字幕本身就是结果，一个字都不用等
-        if (tailOnly && !pcmBlob) {
+        if (tailOnly && !tailPromise) {
           setPartial('');
           onResultRef.current({
               text: partialTextAtStop,
@@ -572,31 +682,18 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           busyRef.current = false;
           return;
         }
-        if (!pcmBlob || pcmBlob.size < 1200) {
+        if (!tailPromise) {
           setError('好像没录到声音，再说一次试试。');
           setTranscribing(false);
           busyRef.current = false;
           return;
         }
-        setTranscribing(true);
-        let controller: AbortController | null = null;
         try {
-          const fd = new FormData();
-          fd.append('audio', pcmBlob, 'speech.wav');
-          fd.append('analysis', options?.analysis === false ? '0' : '1');
-          // 补尾走轻量转写：不做语气观察，也不占正式配额
-          if (tailOnly) fd.append('partial', '1');
-          controller = new AbortController();
-          requestRef.current = controller;
-          const res = await fetch('/api/phil-coach/voice', {
-            method: 'POST',
-            body: fd,
-            signal: controller.signal,
-          });
+          const res = await tailPromise;
           const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
           if (generationRef.current !== generation) return;
           if (!res.ok || typeof json.text !== 'string') {
-            if (partialTextAtStop && options?.analysis === false) {
+            if (partialTextAtStop && dictation) {
               setPartial('');
               onResultRef.current({
               text: partialTextAtStop,
@@ -615,7 +712,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
             const text = tailOnly
               // 只转了尾巴，接在字幕后面就是完整的一段
               ? `${partialTextAtStop}${json.text.trim()}`.trim()
-              : options?.analysis === false
+              : dictation
                 ? preferCompleteTranscript(json.text, partialTextAtStop)
                 : json.text.trim();
             const voiceContext = normalizeVoiceAnalysis(json.voiceContext);
@@ -628,7 +725,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           }
         } catch {
           if (generationRef.current === generation) {
-            if (partialTextAtStop && options?.analysis === false) {
+            if (partialTextAtStop && dictation) {
               setPartial('');
               onResultRef.current({
               text: partialTextAtStop,
@@ -641,7 +738,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
             }
           }
         } finally {
-          if (requestRef.current === controller) requestRef.current = null;
+          if (requestRef.current === tailController) requestRef.current = null;
           if (generationRef.current === generation) {
             busyRef.current = false;
             setTranscribing(false);
@@ -668,7 +765,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       setRequesting(false);
       setRecording(false);
     }
-  }, [cleanup, requestStop, startMeter, stopMeter]);
+  }, [cleanup, requestStop, resetPartialState, startMeter, stopMeter]);
 
   const stop = useCallback(() => {
     requestStop();

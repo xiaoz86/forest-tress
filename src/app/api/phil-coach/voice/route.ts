@@ -9,9 +9,11 @@ export const runtime = 'nodejs';
 const MAX_BYTES = 2_000_000; // 控制 Qwen 音频时长与成本，并留在 Vercel 请求体上限以内
 const WINDOW_MS = 5 * 60 * 1000;
 const MAX_PER_WINDOW = 30;
-// 实时字幕每 3.2 秒来一次，走正式配额说两句话就把人锁死了，所以单独开一桶。
-// 一次 55 秒录音最多 ~17 次，180 够连着说好几轮。
-const MAX_PARTIAL_PER_WINDOW = 180;
+// 实时字幕走正式配额说两句话就把人锁死了，所以单独开一桶。
+// 分段是重叠派发的，稳态下每段约 往返/并发数 长——这条链路上大约 0.7 秒一段，
+// 一次 55 秒录音就是七八十次请求。180 只够说两轮，600 够连着说五分钟。
+// 按音频时长计费的话总成本不变，变的只是请求数。
+const MAX_PARTIAL_PER_WINDOW = 600;
 const buckets = new Map<string, number[]>();
 const partialBuckets = new Map<string, number[]>();
 const QWEN_MODEL = 'Qwen/Qwen3-Omni-30B-A3B-Instruct';
