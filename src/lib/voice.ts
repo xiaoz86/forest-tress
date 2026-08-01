@@ -50,6 +50,18 @@ export function isWeChatBrowser(): boolean {
 }
 
 /** iPhone / iPad（含伪装成 Mac 的 iPadOS）不要同时占用两条麦克风链路。 */
+/**
+ * Web Speech 和我们自己的 getUserMedia 采音能不能共存，是按引擎分的：
+ * WebKit（Safari）实测可以两路并存；Chrome 上麦克风会被语音识别独占，
+ * 我们这一路只录到静音——表现就是「听不见，也出不了字」。
+ * 这个没法在开录前 feature-detect，所以先按引擎给一个保守默认；
+ * 真正的保险是运行时那条「他在说话，我们却收到静音」的检测。
+ */
+export function isWebKitBrowser(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|OPR|CriOS|FxiOS|Android/i.test(ua);
+}
 export function isIOSBrowser(): boolean {
   if (typeof navigator === 'undefined') return false;
   return /iPad|iPhone|iPod/i.test(navigator.userAgent)

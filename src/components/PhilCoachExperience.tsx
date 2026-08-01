@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { useClientFlag, useSpeechInput } from '@/lib/voice';
+import { isWebKitBrowser, useClientFlag, useSpeechInput } from '@/lib/voice';
 import {
   PHIL_COACH_VOICES,
   useServerSpeech,
@@ -39,6 +39,8 @@ const OPENING_INDEX_KEY = 'nf_phil_opening_index';
 const DRAFT_SESSION_KEY = 'nf_phil_session';
 /** 给浏览器听写多久证明它真的在工作；到点没出字就退回服务端分段转写 */
 const CAPTION_WATCHDOG_MS = 2500;
+const MIC_STARVE_CHECK_MS = 1200;   // 浏览器听写出第一个字之后，给自己的采音这么久证明它也活着
+const MIC_ALIVE_LEVEL = 0.02;       // 电平低于这个就是没收到声音
 
 function saveSession(s: Session | null) {
   try {
@@ -229,6 +231,8 @@ export default function PhilCoachExperience() {
   // 浏览器听写到底有没有真的出字——看门狗据此决定要不要退回服务端
   const captionSeenRef = useRef(false);
   const captionWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const starveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const peakLevelRef = useRef(0);
   const liveVoice = useSpeechInput(text => {
     captionSeenRef.current = true;
     setCaption(current => appendTranscript(current, text));
@@ -322,8 +326,13 @@ export default function PhilCoachExperience() {
     () => typeof window !== 'undefined'
       && new URLSearchParams(window.location.search).get('webspeech') === '1',
   );
+  // 还有一层比「支不支持」更要紧的：能不能和我们的采音共存。
+  // Chrome 上 SpeechRecognition 会把麦克风独占走，我们这一路只录到静音，
+  // 最后服务端收到的是空音频——报「这段没能转成文字」。Safari 上实测两路并存没问题。
+  const webKitEngine = useClientFlag(isWebKitBrowser);
   const useWebSpeechCaptions =
-    liveVoice.supported && !liveVoice.inWeChat && (!liveVoice.inIOS || iosWebSpeechOptIn);
+    liveVoice.supported && !liveVoice.inWeChat && webKitEngine
+    && (!liveVoice.inIOS || iosWebSpeechOptIn);
   // 实时字幕：谁有内容就显示谁。
   // 不能按 useWebSpeechCaptions 固定挑一边——看门狗把浏览器听写换成服务端之后，
   // 显示源不跟着切的话，请求照发、字却永远不出现。
@@ -344,6 +353,11 @@ export default function PhilCoachExperience() {
     setVoiceMode(mode);
     setCaption('');
     captionSeenRef.current = false;
+    peakLevelRef.current = 0;
+    if (starveTimerRef.current) {
+      clearTimeout(starveTimerRef.current);
+      starveTimerRef.current = null;
+    }
     // Web Speech 在跑就先不花钱做分段转写，等看门狗判定
     await voiceIn.start({
       partials: !useWebSpeechCaptions,
@@ -368,6 +382,10 @@ export default function PhilCoachExperience() {
     if (captionWatchdogRef.current) {
       clearTimeout(captionWatchdogRef.current);
       captionWatchdogRef.current = null;
+    }
+    if (starveTimerRef.current) {
+      clearTimeout(starveTimerRef.current);
+      starveTimerRef.current = null;
     }
     liveVoice.cancel();
     voiceIn.armPartials();
@@ -394,7 +412,22 @@ export default function PhilCoachExperience() {
   // 只认定稿的话，连续说话的人前几秒往往只有 interim，看门狗会误判成「装死」，
   // 白白退回服务端、多花一串请求。
   useEffect(() => {
-    if (liveVoice.interim) captionSeenRef.current = true;
+    if (voiceIn.level > peakLevelRef.current) peakLevelRef.current = voiceIn.level;
+  }, [voiceIn.level]);
+
+  useEffect(() => {
+    if (!liveVoice.interim) return;
+    captionSeenRef.current = true;
+    // Web Speech 出字了，说明人确实在说话。如果这时我们自己的采音电平一直贴地，
+    // 那就是麦克风被它独占了——继续下去最后只会上传一段静音。
+    // 收掉它，把麦克风还回来，改走服务端分段转写。
+    if (starveTimerRef.current) return;
+    starveTimerRef.current = setTimeout(() => {
+      starveTimerRef.current = null;
+      if (peakLevelRef.current >= MIC_ALIVE_LEVEL) return;
+      fallbackToServerCaptions();
+    }, MIC_STARVE_CHECK_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveVoice.interim]);
 
   // 浏览器听写自己认输了就马上换路。
