@@ -87,15 +87,23 @@ function flattenRange(chunks: Float32Array[], from: number, to: number): Float32
  * 找不到就先不切（返回 null），除非整段已经长到 MAX_SEG_S——
  * 那说明这人一口气说了很久，再等下去就没有「实时」可言了，硬切。
  */
-function findQuietCut(flat: Float32Array, rate: number): number | null {
+function findQuietCut(flat: Float32Array, rate: number): { at: number; forced: boolean } | null {
   const minSamples = Math.floor(MIN_SEG_S * rate);
   const win = Math.max(1, Math.floor(0.03 * rate));   // 30ms 一个窗口
   for (let end = flat.length; end - win >= minSamples; end -= win) {
     let sum = 0;
     for (let i = end - win; i < end; i += 1) sum += flat[i] * flat[i];
-    if (Math.sqrt(sum / win) < QUIET_RMS) return end;
+    if (Math.sqrt(sum / win) < QUIET_RMS) return { at: end, forced: false };
   }
-  return flat.length / rate >= MAX_SEG_S ? flat.length : null;
+  return flat.length / rate >= MAX_SEG_S ? { at: flat.length, forced: true } : null;
+}
+
+/**
+ * 从句子中间硬切时，转写会给这半句补一个句号——「很平静」被切成
+ * 「……感觉到很。」和「平静。」两句。既然知道这一刀落在句中，就把它去掉。
+ */
+function trimForcedEnd(text: string): string {
+  return text.replace(/[。．.!！?？,，、;；]+$/, '');
 }
 
 /** 最终识别若明显只少了尾句，保留实时字幕里已经识别出的完整版本。 */
@@ -236,7 +244,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     const timeout = setTimeout(() => controller.abort(), PARTIAL_TIMEOUT_MS);
     try {
       const fd = new FormData();
-      fd.append('audio', encodePcmWav(flat.subarray(0, cut), rate), 'partial.wav');
+      fd.append('audio', encodePcmWav(flat.subarray(0, cut.at), rate), 'partial.wav');
       fd.append('partial', '1');
       const res = await fetch('/api/phil-coach/voice', {
         method: 'POST',
@@ -246,12 +254,13 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (generationRef.current !== generation) return;
       if (res.ok && typeof json.text === 'string') {
-        const piece = json.text.trim();
+        // 切在句中的那一段，末尾的标点是转写硬补的，去掉才接得上下一句
+        const piece = cut.forced ? trimForcedEnd(json.text.trim()) : json.text.trim();
         // 空结果不能把这段音频消费掉。把它和下一小段一起重试，避免永久缺词。
         if (piece) {
           committedRef.current = {
             text: `${committedRef.current.text}${piece}`,
-            samples: from + cut,
+            samples: from + cut.at,
           };
           setPartial(committedRef.current.text);
         }

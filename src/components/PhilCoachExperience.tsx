@@ -225,6 +225,7 @@ export default function PhilCoachExperience() {
   // 录音时的实时字幕（仅显示用）。真正发出去的文字以服务端转写为准——
   // 系统听写只负责让人「看见自己正在被听到」，说错了也不影响结果。
   const [caption, setCaption] = useState('');
+  const [polishing, setPolishing] = useState(false);
   // 浏览器听写到底有没有真的出字——看门狗据此决定要不要退回服务端
   const captionSeenRef = useRef(false);
   const captionWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -245,6 +246,8 @@ export default function PhilCoachExperience() {
     const merged = mergeTranscript(currentDraft, result.text);
     draftRef.current = merged.text;
     setDraft(merged.text);
+    // 原文先落进输入框，别让人等；顺一遍是后台做的事
+    void polishDraft(result.text, merged.text);
     pendingVoiceContextRef.current = merged.complete ? result.voiceContext : null;
     setVoiceInputNotice(
       merged.complete
@@ -254,6 +257,36 @@ export default function PhilCoachExperience() {
           : '输入框已到 1200 字，这段话只有前面一部分被加入。',
     );
   });
+  /**
+   * 把刚转出来的这段顺一遍：同音错字、被切开的句子、乱掉的标点。
+   * 不挡着人——原文已经在框里了，顺好了才悄悄换掉，而且只在人还没动过时才换。
+   * 顺不动就算了，原文本来就能用。
+   */
+  const polishDraft = async (rawSegment: string, draftAfterMerge: string) => {
+    const raw = rawSegment.trim();
+    if (raw.length < 6) return;              // 太短没什么可顺的
+    setPolishing(true);
+    try {
+      const res = await fetch('/api/phil-coach/polish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: raw }),
+      });
+      const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok || typeof json.text !== 'string' || !json.changed) return;
+      // 这期间人要是改过输入框，就别再动它了
+      if (draftRef.current !== draftAfterMerge) return;
+      const before = draftAfterMerge.slice(0, draftAfterMerge.length - raw.length);
+      const next = `${before}${json.text.trim()}`.slice(0, 1200);
+      draftRef.current = next;
+      setDraft(next);
+    } catch {
+      /* 顺不动就用原文 */
+    } finally {
+      setPolishing(false);
+    }
+  };
+
   const voiceOut = useServerSpeech();
   const spokenRef = useRef<string>('');
   const importPromiseRef = useRef<Promise<void> | null>(null);
@@ -1217,9 +1250,11 @@ export default function PhilCoachExperience() {
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
             <span className="text-[12px] text-white/45">
-              {displayedDraft.length >= 1200
-                ? '已到 1200 字上限'
-                : `${displayedDraft.length}/1200 字 · ⌘/Ctrl + Enter 发送`}
+              {polishing
+                ? '正在顺一遍刚才的话…'
+                : displayedDraft.length >= 1200
+                  ? '已到 1200 字上限'
+                  : `${displayedDraft.length}/1200 字 · ⌘/Ctrl + Enter 发送`}
             </span>
             <div className="flex flex-wrap gap-3">
               {hasConversation && loggedIn && session.thread.some(t => t.kind === 'me') && (
