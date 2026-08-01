@@ -9,11 +9,6 @@ import { normalizeVoiceAnalysis, type VoiceAnalysis } from '@/lib/philCoachVoice
 export type VoiceInputResult = {
   text: string;
   voiceContext: VoiceAnalysis | null;
-  /**
-   * 接缝标点没去掉的那一版。接缝标点确实经常在句子中间，
-   * 但纠错万一没跑成，有错标点也远好过一整段没有标点。
-   */
-  fallbackText?: string;
 };
 
 const MAX_RECORDING_MS = 55_000;
@@ -34,7 +29,8 @@ const MAX_SEG_S = 1.6;          // 一直没停顿也得切，否则字迟迟不
 const QUIET_RATIO = 0.22;       // 低于本段峰值的这个比例算停顿
 const QUIET_RMS_FLOOR = 0.012;  // 再安静的环境也不至于把气声当成人声
 const QUIET_RMS_CEIL = 0.06;    // 再吵也不能把说话本身当成停顿
-const RECORDING_TAIL_MS = 300;  // 点完成后给手机录音编码器留住最后几个字
+const RECORDING_TAIL_MS = 300;
+const SILENT_MIC_RMS = 0.004;   // 整段最高电平低于这个，就不是「说得轻」，是根本没进来声音  // 点完成后给手机录音编码器留住最后几个字
 // 边说边纠错：在停顿处把已经攒下的整段顺一遍，而不是逐段顺。
 // 逐段不行——纠错靠上下文，单独一个「很平近」的碎片没有判断依据。
 const LIVE_POLISH_DEBOUNCE_MS = 1_100;   // 一段转完后再静一会儿才动手，避开连着说的时候
@@ -215,17 +211,32 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stoppingRef = useRef(false);
   // 已经转完并接进字幕的进度：文字 + 已消费到第几个样本
-  const committedRef = useRef({ text: '', seamText: '', samples: 0 });
+  const committedRef = useRef({ text: '', samples: 0 });
   const polishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const polishRequestRef = useRef<AbortController | null>(null);
   const polishBusyRef = useRef(false);
   const polishedRef = useRef({ length: 0, at: 0 });
+  // 整段录音里的最高电平 + 正在用的设备名。
+  // 「一路静音」是很常见的真实故障（选错输入设备、被别的应用独占、
+  // 虚拟声卡没在工作），而它和「说了但没转出字」在结果上长得一模一样——
+  // 不区分开，就只能给人一句没法照着做的「没能转成文字」。
+  const peakLevelRef = useRef(0);
+  const micLabelRef = useRef('');
   // 只有听写才边说边纠：直达最后要整段重转，纠字幕纯属白花钱
   const livePolishRef = useRef(false);
 
   useEffect(() => {
     onResultRef.current = onResult;
   }, [onResult]);
+
+  /** 整段录音的最高电平都没过底噪：麦克风一路都是静的。 */
+  const silentMic = useCallback(() => peakLevelRef.current < SILENT_MIC_RMS, []);
+  const micHint = useCallback(() => {
+    const label = micLabelRef.current;
+    return label
+      ? `全程没有听到声音。浏览器正在用的麦克风是「${label}」，可以在地址栏的麦克风图标里换一个再试。`
+      : '全程没有听到声音，可以检查一下浏览器选的是哪个麦克风。';
+  }, []);
 
   /** 清空流水线账本。收口时要晚一步做——字幕得先被读走。 */
   const resetPartialState = useCallback(() => {
@@ -234,7 +245,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     seqRef.current = 0;
     commitSeqRef.current = 0;
     dispatchedRef.current = 0;
-    committedRef.current = { text: '', seamText: '', samples: 0 };
+    committedRef.current = { text: '', samples: 0 };
   }, []);
 
   /**
@@ -399,9 +410,6 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           committedRef.current = {
             // 接缝处的句末标点是转写补的，不代表这句说完了——去掉才接得上下一句
             text: `${committedRef.current.text}${trimSeamPunctuation(entry.raw)}`,
-            // 同时留一份「标点原样」的：接缝标点确实经常是错的，
-            // 但纠错万一没跑成，有错标点也远好过一整段没有标点。
-            seamText: `${committedRef.current.seamText}${entry.raw}`,
             samples: entry.end,
           };
           grew = true;
@@ -489,6 +497,8 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       startedAtRef.current = Date.now();
       pcmRef.current = [];
       pcmRateRef.current = ctx.sampleRate;
+      peakLevelRef.current = 0;
+      micLabelRef.current = stream.getAudioTracks()[0]?.label || '';
       resetPartialState();
       partialsClosedRef.current = false;
 
@@ -503,6 +513,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         let sum = 0;
         for (let i = 0; i < data.length; i += 1) sum += data[i] * data[i];
         const rms = Math.sqrt(sum / data.length);
+        if (rms > peakLevelRef.current) peakLevelRef.current = rms;
         // 放大到易感知的范围，并留一点底噪门限
         setLevel(Math.min(1, Math.max(0, (rms - 0.01) * 6)));
         setElapsed(Math.floor((Date.now() - startedAtRef.current) / 1000));
@@ -671,23 +682,18 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           if (generationRef.current !== generation) return;
         }
         const partialTextAtStop = committedRef.current.text;
-        const seamTextAtStop = committedRef.current.seamText;
         resetPartialState();
 
         // 尾巴短到没东西可转：字幕本身就是结果，一个字都不用等
         if (tailOnly && !tailPromise) {
           setPartial('');
-          onResultRef.current({
-              text: partialTextAtStop,
-              voiceContext: null,
-              fallbackText: seamTextAtStop,
-            });
+          onResultRef.current({ text: partialTextAtStop, voiceContext: null });
           setTranscribing(false);
           busyRef.current = false;
           return;
         }
         if (!tailPromise) {
-          setError('好像没录到声音，再说一次试试。');
+          setError(silentMic() ? micHint() : '好像没录到声音，再说一次试试。');
           setTranscribing(false);
           busyRef.current = false;
           return;
@@ -699,17 +705,15 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           if (!res.ok || typeof json.text !== 'string') {
             if (partialTextAtStop && dictation) {
               setPartial('');
-              onResultRef.current({
-              text: partialTextAtStop,
-              voiceContext: null,
-              fallbackText: seamTextAtStop,
-            });
+              onResultRef.current({ text: partialTextAtStop, voiceContext: null });
               setError('最后一句没能听清，先留着刚才听到的，改完再发也行。');
             } else {
               setError(
                 json.error === 'too-many'
                   ? '说得有点频繁，歇一会儿再试。'
-                  : '这段没能转成文字，可以直接打字，或再说一次。',
+                  : silentMic()
+                    ? micHint()
+                    : '这段没能转成文字，可以直接打字，或再说一次。',
               );
             }
           } else {
@@ -724,18 +728,13 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
             onResultRef.current({
               text,
               voiceContext: voiceContext ? { ...voiceContext, transcript: text } : null,
-              fallbackText: tailOnly ? `${seamTextAtStop}${json.text.trim()}`.trim() : undefined,
             });
           }
         } catch {
           if (generationRef.current === generation) {
             if (partialTextAtStop && dictation) {
               setPartial('');
-              onResultRef.current({
-              text: partialTextAtStop,
-              voiceContext: null,
-              fallbackText: seamTextAtStop,
-            });
+              onResultRef.current({ text: partialTextAtStop, voiceContext: null });
               setError('网络不太顺，先留着刚才听到的，改完再发也行。');
             } else {
               setError('网络不太顺，这段没送出去。');
@@ -769,7 +768,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       setRequesting(false);
       setRecording(false);
     }
-  }, [cleanup, requestStop, resetPartialState, startMeter, stopMeter]);
+  }, [cleanup, micHint, requestStop, resetPartialState, silentMic, startMeter, stopMeter]);
 
   const stop = useCallback(() => {
     requestStop();
