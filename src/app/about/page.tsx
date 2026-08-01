@@ -104,8 +104,7 @@ export default function AboutPage() {
             附近森林的来处
           </h1>
           <p className="mt-5 text-[15px] text-text-secondary leading-[1.95] max-w-[560px] mx-auto">
-            它不是一个急着说明自己的产品，<br />
-            更像一张慢慢被重新摆出来的桌子。
+            关于这片森林从哪里来，往哪里去。
           </p>
         </div>
       </header>
@@ -162,10 +161,10 @@ export default function AboutPage() {
             每一棵树都是独一无二的。它按自己的节奏、用自己的方式生长；但没有哪一棵树真正独自长成。看不见的地下，根系悄然相连，彼此支撑，也彼此滋养。
           </p>
           <p className="text-[15.5px] text-text-secondary leading-[2] mb-6">
-            我们相信，人也是如此。每个人都有自己的天赋、梦想与人生道路，也都需要真诚的联结、可靠的支持，以及与他人共同创造的机会。
+            人也一样。每个人的路不同，但都需要被理解，也需要和信任的人一起做些什么。
           </p>
           <p className="text-[15.5px] text-text-secondary leading-[2] mb-8">
-            附近森林，是我们对这种生态关系的一次持续尝试：让人可以慢下来，重新与自己建立联系；遇见志趣相投的人；从一次真实交流出发，共同做一些有意义的事。
+            附近森林就是在试着做这件事——让人慢下来，遇到同频的人，一起把想法变成真实的事。
           </p>
           <div className="font-serif text-[1.05rem] font-semibold text-forest-deep leading-[1.8] py-6 px-7 bg-white/70 rounded-lg border-l border-coral-soft">
             我们希望科技，尤其是人工智能，帮助人更深地理解自己、靠近他人，而不是取代人与人之间真实的相遇。
@@ -294,16 +293,16 @@ export default function AboutPage() {
         </div>
         <div className="max-w-[680px] mx-auto">
           <p className="font-serif text-[clamp(1.1rem,2.2vw,1.4rem)] font-semibold text-forest-deep leading-[1.8] mb-8">
-            这个生态并不是某一个人的项目。<br />它更像是一种关系网络，一种持续生长的生命系统。
+            附近森林不是一个人能做成的事。<br />它是很多人一起在做的一件事。
           </p>
           <p className="text-[15px] text-text-secondary leading-[2] mb-6">
-            我希望自己可以做的，只是去体验、去学习、去探索。把这些经历分享出来，成为一个连接世界的载体，把光继续传递下去。
+            我能做的其实很少：把自己经历过的、学到的东西分享出来。如果刚好对谁有一点用，那就是最好的事了。
           </p>
           <p className="text-[15px] text-text-secondary leading-[2] mb-6">
             慢慢地，让更多人找到彼此。也让这片森林，一点一点地长出来。
           </p>
           <div className="inline-block px-7 py-3.5 bg-white/70 rounded-lg font-serif text-[1rem] font-semibold text-forest-deep border border-moss/10 mt-4">
-            在一个越来越容易让人孤立的世界里，重新织起一张有温度的网。
+            在一个容易让人各自待着的世界里，重新把一些人连在一起。
           </div>
         </div>
       </section>
@@ -317,13 +316,13 @@ export default function AboutPage() {
           </h2>
           <div className="text-left text-[15.5px] text-text-secondary leading-[2]">
             <p className="mb-5">
-              附近森林生态社区生长社群，是给已经注册、正在使用附近森林，或愿意一起陪伴社区最新作品成长的朋友们，一个让超级创造者彼此相聚、慢慢走近的附近社群。
+              附近森林生态社区生长社群，是给注册和使用附近森林、愿意陪伴社区最新作品一起成长的超级创造者们，一个相聚、走近彼此的附近社群。
             </p>
             <p className="mb-5">
-              我们希望，这里既是一处让大家走近附近、交流与联结的地方，也是一处可以自在共享想法💡的地方。
+              我们希望这里既是大家走近附近、交流联结的地方，也是可以自在共享想法💡的地方。
             </p>
             <p>
-              同时，我们也期待听见大家使用 PhilCoach 等社区作品时，任何真实的体验与反馈。
+              也期待听到大家使用 PhilCoach 等社区作品时，任何体验上的反馈。
             </p>
           </div>
         </div>
@@ -334,7 +333,7 @@ export default function AboutPage() {
             从一次真实的招呼开始
           </h3>
           <p className="text-[15px] text-text-secondary leading-[1.9]">
-            想进一步了解、加入社群，或把使用中的感受告诉我们，可以添加两位创始人的微信。
+            想进一步了解、加入社群，或分享使用中的感受，可以添加两位创始人的微信。
           </p>
         </div>
 
