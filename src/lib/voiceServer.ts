@@ -21,6 +21,12 @@ const MIN_SEG_S = 0.7;          // 太短的片段容易只有半个音节，先
 const MAX_SEG_S = 2.6;          // 一直没停顿也得切，否则字迟迟不出
 const QUIET_RMS = 0.02;         // 低于这个音量算「停顿」，可以在这里下刀
 const RECORDING_TAIL_MS = 300;  // 点完成后给手机录音编码器留住最后几个字
+// 边说边纠错：在停顿处把已经攒下的整段顺一遍，而不是逐段顺。
+// 逐段不行——纠错靠上下文，单独一个「很平近」的碎片没有判断依据。
+const LIVE_POLISH_DEBOUNCE_MS = 1_400;   // 一段转完后再静一会儿才动手，避开连着说的时候
+const LIVE_POLISH_MIN_INTERVAL_MS = 4_000;
+const LIVE_POLISH_MIN_CHARS = 12;        // 太短没有上下文，纠了也是猜
+const LIVE_POLISH_MIN_GROWTH = 10;       // 没新增多少就别重复调用
 
 function writeAscii(view: DataView, offset: number, value: string) {
   for (let index = 0; index < value.length; index += 1) {
@@ -176,6 +182,12 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   const stoppingRef = useRef(false);
   // 已经转完并接进字幕的进度：文字 + 已消费到第几个样本
   const committedRef = useRef({ text: '', samples: 0 });
+  const polishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const polishRequestRef = useRef<AbortController | null>(null);
+  const polishBusyRef = useRef(false);
+  const polishedRef = useRef({ length: 0, at: 0 });
+  // 只有听写才边说边纠：直达最后要整段重转，纠字幕纯属白花钱
+  const livePolishRef = useRef(false);
 
   useEffect(() => {
     onResultRef.current = onResult;
@@ -194,8 +206,16 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       clearTimeout(finishTimerRef.current);
       finishTimerRef.current = null;
     }
+    if (polishTimerRef.current) {
+      clearTimeout(polishTimerRef.current);
+      polishTimerRef.current = null;
+    }
     partialRequestRef.current?.abort();
     partialRequestRef.current = null;
+    polishRequestRef.current?.abort();
+    polishRequestRef.current = null;
+    polishBusyRef.current = false;
+    polishedRef.current = { length: 0, at: 0 };
     try {
       tapRef.current?.disconnect();
     } catch {
@@ -215,6 +235,66 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     setLevel(0);
     setElapsed(0);
   }, []);
+
+  /**
+   * 停顿时把已经攒下的字幕整段顺一遍：同音错字、切点补出来的假句号，
+   * 在你还在想下一句的时候就已经改好了，不必等到点完停止才一次性整理。
+   *
+   * 顺的是「整段」而不是「刚转好的那一段」——纠错全靠上下文，
+   * 「很平近」单独拿出来没法判断，接在整句里才知道是「平静」。
+   */
+  const runLivePolish = useCallback(async (generation: number) => {
+    if (polishBusyRef.current) return;
+    const before = committedRef.current.text;
+    if (before.length < LIVE_POLISH_MIN_CHARS) return;
+    if (before.length - polishedRef.current.length < LIVE_POLISH_MIN_GROWTH) return;
+
+    polishBusyRef.current = true;
+    const controller = new AbortController();
+    polishRequestRef.current = controller;
+    try {
+      const res = await fetch('/api/phil-coach/polish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: before }),
+        signal: controller.signal,
+      });
+      const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (generationRef.current !== generation) return;
+      polishedRef.current = { length: before.length, at: Date.now() };
+      if (!res.ok || typeof json.text !== 'string' || !json.changed) return;
+      // 等结果的这段时间里可能又转好了新的一段，把它接回去
+      const now = committedRef.current.text;
+      if (!now.startsWith(before)) return;
+      // 顺的是「说到一半」的话，模型会顺手补个句号收尾——留着它，
+      // 下一段接上来就又成了假的句子边界。真正的收尾标点等停止后那一次再补。
+      const merged = `${trimSeamPunctuation(json.text.trim())}${now.slice(before.length)}`;
+      committedRef.current = { ...committedRef.current, text: merged };
+      polishedRef.current = { length: merged.length, at: Date.now() };
+      setPartial(merged);
+    } catch {
+      /* 顺不动就还是原文，字幕本身没坏 */
+      polishedRef.current = { length: before.length, at: Date.now() };
+    } finally {
+      if (polishRequestRef.current === controller) polishRequestRef.current = null;
+      polishBusyRef.current = false;
+    }
+  }, []);
+
+  const scheduleLivePolish = useCallback(
+    (generation: number) => {
+      if (!livePolishRef.current) return;
+      if (polishTimerRef.current) clearTimeout(polishTimerRef.current);
+      const since = Date.now() - polishedRef.current.at;
+      const wait = Math.max(LIVE_POLISH_DEBOUNCE_MS, LIVE_POLISH_MIN_INTERVAL_MS - since);
+      polishTimerRef.current = setTimeout(() => {
+        polishTimerRef.current = null;
+        if (generationRef.current !== generation) return;
+        void runLivePolish(generation);
+      }, wait);
+    },
+    [runLivePolish],
+  );
 
   /**
    * 只把「还没转过的那一段」送去转写，转好就接在已定的字幕后面。
@@ -265,6 +345,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
             samples: from + cut,
           };
           setPartial(committedRef.current.text);
+          scheduleLivePolish(generation);
         }
       }
     } catch {
@@ -274,7 +355,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       if (partialRequestRef.current === controller) partialRequestRef.current = null;
       partialBusyRef.current = false;
     }
-  }, []);
+  }, [scheduleLivePolish]);
 
   /** 起转写定时器：第一次早一点发，之后按固定间隔。 */
   const beginPartials = useCallback(
@@ -427,6 +508,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       }
       setRequesting(false);
       streamRef.current = stream;
+      livePolishRef.current = options?.analysis === false;
       startMeter(stream, options?.partials !== false, generation);
       // 只用 Web Audio 采音，不再挂 MediaRecorder。
       // iOS Safari 上同一条音轨被两个消费者同时读时，AudioContext 会被饿死——

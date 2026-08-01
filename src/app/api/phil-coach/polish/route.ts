@@ -10,7 +10,9 @@ export const runtime = 'nodejs';
 
 const MAX_CHARS = 1200;
 const WINDOW_MS = 5 * 60 * 1000;
-const MAX_PER_WINDOW = 60;
+// 边说边纠：一次录音会在每个停顿处顺一遍，55 秒最多十来次。
+// 60 只够说四段话就把人锁死了。
+const MAX_PER_WINDOW = 240;
 const buckets = new Map<string, number[]>();
 
 const PROMPT = `你会收到一段语音转文字的结果。它可能有这些毛病：
