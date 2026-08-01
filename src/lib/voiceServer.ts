@@ -610,6 +610,10 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       if (generationRef.current !== generation) {
         stream.getTracks().forEach(track => track.stop());
         stopMeter();   // 上面提前建好的 AudioContext 要收掉，别泄漏
+        // 这里必须把状态收干净：漏掉的话 UI 会永远停在「正在打开麦克风…」，
+        // busyRef 也一直是 true，连重新开始都按不动。
+        setRequesting(false);
+        busyRef.current = false;
         return;
       }
       setRequesting(false);

@@ -339,18 +339,20 @@ export default function PhilCoachExperience() {
   const displayedDraft =
     dictating && liveCaption ? appendTranscript(draft, liveCaption) : draft;
   // 三个入口统一包一层：字幕跟着录音一起起停，且字幕失败不影响录音
-  const startVoice = (mode: 'dictate' | 'direct') => {
+  const startVoice = async (mode: 'dictate' | 'direct') => {
     voiceModeRef.current = mode;
     setVoiceMode(mode);
     setCaption('');
     captionSeenRef.current = false;
     // Web Speech 在跑就先不花钱做分段转写，等看门狗判定
-    void voiceIn.start({
+    await voiceIn.start({
       partials: !useWebSpeechCaptions,
       // 灰色麦克风只是听写，不需要等较慢的语气分析；直达模式才保留声音观察。
       analysis: mode === 'direct',
     });
-    if (!useWebSpeechCaptions) return;
+    // 一定要等麦克风到手再起浏览器听写。两个都在抢麦克风，同时发起的话
+    // 两套权限流程会叠在一起——Mac Chrome 上表现为卡在「正在打开麦克风…」。
+    if (!useWebSpeechCaptions || voiceModeRef.current !== mode) return;
     liveVoice.start();
     // 看门狗现在只是兜底。正常的失败（没权限、没麦克风、连不上 Google）都会
     // 触发 error 事件，下面那个 effect 会立刻切走，不必白等这几秒。
@@ -1208,11 +1210,12 @@ export default function PhilCoachExperience() {
                       </span>
                     </div>
                     <button
-                      onClick={finishVoice}
-                      disabled={!voiceIn.recording}
+                      /* 还没录起来时它是「退出」——否则一旦卡在开麦克风这一步就出不来了 */
+                      onClick={voiceIn.recording ? finishVoice : cancelVoice}
+                      disabled={voiceIn.transcribing}
                       type="button"
-                      aria-label="完成听写"
-                      title="完成"
+                      aria-label={voiceIn.recording ? '完成听写' : '退出听写'}
+                      title={voiceIn.recording ? '完成' : '退出'}
                       className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-coral-soft text-[#24140f] transition-opacity disabled:opacity-45"
                     >
                       <span aria-hidden="true" className="block h-3.5 w-3.5 rounded-[3px] bg-current" />
@@ -1264,7 +1267,7 @@ export default function PhilCoachExperience() {
                     /* 两个语音入口，像 Gemini：🎤 听写进输入框（可改再发），声波直达（说完就发） */
                     <div className="flex shrink-0 items-center gap-2">
                       <button
-                        onClick={() => startVoice('dictate')}
+                        onClick={() => void startVoice('dictate')}
                         disabled={loading || voiceBusy || displayedDraft.length >= 1200}
                         type="button"
                         aria-label="说话变文字"
@@ -1274,7 +1277,7 @@ export default function PhilCoachExperience() {
                         <MicrophoneIcon />
                       </button>
                       <button
-                        onClick={() => startVoice('direct')}
+                        onClick={() => void startVoice('direct')}
                         disabled={loading || voiceBusy}
                         type="button"
                         aria-label="说完直接发给它"
