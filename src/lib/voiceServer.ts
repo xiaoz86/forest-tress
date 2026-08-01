@@ -87,22 +87,24 @@ function flattenRange(chunks: Float32Array[], from: number, to: number): Float32
  * 找不到就先不切（返回 null），除非整段已经长到 MAX_SEG_S——
  * 那说明这人一口气说了很久，再等下去就没有「实时」可言了，硬切。
  */
-function findQuietCut(flat: Float32Array, rate: number): { at: number; forced: boolean } | null {
+function findQuietCut(flat: Float32Array, rate: number): number | null {
   const minSamples = Math.floor(MIN_SEG_S * rate);
   const win = Math.max(1, Math.floor(0.03 * rate));   // 30ms 一个窗口
   for (let end = flat.length; end - win >= minSamples; end -= win) {
     let sum = 0;
     for (let i = end - win; i < end; i += 1) sum += flat[i] * flat[i];
-    if (Math.sqrt(sum / win) < QUIET_RMS) return { at: end, forced: false };
+    if (Math.sqrt(sum / win) < QUIET_RMS) return end;
   }
-  return flat.length / rate >= MAX_SEG_S ? { at: flat.length, forced: true } : null;
+  return flat.length / rate >= MAX_SEG_S ? flat.length : null;
 }
 
 /**
- * 从句子中间硬切时，转写会给这半句补一个句号——「很平静」被切成
- * 「……感觉到很。」和「平静。」两句。既然知道这一刀落在句中，就把它去掉。
+ * 每一段转写都会被补上句末标点，但我们的切点是「一段安静」，
+ * 而人说话时句中停顿太常见了——「今天我想和你聊一聊……我将要发生的事」
+ * 被切成两段，就成了「聊一聊。」「我将要发生的事。」两句话。
+ * 所以接缝处的句末标点一律去掉，真正的断句交给后面的纠错去补。
  */
-function trimForcedEnd(text: string): string {
+function trimSeamPunctuation(text: string): string {
   return text.replace(/[。．.!！?？,，、;；]+$/, '');
 }
 
@@ -244,7 +246,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     const timeout = setTimeout(() => controller.abort(), PARTIAL_TIMEOUT_MS);
     try {
       const fd = new FormData();
-      fd.append('audio', encodePcmWav(flat.subarray(0, cut.at), rate), 'partial.wav');
+      fd.append('audio', encodePcmWav(flat.subarray(0, cut), rate), 'partial.wav');
       fd.append('partial', '1');
       const res = await fetch('/api/phil-coach/voice', {
         method: 'POST',
@@ -254,13 +256,13 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (generationRef.current !== generation) return;
       if (res.ok && typeof json.text === 'string') {
-        // 切在句中的那一段，末尾的标点是转写硬补的，去掉才接得上下一句
-        const piece = cut.forced ? trimForcedEnd(json.text.trim()) : json.text.trim();
+        // 接缝处的句末标点是转写补的，不代表这句说完了——去掉才接得上下一句
+        const piece = trimSeamPunctuation(json.text.trim());
         // 空结果不能把这段音频消费掉。把它和下一小段一起重试，避免永久缺词。
         if (piece) {
           committedRef.current = {
             text: `${committedRef.current.text}${piece}`,
-            samples: from + cut.at,
+            samples: from + cut,
           };
           setPartial(committedRef.current.text);
         }
@@ -483,7 +485,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
             if (partialTextAtStop && options?.analysis === false) {
               setPartial('');
               onResultRef.current({ text: partialTextAtStop, voiceContext: null });
-              setError('完整整理没有成功，已保留刚才听到的文字，请检查后再发送。');
+              setError('最后一句没能听清，先留着刚才听到的，改完再发也行。');
             } else {
               setError(
                 json.error === 'too-many'
@@ -510,7 +512,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
             if (partialTextAtStop && options?.analysis === false) {
               setPartial('');
               onResultRef.current({ text: partialTextAtStop, voiceContext: null });
-              setError('网络不太顺，已保留刚才听到的文字，请检查后再发送。');
+              setError('网络不太顺，先留着刚才听到的，改完再发也行。');
             } else {
               setError('网络不太顺，这段没送出去。');
             }
