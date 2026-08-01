@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 
 /** 读取「浏览器是否支持某能力」——SSR 安全，且不需要在 effect 里 setState */
 const noopSubscribe = () => () => {};
-function useClientFlag(probe: () => boolean): boolean {
+export function useClientFlag(probe: () => boolean): boolean {
   return useSyncExternalStore(noopSubscribe, probe, () => false);
 }
 
@@ -65,6 +65,10 @@ export function useSpeechInput(onText: (text: string) => void) {
   const [listening, setListening] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [interim, setInterim] = useState('');
+  // 浏览器听写彻底放弃了（权限、没麦克风、连不上后端、反复自己停）。
+  // 上层据此立刻切到服务端，而不是干等看门狗——中国大陆的 Chrome/Edge
+  // 走的是 Google 的后端，连不上时这个信号几乎是立刻到的。
+  const [failed, setFailed] = useState(false);
   const [error, setError] = useState('');
   const recRef = useRef<RecognitionInstance | null>(null);
   const wantedRef = useRef(false);
@@ -156,6 +160,7 @@ export function useSpeechInput(onText: (text: string) => void) {
           stoppingRef.current = false;
           setStopping(false);
           commitPending();
+          setFailed(true);
         }
       };
       rec.onend = () => {
@@ -177,6 +182,7 @@ export function useSpeechInput(onText: (text: string) => void) {
           wantedRef.current = false;
           setListening(false);
           setError('实时听写没有成功保持开启，可以改用「录一段」。');
+          setFailed(true);
           return;
         }
         restartTimerRef.current = setTimeout(() => startRecognitionRef.current(), 250);
@@ -204,6 +210,7 @@ export function useSpeechInput(onText: (text: string) => void) {
     clearRestartTimer();
     clearStopTimer();
     setError('');
+    setFailed(false);
     wantedRef.current = true;
     stoppingRef.current = false;
     setStopping(false);
@@ -317,7 +324,10 @@ export function useSpeechInput(onText: (text: string) => void) {
     else start();
   }, [listening, start, stop]);
 
-  return { supported, inWeChat, inIOS, listening, stopping, interim, error, start, stop, toggle, cancel };
+  return {
+    supported, inWeChat, inIOS, listening, stopping, interim, error, failed,
+    start, stop, toggle, cancel,
+  };
 }
 
 const VOICE_PREF_KEY = 'nf_phil_read_aloud';

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { useSpeechInput } from '@/lib/voice';
+import { useClientFlag, useSpeechInput } from '@/lib/voice';
 import {
   PHIL_COACH_VOICES,
   useServerSpeech,
@@ -309,10 +309,21 @@ export default function PhilCoachExperience() {
   const conversationReady = identityReady && importState !== 'importing';
   // 字幕两条路：浏览器听写（Web Speech）逐字出、几乎零延迟；
   // 服务端分段转写以短语为单位刷新，但哪儿都能用。
-  // iPhone / iPad 上 Web Speech 与 MediaRecorder 会争用麦克风，既可能弹两次授权，
-  // 也可能让两边都拿不到完整声音。Apple 移动设备与微信只开一条服务端录音链路；
-  // 其余浏览器保留低延迟的 Web Speech 字幕。
-  const useWebSpeechCaptions = liveVoice.supported && !liveVoice.inWeChat && !liveVoice.inIOS;
+  //
+  // 谁真的能走第一条，只有运行时才知道：
+  // Edge 压根没实现、Firefox 默认关着、iOS 的微信与 Chrome 都是 WKWebView 拿不到，
+  // 而 Chrome/Edge 的后端在 Google——在够不着 Google 的网络里 API 在、一用就报
+  // network。所以判据是「它有没有真的出字」，不是嗅探 UA。
+  //
+  // iPhone / iPad 上还有一层：Web Speech 会自己开一路麦克风，和我们采 PCM 的
+  // AudioContext 是两个消费者，可能互相饿死。这条没有真机验不了，所以默认仍然
+  // 只走服务端；带上 ?webspeech=1 可以在 iOS Safari 上单独试（微信不受影响）。
+  const iosWebSpeechOptIn = useClientFlag(
+    () => typeof window !== 'undefined'
+      && new URLSearchParams(window.location.search).get('webspeech') === '1',
+  );
+  const useWebSpeechCaptions =
+    liveVoice.supported && !liveVoice.inWeChat && (!liveVoice.inIOS || iosWebSpeechOptIn);
   // 实时字幕：谁有内容就显示谁。
   // 不能按 useWebSpeechCaptions 固定挑一边——看门狗把浏览器听写换成服务端之后，
   // 显示源不跟着切的话，请求照发、字却永远不出现。
@@ -341,15 +352,23 @@ export default function PhilCoachExperience() {
     });
     if (!useWebSpeechCaptions) return;
     liveVoice.start();
-    // 看门狗：给浏览器听写一点时间证明它真的在工作。到点还一个字都没有，
-    // 就当它被掐断了——收掉它，接上服务端分段转写。PCM 从开录就在攒，
-    // 所以字幕会从头出，不会从半截开始。
+    // 看门狗现在只是兜底。正常的失败（没权限、没麦克风、连不上 Google）都会
+    // 触发 error 事件，下面那个 effect 会立刻切走，不必白等这几秒。
+    // 留着它是为了「不报错也不出字」那种装死的情况。
     if (captionWatchdogRef.current) clearTimeout(captionWatchdogRef.current);
     captionWatchdogRef.current = setTimeout(() => {
       if (captionSeenRef.current) return;
-      liveVoice.cancel();
-      voiceIn.armPartials();
+      fallbackToServerCaptions();
     }, CAPTION_WATCHDOG_MS);
+  };
+  /** 收掉浏览器听写，接上服务端分段转写。PCM 从开录就在攒，所以字幕从头出，不会缺一截。 */
+  const fallbackToServerCaptions = () => {
+    if (captionWatchdogRef.current) {
+      clearTimeout(captionWatchdogRef.current);
+      captionWatchdogRef.current = null;
+    }
+    liveVoice.cancel();
+    voiceIn.armPartials();
   };
   const finishVoice = () => {
     if (captionWatchdogRef.current) clearTimeout(captionWatchdogRef.current);
@@ -375,6 +394,16 @@ export default function PhilCoachExperience() {
   useEffect(() => {
     if (liveVoice.interim) captionSeenRef.current = true;
   }, [liveVoice.interim]);
+
+  // 浏览器听写自己认输了就马上换路。
+  // 这是 Windows / 安卓 / 够不着 Google 的网络里真正省下来的那几秒——
+  // 以前要等满看门狗才切，那几秒是纯亏的。
+  useEffect(() => {
+    if (!liveVoice.failed) return;
+    if (!voiceIn.recording && !voiceIn.requesting) return;
+    fallbackToServerCaptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveVoice.failed]);
 
   // 挂载时恢复上一次未走完的对话（去登录/注册回来后，聊过的内容不会丢）
   useEffect(() => {
