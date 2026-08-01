@@ -1104,7 +1104,25 @@ export default function PhilCoachExperience() {
             </div>
           )}
           {voiceIn.error && (
-            <div role="alert" className="mb-3 text-[12px] text-coral-soft/90">{voiceIn.error}</div>
+            <div role="alert" className="mb-3 text-[12px] text-coral-soft/90">
+              {voiceIn.error}
+              {/* 一路静音多半是虚拟声卡（Cast、Krisp、Loopback…）抢了默认输入。
+                  与其让人去浏览器设置里翻，不如就地把设备列出来点一下。 */}
+              {voiceIn.inputDevices.length > 0 && (
+                <span className="mt-2 flex flex-wrap gap-1.5">
+                  {voiceIn.inputDevices.map(d => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => voiceIn.chooseInputDevice(d.id)}
+                      className="rounded-full border border-coral-soft/40 px-2.5 py-1 text-[11.5px] text-coral-soft transition-colors hover:bg-coral-soft/12"
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </span>
+              )}
+            </div>
           )}
           {voiceInputNotice && (
             <div role="status" className="mb-3 text-[12px] text-coral-soft/90">

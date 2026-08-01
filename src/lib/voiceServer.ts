@@ -30,6 +30,7 @@ const QUIET_RATIO = 0.22;       // 低于本段峰值的这个比例算停顿
 const QUIET_RMS_FLOOR = 0.012;  // 再安静的环境也不至于把气声当成人声
 const QUIET_RMS_CEIL = 0.06;    // 再吵也不能把说话本身当成停顿
 const RECORDING_TAIL_MS = 300;
+const MIC_PREF_KEY = 'nf_mic_device';
 const SILENT_MIC_RMS = 0.004;   // 整段最高电平低于这个，就不是「说得轻」，是根本没进来声音  // 点完成后给手机录音编码器留住最后几个字
 // 边说边纠错：在停顿处把已经攒下的整段顺一遍，而不是逐段顺。
 // 逐段不行——纠错靠上下文，单独一个「很平近」的碎片没有判断依据。
@@ -222,6 +223,10 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   // 不区分开，就只能给人一句没法照着做的「没能转成文字」。
   const peakLevelRef = useRef(0);
   const micLabelRef = useRef('');
+  // 记住上次选中的输入设备。虚拟声卡（Cast、Krisp、Loopback、OBS…）
+  // 抢默认输入很常见，抢到了就是一路静音——让人自己挑一次，然后记住。
+  const preferredDeviceRef = useRef<string>('');
+  const [inputDevices, setInputDevices] = useState<{ id: string; label: string }[]>([]);
   // 只有听写才边说边纠：直达最后要整段重转，纠字幕纯属白花钱
   const livePolishRef = useRef(false);
 
@@ -229,14 +234,48 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     onResultRef.current = onResult;
   }, [onResult]);
 
+  useEffect(() => {
+    try {
+      preferredDeviceRef.current = localStorage.getItem(MIC_PREF_KEY) || '';
+    } catch {
+      /* 无痕模式下读不到，用默认设备就是了 */
+    }
+  }, []);
+
+  /** 列出可选的输入设备。设备名要拿到麦克风权限之后才可见，所以只在出问题时才列。 */
+  const listInputDevices = useCallback(async () => {
+    try {
+      const all = await navigator.mediaDevices.enumerateDevices();
+      setInputDevices(
+        all
+          .filter(d => d.kind === 'audioinput' && d.deviceId)
+          .map(d => ({ id: d.deviceId, label: d.label || '未命名设备' })),
+      );
+    } catch {
+      setInputDevices([]);
+    }
+  }, []);
+
+  const chooseInputDevice = useCallback((id: string) => {
+    preferredDeviceRef.current = id;
+    try {
+      localStorage.setItem(MIC_PREF_KEY, id);
+    } catch {
+      /* 记不住就下次再选一遍 */
+    }
+    setError('');
+    setInputDevices([]);
+  }, []);
+
   /** 整段录音的最高电平都没过底噪：麦克风一路都是静的。 */
   const silentMic = useCallback(() => peakLevelRef.current < SILENT_MIC_RMS, []);
   const micHint = useCallback(() => {
+    void listInputDevices();
     const label = micLabelRef.current;
     return label
-      ? `全程没有听到声音。浏览器正在用的麦克风是「${label}」，可以在地址栏的麦克风图标里换一个再试。`
-      : '全程没有听到声音，可以检查一下浏览器选的是哪个麦克风。';
-  }, []);
+      ? `全程没有听到声音——「${label}」这个设备没有把声音送进来。换一个试试：`
+      : '全程没有听到声音。换一个输入设备试试：';
+  }, [listInputDevices]);
 
   /** 清空流水线账本。收口时要晚一步做——字幕得先被读走。 */
   const resetPartialState = useCallback(() => {
@@ -617,7 +656,16 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       /* 没有音量表和字幕也不影响录音 */
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const wanted = preferredDeviceRef.current;
+      const stream = await navigator.mediaDevices
+        .getUserMedia({ audio: wanted ? { deviceId: { exact: wanted } } : true })
+        // 记住的设备被拔掉了就退回默认，别让人卡在一个不存在的麦克风上
+        .catch(async err => {
+          if (!wanted) throw err;
+          preferredDeviceRef.current = '';
+          try { localStorage.removeItem(MIC_PREF_KEY); } catch { /* ignore */ }
+          return navigator.mediaDevices.getUserMedia({ audio: true });
+        });
       if (generationRef.current !== generation) {
         stream.getTracks().forEach(track => track.stop());
         stopMeter();   // 上面提前建好的 AudioContext 要收掉，别泄漏
@@ -782,6 +830,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   return {
     supported, requesting, recording, transcribing, error,
     level, elapsed, partial, armPartials,
+    inputDevices, chooseInputDevice,
     start, stop, toggle, cancel,
   };
 }
