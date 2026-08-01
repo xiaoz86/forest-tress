@@ -9,6 +9,11 @@ import { normalizeVoiceAnalysis, type VoiceAnalysis } from '@/lib/philCoachVoice
 export type VoiceInputResult = {
   text: string;
   voiceContext: VoiceAnalysis | null;
+  /**
+   * 接缝标点没去掉的那一版。接缝标点确实经常在句子中间，
+   * 但纠错万一没跑成，有错标点也远好过一整段没有标点。
+   */
+  fallbackText?: string;
 };
 
 const MAX_RECORDING_MS = 55_000;
@@ -199,7 +204,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stoppingRef = useRef(false);
   // 已经转完并接进字幕的进度：文字 + 已消费到第几个样本
-  const committedRef = useRef({ text: '', samples: 0 });
+  const committedRef = useRef({ text: '', seamText: '', samples: 0 });
   const polishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const polishRequestRef = useRef<AbortController | null>(null);
   const polishBusyRef = useRef(false);
@@ -241,7 +246,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     }
     tapRef.current = null;
     pcmRef.current = [];
-    committedRef.current = { text: '', samples: 0 };
+    committedRef.current = { text: '', seamText: '', samples: 0 };
     partialBusyRef.current = false;
     stoppingRef.current = false;
     try {
@@ -354,12 +359,16 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (generationRef.current !== generation) return;
       if (res.ok && typeof json.text === 'string') {
+        const raw = json.text.trim();
         // 接缝处的句末标点是转写补的，不代表这句说完了——去掉才接得上下一句
-        const piece = trimSeamPunctuation(json.text.trim());
+        const piece = trimSeamPunctuation(raw);
         // 空结果不能把这段音频消费掉。把它和下一小段一起重试，避免永久缺词。
         if (piece) {
           committedRef.current = {
             text: `${committedRef.current.text}${piece}`,
+            // 同时留一份「标点原样」的：接缝标点确实经常是错的，
+            // 但纠错万一没跑成，有错标点也远好过一整段没有标点。
+            seamText: `${committedRef.current.seamText}${raw}`,
             samples: from + cut,
           };
           setPartial(committedRef.current.text);
@@ -402,7 +411,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       startedAtRef.current = Date.now();
       pcmRef.current = [];
       pcmRateRef.current = ctx.sampleRate;
-      committedRef.current = { text: '', samples: 0 };
+      committedRef.current = { text: '', seamText: '', samples: 0 };
 
       const tap = ctx.createScriptProcessor(4096, 1, 1);
       // 音量表和录音都从这一个回调出：
@@ -538,6 +547,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         const pcmRate = pcmRateRef.current;
         const pcmSamples = pcmChunks.reduce((total, chunk) => total + chunk.length, 0);
         const partialTextAtStop = committedRef.current.text;
+        const seamTextAtStop = committedRef.current.seamText;
         const committedSamples = committedRef.current.samples;
         // 听写：字幕已经把前面绝大部分转完了，收口时只补最后那一小段没转的，
         // 不必把整段重转一遍——那正是「点完停止还要干等」的来源。
@@ -553,7 +563,11 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         // 尾巴短到没东西可转：字幕本身就是结果，一个字都不用等
         if (tailOnly && !pcmBlob) {
           setPartial('');
-          onResultRef.current({ text: partialTextAtStop, voiceContext: null });
+          onResultRef.current({
+              text: partialTextAtStop,
+              voiceContext: null,
+              fallbackText: seamTextAtStop,
+            });
           setTranscribing(false);
           busyRef.current = false;
           return;
@@ -584,7 +598,11 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           if (!res.ok || typeof json.text !== 'string') {
             if (partialTextAtStop && options?.analysis === false) {
               setPartial('');
-              onResultRef.current({ text: partialTextAtStop, voiceContext: null });
+              onResultRef.current({
+              text: partialTextAtStop,
+              voiceContext: null,
+              fallbackText: seamTextAtStop,
+            });
               setError('最后一句没能听清，先留着刚才听到的，改完再发也行。');
             } else {
               setError(
@@ -605,13 +623,18 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
             onResultRef.current({
               text,
               voiceContext: voiceContext ? { ...voiceContext, transcript: text } : null,
+              fallbackText: tailOnly ? `${seamTextAtStop}${json.text.trim()}`.trim() : undefined,
             });
           }
         } catch {
           if (generationRef.current === generation) {
             if (partialTextAtStop && options?.analysis === false) {
               setPartial('');
-              onResultRef.current({ text: partialTextAtStop, voiceContext: null });
+              onResultRef.current({
+              text: partialTextAtStop,
+              voiceContext: null,
+              fallbackText: seamTextAtStop,
+            });
               setError('网络不太顺，先留着刚才听到的，改完再发也行。');
             } else {
               setError('网络不太顺，这段没送出去。');

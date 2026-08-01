@@ -247,7 +247,7 @@ export default function PhilCoachExperience() {
     draftRef.current = merged.text;
     setDraft(merged.text);
     // 原文先落进输入框，别让人等；顺一遍是后台做的事
-    void polishDraft(result.text, merged.text);
+    void polishDraft(result.text, merged.text, result.fallbackText);
     pendingVoiceContextRef.current = merged.complete ? result.voiceContext : null;
     setVoiceInputNotice(
       merged.complete
@@ -262,9 +262,23 @@ export default function PhilCoachExperience() {
    * 不挡着人——原文已经在框里了，顺好了才悄悄换掉，而且只在人还没动过时才换。
    * 顺不动就算了，原文本来就能用。
    */
-  const polishDraft = async (rawSegment: string, draftAfterMerge: string) => {
+  const polishDraft = async (
+    rawSegment: string,
+    draftAfterMerge: string,
+    fallbackSegment?: string,
+  ) => {
     const raw = rawSegment.trim();
     if (raw.length < 6) return;              // 太短没什么可顺的
+    // 接缝标点是纠错负责补回来的。顺不成就退回「标点原样」的那一版——
+    // 标点可能断错地方，但总好过交给人一整段没有标点的字。
+    const applySegment = (value: string) => {
+      if (draftRef.current !== draftAfterMerge) return;   // 这期间人改过输入框就别动了
+      const before = draftAfterMerge.slice(0, draftAfterMerge.length - raw.length);
+      const next = `${before}${value}`.slice(0, 1200);
+      draftRef.current = next;
+      setDraft(next);
+    };
+    const fallback = fallbackSegment?.trim();
     setPolishing(true);
     try {
       const res = await fetch('/api/phil-coach/polish', {
@@ -273,15 +287,14 @@ export default function PhilCoachExperience() {
         body: JSON.stringify({ text: raw }),
       });
       const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      if (!res.ok || typeof json.text !== 'string' || !json.changed) return;
-      // 这期间人要是改过输入框，就别再动它了
-      if (draftRef.current !== draftAfterMerge) return;
-      const before = draftAfterMerge.slice(0, draftAfterMerge.length - raw.length);
-      const next = `${before}${json.text.trim()}`.slice(0, 1200);
-      draftRef.current = next;
-      setDraft(next);
+      if (!res.ok || typeof json.text !== 'string') {
+        if (fallback) applySegment(fallback);
+        return;
+      }
+      if (json.changed) applySegment(json.text.trim());
+      else if (fallback && !/[。！？，、；]/.test(raw)) applySegment(fallback);
     } catch {
-      /* 顺不动就用原文 */
+      if (fallback) applySegment(fallback);
     } finally {
       setPolishing(false);
     }
