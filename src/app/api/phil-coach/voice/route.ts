@@ -43,6 +43,18 @@ function rateLimited(ip: string, partial: boolean): boolean {
   return false;
 }
 
+/**
+ * SenseVoice 会往文字里塞情绪符号（😔😊）和 <|zh|><|NEUTRAL|> 这类标记。
+ * 那是给分析用的元数据，不是人说出口的话——原样落进输入框就是乱码。
+ */
+function stripAsrArtifacts(text: string): string {
+  return text
+    .replace(/<\|[^|]*\|>/g, '')
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function audioMime(file: File): string {
   const mime = file.type.split(';')[0]?.trim().toLowerCase();
   return mime?.startsWith('audio/') ? mime : 'audio/webm';
@@ -149,7 +161,7 @@ async function transcribeWithSenseVoice(
     return { kind: 'upstream-error' };
   }
   const json = (await res.json()) as { text?: unknown };
-  const text = typeof json.text === 'string' ? json.text.trim() : '';
+  const text = typeof json.text === 'string' ? stripAsrArtifacts(json.text) : '';
   return text ? { kind: 'ok', text } : { kind: 'empty' };
 }
 
@@ -220,7 +232,7 @@ export async function POST(request: NextRequest) {
     // SenseVoice 偶发失败时仍可用 Qwen 的逐字字段兜底，但不再把它放在首选位置。
     if (analysis?.transcript) {
       return NextResponse.json({
-        text: analysis.transcript,
+        text: stripAsrArtifacts(analysis.transcript),
         voiceContext: analysis,
         source: 'qwen3-omni-fallback',
       });

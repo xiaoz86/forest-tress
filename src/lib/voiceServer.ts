@@ -18,15 +18,19 @@ const PARTIAL_MS = 900;         // 字幕刷新间隔：只转新增那一段，
 const PARTIAL_FIRST_MS = 700;   // 第一次早发，别让人盯着空框等一个完整周期
 const PARTIAL_TIMEOUT_MS = 7_000;
 const MIN_SEG_S = 0.7;          // 太短的片段容易只有半个音节，先和后面合起来
-const MAX_SEG_S = 2.6;          // 一直没停顿也得切，否则字迟迟不出
-const QUIET_RMS = 0.02;         // 低于这个音量算「停顿」，可以在这里下刀
+const MAX_SEG_S = 1.6;          // 一直没停顿也得切，否则字迟迟不出
+// 「安静」得相对于当前环境来判断。固定阈值在有底噪的地方永远够不着，
+// 于是每一段都只能等 MAX_SEG_S 硬切——那正是手机上「说完还要等三四秒」的来源。
+const QUIET_RATIO = 0.22;       // 低于本段峰值的这个比例算停顿
+const QUIET_RMS_FLOOR = 0.012;  // 再安静的环境也不至于把气声当成人声
+const QUIET_RMS_CEIL = 0.06;    // 再吵也不能把说话本身当成停顿
 const RECORDING_TAIL_MS = 300;  // 点完成后给手机录音编码器留住最后几个字
 // 边说边纠错：在停顿处把已经攒下的整段顺一遍，而不是逐段顺。
 // 逐段不行——纠错靠上下文，单独一个「很平近」的碎片没有判断依据。
-const LIVE_POLISH_DEBOUNCE_MS = 1_400;   // 一段转完后再静一会儿才动手，避开连着说的时候
-const LIVE_POLISH_MIN_INTERVAL_MS = 4_000;
-const LIVE_POLISH_MIN_CHARS = 12;        // 太短没有上下文，纠了也是猜
-const LIVE_POLISH_MIN_GROWTH = 10;       // 没新增多少就别重复调用
+const LIVE_POLISH_DEBOUNCE_MS = 1_100;   // 一段转完后再静一会儿才动手，避开连着说的时候
+const LIVE_POLISH_MIN_INTERVAL_MS = 3_000;
+const LIVE_POLISH_MIN_CHARS = 10;        // 太短没有上下文，纠了也是猜
+const LIVE_POLISH_MIN_GROWTH = 7;        // 没新增多少就别重复调用
 
 function writeAscii(view: DataView, offset: number, value: string) {
   for (let index = 0; index < value.length; index += 1) {
@@ -96,10 +100,24 @@ function flattenRange(chunks: Float32Array[], from: number, to: number): Float32
 function findQuietCut(flat: Float32Array, rate: number): number | null {
   const minSamples = Math.floor(MIN_SEG_S * rate);
   const win = Math.max(1, Math.floor(0.03 * rate));   // 30ms 一个窗口
-  for (let end = flat.length; end - win >= minSamples; end -= win) {
+  if (flat.length < minSamples + win) return null;
+
+  // 先量一遍这段自己有多响，再定「多安静算停顿」——阈值跟着环境走
+  const windows: number[] = [];                        // [0] 是最靠后的窗口
+  let peak = 0;
+  for (let end = flat.length; end - win >= 0; end -= win) {
     let sum = 0;
     for (let i = end - win; i < end; i += 1) sum += flat[i] * flat[i];
-    if (Math.sqrt(sum / win) < QUIET_RMS) return end;
+    const value = Math.sqrt(sum / win);
+    windows.push(value);
+    if (value > peak) peak = value;
+  }
+  const quiet = Math.min(QUIET_RMS_CEIL, Math.max(QUIET_RMS_FLOOR, peak * QUIET_RATIO));
+
+  for (let index = 0; index < windows.length; index += 1) {
+    const end = flat.length - index * win;
+    if (end - win < minSamples) break;
+    if (windows[index] < quiet) return end;
   }
   return flat.length / rate >= MAX_SEG_S ? flat.length : null;
 }
