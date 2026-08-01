@@ -342,6 +342,9 @@ export default function PhilCoachExperience() {
     dictating && liveCaption ? appendTranscript(draft, liveCaption) : draft;
   // 三个入口统一包一层：字幕跟着录音一起起停，且字幕失败不影响录音
   const startVoice = async (mode: 'dictate' | 'direct') => {
+    // 它正念着的时候开录，麦克风会把它自己的话录回输入框——
+    // 手机外放尤其明显，回声消除挡不住。开录第一件事就是让它闭嘴。
+    voiceOut.stop();
     voiceModeRef.current = mode;
     setVoiceMode(mode);
     setCaption('');
@@ -458,14 +461,16 @@ export default function PhilCoachExperience() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [session?.thread.length, loading, error, voiceIn.transcribing]);
 
-  // 开着朗读时，把最新一条回复念出来（同一条不重复念）
+  // 开着朗读时，把最新一条回复念出来（同一条不重复念）。
+  // 正在录音就先别念——念出来会被麦克风录回去，成了它在跟自己说话。
   useEffect(() => {
     if (!voiceOut.enabled || !session) return;
+    if (voiceIn.recording || voiceIn.requesting) return;
     const last = [...session.thread].reverse().find(t => t.kind === 'coach');
     if (!last || last.text === spokenRef.current) return;
     spokenRef.current = last.text;
     voiceOut.speak(last.text);
-  }, [session, voiceOut]);
+  }, [session, voiceOut, voiceIn.recording, voiceIn.requesting]);
 
   // 登录检测 + 第一次对话默认导入注册资料
   useEffect(() => {

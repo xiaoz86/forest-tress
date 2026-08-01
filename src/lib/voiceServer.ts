@@ -31,6 +31,17 @@ const QUIET_RMS_FLOOR = 0.012;  // 再安静的环境也不至于把气声当成
 const QUIET_RMS_CEIL = 0.06;    // 再吵也不能把说话本身当成停顿
 const RECORDING_TAIL_MS = 300;
 const MIC_PREF_KEY = 'nf_mic_device';
+// 回环/虚拟声卡录的是「电脑正在播放的声音」，不是人说的话。
+// 没在放音时它一片静音；一旦开着朗读，它就把 phil-coach 自己的话录回输入框。
+// 系统默认输入被这类设备占掉很常见（装了投屏、降噪、录屏、虚拟调音台都会）。
+const VIRTUAL_MIC = /virtual|cast|loopback|blackhole|soundflower|obs|krisp|voicemeeter|aggregate|stereo mix|立体声混音|虚拟/i;
+// 采音约束。指定 deviceId 时一并写清楚，别依赖各家的默认值——
+// 回声消除关掉的话，外放时朗读声会被录回去。
+const AUDIO_CONSTRAINTS = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+} as const;
 const SILENT_MIC_RMS = 0.004;   // 整段最高电平低于这个，就不是「说得轻」，是根本没进来声音  // 点完成后给手机录音编码器留住最后几个字
 // 边说边纠错：在停顿处把已经攒下的整段顺一遍，而不是逐段顺。
 // 逐段不行——纠错靠上下文，单独一个「很平近」的碎片没有判断依据。
@@ -151,6 +162,25 @@ function preferCompleteTranscript(finalText: string, partialText: string): strin
   return partialCompact.startsWith(finalCompact) && partialCompact.length > finalCompact.length
     ? partialValue
     : finalValue;
+}
+
+/**
+ * 当前拿到的是回环/虚拟声卡时，找一个真麦克风换上。
+ * 设备名要有麦克风权限才可见，所以只能拿到流之后再判断。
+ */
+async function findRealMic(stream: MediaStream): Promise<string | null> {
+  const label = stream.getAudioTracks()[0]?.label || '';
+  if (!label || !VIRTUAL_MIC.test(label)) return null;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const real = devices.find(
+      d => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default'
+        && d.label && !VIRTUAL_MIC.test(d.label),
+    );
+    return real?.deviceId || null;
+  } catch {
+    return null;
+  }
 }
 
 const noopSubscribe = () => () => {};
@@ -657,15 +687,27 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     }
     try {
       const wanted = preferredDeviceRef.current;
-      const stream = await navigator.mediaDevices
-        .getUserMedia({ audio: wanted ? { deviceId: { exact: wanted } } : true })
+      let stream = await navigator.mediaDevices
+        .getUserMedia({
+          audio: wanted ? { ...AUDIO_CONSTRAINTS, deviceId: { exact: wanted } } : AUDIO_CONSTRAINTS,
+        })
         // 记住的设备被拔掉了就退回默认，别让人卡在一个不存在的麦克风上
         .catch(async err => {
           if (!wanted) throw err;
           preferredDeviceRef.current = '';
           try { localStorage.removeItem(MIC_PREF_KEY); } catch { /* ignore */ }
-          return navigator.mediaDevices.getUserMedia({ audio: true });
+          return navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
         });
+      // 系统默认给的是回环声卡的话，自己换成真麦克风，别等人录废一段才发现
+      if (!wanted) {
+        const real = await findRealMic(stream);
+        if (real) {
+          stream.getTracks().forEach(t => t.stop());
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: { ...AUDIO_CONSTRAINTS, deviceId: { exact: real } },
+          });
+        }
+      }
       if (generationRef.current !== generation) {
         stream.getTracks().forEach(track => track.stop());
         stopMeter();   // 上面提前建好的 AudioContext 要收掉，别泄漏
