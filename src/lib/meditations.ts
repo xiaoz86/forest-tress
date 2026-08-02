@@ -55,7 +55,12 @@ export type MeditationTrack = {
   stage: string;
   categoryId: string;
   mood: TrackMood;
+  /** 私有桶里的对象路径，如 `sleep-d01/1781755411028.mp3`。服务端专用，永不下发。 */
+  audioPath?: string;
+  /** 老数据：公开桶时代存的完整 URL。只用于迁移和兜底，新上传不再写。 */
   audioUrl?: string;
+  /** 下发给浏览器的只有这个布尔值——有没有音频，而不是音频在哪 */
+  hasAudio?: boolean;
   /** program 里的第几段（1–21）：定序，也用来划免费线 */
   seq?: number;
   phaseId?: string;
@@ -365,6 +370,9 @@ export function normalizeMeditationContent(input: unknown): MeditationContent {
     const audioUrl = typeof r.audioUrl === 'string' && /^https?:\/\//i.test(r.audioUrl.trim())
       ? r.audioUrl.trim().slice(0, 800)
       : undefined;
+    const audioPath = typeof r.audioPath === 'string' && r.audioPath.trim()
+      ? r.audioPath.trim().replace(/^\/+/, '').slice(0, 400)
+      : undefined;
     const seq = cleanInt(r.seq, undefined, 1, 999);
     const phaseId = typeof r.phaseId === 'string' ? cleanId(r.phaseId, '') : '';
     tracks.push({
@@ -377,6 +385,7 @@ export function normalizeMeditationContent(input: unknown): MeditationContent {
       categoryId: categoryIds.has(categoryId) ? categoryId : categories[0].id,
       mood: moodRaw,
       ...(audioUrl ? { audioUrl } : {}),
+      ...(audioPath ? { audioPath } : {}),
       ...(seq === undefined ? {} : { seq }),
       ...(phaseId ? { phaseId } : {}),
       ...(r.loopable === true ? { loopable: true } : {}),
@@ -500,38 +509,49 @@ export function buildProgramView(
   };
 }
 
-/**
- * 把没买的那些段落的音频地址从返回给浏览器的数据里删掉。
- *
- * 只在前端画个锁是挡不住人的——整份 content 会随 RSC 一起发到浏览器，
- * 查看源码就能拿到全部 mp3 地址。所以过滤必须发生在服务端。
- *
- * 注意这里只管付费门，不管阶段门：进度存在浏览器本地，服务端不知道谁走到第几周。
- * 这是有意的——付费门是安全边界，阶段门只是给已经付过钱的人定节奏的，
- * 就算有人翻出地址跳到第三周，也只是打乱了自己的节奏，没有收入损失。
- */
-export function stripLockedAudio(
-  content: MeditationContent,
-  paidCategoryIds: Set<string>,
-): MeditationContent {
-  const programs = new Map(
-    content.categories.filter(c => c.kind === 'program').map(c => [c.id, c]),
-  );
-  if (programs.size === 0) return content;
+/** 老数据存的是完整公开 URL，桶转私有后要还原成对象路径 */
+export function resolveAudioPath(track: MeditationTrack): string {
+  if (track.audioPath) return track.audioPath;
+  if (!track.audioUrl) return '';
+  const m = track.audioUrl.match(/\/storage\/v1\/object\/(?:public|sign)\/meditations\/(.+?)(?:\?|$)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
 
+/**
+ * 整理成能安全发给浏览器的样子：把音频「在哪」全部拿掉，只留「有没有」。
+ *
+ * 浏览器永远拿不到地址——播放一律走 /api/meditations/stream?track=xxx，
+ * 由那条路由校验资格后现发一条短时效签名链接。这样即使有人扒源码、
+ * 转发链接，拿到的也只是一个会 403 或很快过期的入口。
+ */
+export function prepareClientContent(content: MeditationContent): MeditationContent {
   return {
     ...content,
     tracks: content.tracks.map(track => {
-      const category = programs.get(track.categoryId);
-      if (!category) return track;
-      if (paidCategoryIds.has(category.id)) return track;
-      if ((track.seq ?? 0) <= (category.freeCount ?? 0)) return track;
-      if (!track.audioUrl) return track;
-      const rest = { ...track };
+      const rest: MeditationTrack = { ...track, hasAudio: Boolean(resolveAudioPath(track)) };
+      delete rest.audioPath;
       delete rest.audioUrl;
       return rest;
     }),
   };
+}
+
+/**
+ * 这一段对这个人开不开放。stream 路由和前端共用同一套判断。
+ *
+ * 只管付费门，不管阶段门：进度存在浏览器本地，服务端不知道谁走到第几周。
+ * 这是有意的——付费门是安全边界，阶段门只是给已经付过钱的人定节奏的，
+ * 就算有人跳到第三周，也只是打乱了自己的节奏，没有收入损失。
+ */
+export function canAccessTrack(
+  content: MeditationContent,
+  track: MeditationTrack,
+  paidCategoryIds: Set<string>,
+): boolean {
+  const category = content.categories.find(c => c.id === track.categoryId);
+  if (!category || category.kind !== 'program') return true;   // 引导和纯声音都免费
+  if (paidCategoryIds.has(category.id)) return true;
+  return (track.seq ?? 0) <= (category.freeCount ?? 0);
 }
 
 /** 这个人买过哪些陪伴营。没登录就是空集。 */

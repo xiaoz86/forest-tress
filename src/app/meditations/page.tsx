@@ -9,7 +9,7 @@ import {
   fetchPaidPrograms,
   getMeditationCategory,
   getTracksForCategory,
-  stripLockedAudio,
+  prepareClientContent,
   type MeditationCategory,
   type TrackMood,
 } from '@/lib/meditations';
@@ -32,9 +32,9 @@ export default async function MeditationsPage({ searchParams }: Props) {
   const memberId = cookieStore.get('nf_member')?.value || '';
   const isAdmin = isAdminId(memberId);
 
-  // 付费内容的地址在这里就摘掉，不让它随 RSC 一起发到浏览器
+  // 音频「在哪」在这里就全部摘掉，只留「有没有」——播放统一走 stream 路由
   const paidPrograms = await fetchPaidPrograms(memberId);
-  const content = stripLockedAudio(rawContent, paidPrograms);
+  const content = prepareClientContent(rawContent);
 
   const firstCategoryId = content.categories[0]?.id || 'recommended';
   const activeCategoryId = content.categories.some(item => item.id === category)

@@ -224,7 +224,7 @@ export default function MeditationProgram({ content, category, paid }: Props) {
                   controls
                   autoPlay
                   preload="none"
-                  src={playing.audioUrl}
+                  src={`/api/meditations/stream?track=${encodeURIComponent(playing.id)}`}
                   onTimeUpdate={onTimeUpdate}
                   onEnded={() => markDone(playing.id)}
                   className="w-[min(52vw,420px)] max-md:w-[46vw]"
@@ -283,7 +283,7 @@ function TrackRow({
   playing: boolean;
   onPlay: () => void;
 }) {
-  const playable = isPlayable(state) && Boolean(track.audioUrl);
+  const playable = isPlayable(state) && Boolean(track.hasAudio);
   const label = track.seq ? String(track.seq).padStart(2, '0') : '';
 
   return (
@@ -315,7 +315,7 @@ function TrackRow({
       {track.duration && (
         <span className="shrink-0 text-[11px] tabular-nums text-white/36">{track.duration}</span>
       )}
-      {isPlayable(state) && !track.audioUrl && (
+      {isPlayable(state) && !track.hasAudio && (
         <span className="shrink-0 text-[11px] text-white/32">整理中</span>
       )}
     </div>

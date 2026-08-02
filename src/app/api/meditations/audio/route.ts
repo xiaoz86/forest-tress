@@ -72,8 +72,10 @@ export async function POST(request: NextRequest) {
   try {
     const list = await sb.storage.listBuckets();
     if (list.data && !list.data.some(b => b.name === BUCKET)) {
+      // 私有桶：音频要付费才能听，不能靠一条永久公开链接发出去。
+      // 取用一律走 /api/meditations/stream，那里校验资格后现发签名链接。
       await sb.storage.createBucket(BUCKET, {
-        public: true,
+        public: false,
         fileSizeLimit: MAX_BYTES,
       });
     }
@@ -95,9 +97,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: pub } = sb.storage.from(BUCKET).getPublicUrl(path);
-  const audioUrl = pub.publicUrl;
-  content.tracks[idx] = { ...content.tracks[idx], audioUrl };
+  // 只存对象路径。桶是私有的，公开 URL 拿不到内容，存了也只是误导。
+  const next = { ...content.tracks[idx], audioPath: path };
+  delete next.audioUrl;
+  content.tracks[idx] = next;
 
   const { error: updErr } = await sb
     .from('meditation_content')
@@ -113,5 +116,5 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ content, audioUrl });
+  return NextResponse.json({ content, audioPath: path });
 }

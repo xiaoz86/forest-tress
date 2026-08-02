@@ -384,8 +384,13 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
                 </Field>
               </div>
 
-              {track.audioUrl && (
-                <audio controls preload="none" src={track.audioUrl} className="mt-4 w-full" />
+              {(track.audioPath || track.audioUrl) && (
+                <audio
+                  controls
+                  preload="none"
+                  src={`/api/meditations/stream?track=${encodeURIComponent(track.id)}`}
+                  className="mt-4 w-full"
+                />
               )}
             </article>
           ))}

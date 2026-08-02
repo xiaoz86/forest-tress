@@ -70,7 +70,7 @@ export default function MeditationTrackCard({
         Mindfulness
       </div>
       <div className="absolute right-3 top-3 rounded-md bg-white/18 px-2.5 py-1 text-[11px] font-medium text-white/86 backdrop-blur-sm">
-        {track.audioUrl ? '可收听' : '整理中'}
+        {track.hasAudio ? '可收听' : '整理中'}
       </div>
       <div className="absolute inset-0 flex items-center justify-center text-white/88">
         <TrackGlyph mood={track.mood} />
@@ -104,8 +104,13 @@ export default function MeditationTrackCard({
       </div>
 
       {showAudio && (
-        track.audioUrl ? (
-          <audio controls preload="none" src={track.audioUrl} className="mt-4 w-full" />
+        track.hasAudio ? (
+          <audio
+            controls
+            preload="none"
+            src={`/api/meditations/stream?track=${encodeURIComponent(track.id)}`}
+            className="mt-4 w-full"
+          />
         ) : (
           <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-white/42">
             音频正在整理中
