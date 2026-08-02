@@ -2,11 +2,14 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import Nav from '@/components/Nav';
 import MeditationTrackCard from '@/components/MeditationTrackCard';
+import MeditationProgram from '@/components/MeditationProgram';
 import { isAdminId } from '@/lib/admin';
 import {
   fetchMeditationContent,
+  fetchPaidPrograms,
   getMeditationCategory,
   getTracksForCategory,
+  stripLockedAudio,
   type MeditationCategory,
   type TrackMood,
 } from '@/lib/meditations';
@@ -21,19 +24,25 @@ type Props = {
 };
 
 export default async function MeditationsPage({ searchParams }: Props) {
-  const [{ category }, content, cookieStore] = await Promise.all([
+  const [{ category }, rawContent, cookieStore] = await Promise.all([
     searchParams,
     fetchMeditationContent(),
     cookies(),
   ]);
+  const memberId = cookieStore.get('nf_member')?.value || '';
+  const isAdmin = isAdminId(memberId);
+
+  // 付费内容的地址在这里就摘掉，不让它随 RSC 一起发到浏览器
+  const paidPrograms = await fetchPaidPrograms(memberId);
+  const content = stripLockedAudio(rawContent, paidPrograms);
+
   const firstCategoryId = content.categories[0]?.id || 'recommended';
   const activeCategoryId = content.categories.some(item => item.id === category)
     ? category!
     : firstCategoryId;
   const activeCategory = getMeditationCategory(content, activeCategoryId);
   const tracks = getTracksForCategory(content, activeCategoryId);
-  const memberId = cookieStore.get('nf_member')?.value || '';
-  const isAdmin = isAdminId(memberId);
+  const isProgram = activeCategory.kind === 'program';
 
   return (
     <>
@@ -59,6 +68,8 @@ export default async function MeditationsPage({ searchParams }: Props) {
             )}
           </div>
 
+          {/* 陪伴营自带头部（封面 + 金句 + 导师），不再套这一层通用大标题 */}
+          {!isProgram && (
           <section className="grid grid-cols-[0.72fr_1.28fr] gap-12 items-end max-lg:grid-cols-1 max-lg:gap-10">
             <div className="max-w-[560px]">
               <div className="mb-8 h-px w-20 bg-coral-soft/70" />
@@ -82,8 +93,9 @@ export default async function MeditationsPage({ searchParams }: Props) {
 
             <CategoryHero category={activeCategory} count={tracks.length} />
           </section>
+          )}
 
-          <section className="mt-14 grid grid-cols-[220px_1fr] gap-10 max-lg:grid-cols-1">
+          <section className="mt-14 grid grid-cols-[220px_1fr] gap-10 max-lg:grid-cols-1 max-lg:mt-8">
             <aside className="max-lg:overflow-x-auto">
               <div className="flex flex-col gap-3 max-lg:flex-row max-lg:pb-2">
                 {content.categories.map(categoryItem => {
@@ -105,6 +117,13 @@ export default async function MeditationsPage({ searchParams }: Props) {
               </div>
             </aside>
 
+            {isProgram ? (
+              <MeditationProgram
+                content={content}
+                category={activeCategory}
+                paid={paidPrograms.has(activeCategory.id)}
+              />
+            ) : (
             <div>
             <CategoryNotes category={activeCategory} />
 
@@ -136,6 +155,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
               </div>
             )}
             </div>
+            )}
           </section>
         </div>
       </main>
@@ -197,6 +217,8 @@ const CATEGORY_VISUALS: Record<TrackMood, string> = {
   healing: 'bg-[linear-gradient(135deg,#6f8966_0%,#bac8ad_52%,#e7dac4_100%)]',
   body: 'bg-[linear-gradient(135deg,#687d77_0%,#aebdaf_52%,#ded8c7_100%)]',
   kindness: 'bg-[linear-gradient(135deg,#cf9087_0%,#ead0bf_50%,#c7d8cb_100%)]',
+  // 夜空 → 海面 → 远处的一点光，取自睡眠专题那张弦月照片
+  sleep: 'bg-[linear-gradient(160deg,#05080d_0%,#0f2430_48%,#27505f_78%,#8fa0a2_100%)]',
 };
 
 function CategoryHero({ category, count }: { category: MeditationCategory; count: number }) {

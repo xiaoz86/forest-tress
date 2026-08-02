@@ -326,3 +326,38 @@ create index if not exists idx_phil_guests_created
 -- 2026-07-21 轻登记增加审核流：登记后需主理人在邮件里点击通过，才可继续使用
 alter table phil_coach_guests add column if not exists status text not null default 'pending';
 alter table phil_coach_guests add column if not exists approved_at timestamptz;
+
+-- ============================================================
+-- 2026-08-03 陪伴营付费与解锁（21 天睡眠陪伴营）
+--
+-- 第一版不接商户号：钱走微信/支付宝收款码，网站只管开权限。
+-- 用户点解锁 → 建一条 pending 单并拿到四位口令 → 付款时把口令写在备注里
+-- → 主理人对着收款记录搜口令 → 一键置为 paid。
+-- 将来接了支付，改的只是「谁把 status 写成 paid」，表结构不用动。
+create table if not exists program_orders (
+  id uuid default gen_random_uuid() primary key,
+  member_id text not null,                  -- nf_member cookie 里那个节点 id
+  program_id text not null,                 -- 对应 meditation category id，如 'sleep'
+  code text not null,                       -- 四位口令，付款备注里填这个
+  status text not null default 'pending',   -- pending | paid | rejected
+  amount_cents int not null default 6800,
+  note text default '',                     -- 主理人备注（驳回原因等）
+  created_at timestamptz default now(),
+  confirmed_at timestamptz,
+  confirmed_by text                         -- 哪个管理员点的确认
+);
+
+-- 口令只在「待确认」之间保证唯一；单子结掉之后可以循环使用，
+-- 所以是部分唯一索引，不是普通 unique。
+create unique index if not exists idx_program_orders_pending_code
+  on program_orders(code) where status = 'pending';
+
+create index if not exists idx_program_orders_member
+  on program_orders(member_id, program_id);
+
+create index if not exists idx_program_orders_created
+  on program_orders(created_at desc);
+
+-- 开 RLS 且不加任何 policy = 只有服务端（service role key）能读写。
+-- 这是购买凭证，绝不能让浏览器直接查——否则谁都能给自己插一条 paid。
+alter table program_orders enable row level security;

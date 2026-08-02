@@ -43,3 +43,6 @@ next-env.d.ts
 # 本地脚本产物
 /tmp
 /output
+
+# Claude Code 的临时工作区，不入库
+.claude/worktrees/

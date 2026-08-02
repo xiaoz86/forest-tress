@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "dev-default-content",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["NEXT_PUBLIC_SUPABASE_URL=", "npm", "run", "dev"],
+      "port": 3100,
+      "autoPort": true
     }
   ]
 }

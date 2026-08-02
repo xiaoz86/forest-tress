@@ -44,6 +44,11 @@ const TRACK_VISUALS: Record<TrackMood, { cover: string; dot: string; shade: stri
     dot: 'bg-coral-soft',
     shade: 'bg-[radial-gradient(circle_at_40%_24%,rgba(255,255,255,0.28),transparent_31%),linear-gradient(180deg,transparent_0%,rgba(60,28,18,0.2)_100%)]',
   },
+  sleep: {
+    cover: 'bg-[linear-gradient(160deg,#05080d_0%,#0f2430_48%,#27505f_78%,#8fa0a2_100%)]',
+    dot: 'bg-sky',
+    shade: 'bg-[radial-gradient(circle_at_62%_30%,rgba(242,234,214,0.3),transparent_26%),linear-gradient(180deg,transparent_0%,rgba(2,6,12,0.4)_100%)]',
+  },
 };
 
 export default function MeditationTrackCard({

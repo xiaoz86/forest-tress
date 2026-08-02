@@ -145,6 +145,7 @@ const CATEGORY_VISUALS: Record<TrackMood, string> = {
   healing: 'bg-[linear-gradient(135deg,#718b68_0%,#b9c9ad_54%,#e6dac4_100%)]',
   body: 'bg-[linear-gradient(135deg,#6f837d_0%,#aebdaf_52%,#ded8c7_100%)]',
   kindness: 'bg-[linear-gradient(135deg,#cf8f86_0%,#ead0bf_50%,#c5d7ca_100%)]',
+  sleep: 'bg-[linear-gradient(160deg,#05080d_0%,#0f2430_48%,#27505f_78%,#8fa0a2_100%)]',
 };
 
 function CategoryCard({ category }: { category: MeditationCategory }) {
