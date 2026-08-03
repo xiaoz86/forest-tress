@@ -249,7 +249,7 @@ function CategoryHero({ category, count }: { category: MeditationCategory; count
             {category.heroSubtitle || category.description}
           </p>
           <div className="mt-7 inline-flex rounded-full border border-white/18 bg-white/12 px-4 py-2 text-[12px] text-white/76 backdrop-blur-sm">
-            {count > 0 ? `${count} 段声音` : '声音整理中'}
+            {count > 0 ? `${count} 段声音` : '声音开放中'}
           </div>
         </div>
       </div>

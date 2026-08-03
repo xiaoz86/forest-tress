@@ -49,6 +49,7 @@ export default function MeditationProgram({
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [openNotes, setOpenNotes] = useState<string | null>(null);
   const [counts, setCounts] = useState(noteCounts);
+  const [failed, setFailed] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const bumpCount = useCallback((trackId: string, delta: number) => {
@@ -209,7 +210,7 @@ export default function MeditationProgram({
                           state={row.state}
                           done={row.done}
                           playing={playingId === row.track.id}
-                          onPlay={() => setPlayingId(row.track.id)}
+                          onPlay={() => { setFailed(false); setPlayingId(row.track.id); }}
                           noteCount={counts[row.track.id] || 0}
                           notesOpen={openNotes === row.track.id}
                           onToggleNotes={() =>
@@ -241,7 +242,14 @@ export default function MeditationProgram({
               <>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[13px] font-semibold text-white">{playing.title}</div>
-                  <div className="text-[11px] text-white/44">{playing.stage}</div>
+                  <div className="text-[11px] text-white/44">
+                    {/* 取不到音频时原生播放器一声不吭地卡住，得替它把话说出来 */}
+                    {failed ? (
+                      <span className="text-coral-soft">这段声音暂时没能打开，刷新页面再试一次</span>
+                    ) : (
+                      playing.stage
+                    )}
+                  </div>
                 </div>
                 <audio
                   ref={audioRef}
@@ -256,6 +264,8 @@ export default function MeditationProgram({
                   src={`/api/meditations/stream?track=${encodeURIComponent(playing.id)}`}
                   onTimeUpdate={onTimeUpdate}
                   onEnded={() => markDone(playing.id)}
+                  onError={() => setFailed(true)}
+                  onPlaying={() => setFailed(false)}
                   className="w-[min(52vw,420px)] max-md:w-[46vw]"
                 />
               </>
@@ -348,7 +358,7 @@ function TrackRow({
         <span className="shrink-0 text-[11px] tabular-nums text-white/36">{track.duration}</span>
       )}
       {isPlayable(state) && !track.hasAudio && (
-        <span className="shrink-0 text-[11px] text-white/32">整理中</span>
+        <span className="shrink-0 text-[11px] text-white/32">开放中</span>
       )}
       {isPlayable(state) && (
         <button

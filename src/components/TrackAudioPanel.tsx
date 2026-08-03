@@ -19,24 +19,36 @@ type Props = {
 export default function TrackAudioPanel({ trackId, hasAudio, loggedIn, noteCount }: Props) {
   const [open, setOpen] = useState(false);
   const [count, setCount] = useState(noteCount);
+  const [failed, setFailed] = useState(false);
 
   return (
     <div className="mt-4">
       {hasAudio ? (
-        <audio
-          controls
-          preload="none"
-          // 去掉原生控件里的「下载」，并挡掉右键菜单。
-          // 这只是抬高门槛：地址在网络面板里仍然看得见，
-          // 真正的边界是付费门 + 签名链接一小时过期。
-          controlsList="nodownload noplaybackrate"
-          onContextMenu={e => e.preventDefault()}
-          src={`/api/meditations/stream?track=${encodeURIComponent(trackId)}`}
-          className="w-full"
-        />
+        <>
+          <audio
+            controls
+            preload="none"
+            // 去掉原生控件里的「下载」，并挡掉右键菜单。
+            // 这只是抬高门槛：地址在网络面板里仍然看得见，
+            // 真正的边界是付费门 + 签名链接一小时过期。
+            controlsList="nodownload noplaybackrate"
+            onContextMenu={e => e.preventDefault()}
+            onError={() => setFailed(true)}
+            onPlaying={() => setFailed(false)}
+            src={`/api/meditations/stream?track=${encodeURIComponent(trackId)}`}
+            className="w-full"
+          />
+          {failed && (
+            // 取不到音频时原生播放器是彻底静默的——不说一句话就卡在那里。
+            // 常见原因是签名链接过期，刷新就好，所以直接告诉人怎么办。
+            <p className="mt-2 text-[12.5px] text-coral-soft">
+              这段声音暂时没能打开，刷新页面再试一次。
+            </p>
+          )}
+        </>
       ) : (
         <div className="rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-white/42">
-          音频正在整理中
+          这段声音正在开放中
         </div>
       )}
 

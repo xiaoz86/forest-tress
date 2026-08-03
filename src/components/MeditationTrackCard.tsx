@@ -76,7 +76,7 @@ export default function MeditationTrackCard({
         Mindfulness
       </div>
       <div className="absolute right-3 top-3 rounded-md bg-white/18 px-2.5 py-1 text-[11px] font-medium text-white/86 backdrop-blur-sm">
-        {track.hasAudio ? '可收听' : '整理中'}
+        {track.hasAudio ? '可收听' : '开放中'}
       </div>
       <div className="absolute inset-0 flex items-center justify-center text-white/88">
         <TrackGlyph mood={track.mood} />
