@@ -3,12 +3,12 @@ import { cookies } from 'next/headers';
 import Nav from '@/components/Nav';
 import MeditationTrackCard from '@/components/MeditationTrackCard';
 import MeditationProgram from '@/components/MeditationProgram';
+import MeditationGrove from '@/components/MeditationGrove';
 import { isAdminId } from '@/lib/admin';
 import { fetchNoteCounts } from '@/lib/meditationNotes';
 import {
   fetchMeditationContent,
   fetchPaidPrograms,
-  getMeditationCategory,
   getTracksForCategory,
   prepareClientContent,
   type MeditationCategory,
@@ -37,11 +37,47 @@ export default async function MeditationsPage({ searchParams }: Props) {
   const paidPrograms = await fetchPaidPrograms(memberId);
   const content = prepareClientContent(rawContent);
 
-  const firstCategoryId = content.categories[0]?.id || 'recommended';
-  const activeCategoryId = content.categories.some(item => item.id === category)
-    ? category!
-    : firstCategoryId;
-  const activeCategory = getMeditationCategory(content, activeCategoryId);
+  // 不带 category（或给了个不存在的）就展示声音林。
+  // 原来会默默落到第一个分类——进门就被塞进一条小径，看不到还有哪些路。
+  const activeCategory = category
+    ? content.categories.find(item => item.id === category)
+    : undefined;
+
+  if (!activeCategory) {
+    const trackCounts: Record<string, number> = {};
+    for (const t of content.tracks) {
+      trackCounts[t.categoryId] = (trackCounts[t.categoryId] || 0) + 1;
+    }
+    return (
+      <>
+        <Nav />
+        <main className="relative min-h-screen overflow-hidden bg-[#0f1411] px-8 pb-28 pt-32 text-white max-md:px-5 max-md:pt-28">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(160deg,rgba(255,255,255,0.055),transparent_44%,rgba(232,201,160,0.05))]" />
+          <div className="relative">
+            <div className="mx-auto mb-12 flex max-w-[1080px] items-center justify-between gap-4">
+              <Link
+                href="/"
+                className="text-sm text-white/42 underline-offset-4 transition-colors hover:text-white"
+              >
+                ← 回到首页
+              </Link>
+              {isAdmin && (
+                <Link
+                  href="/meditations/admin"
+                  className="rounded-full border border-white/14 bg-white/[0.055] px-4 py-2 text-sm font-medium text-white/62 no-underline transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  管理冥想
+                </Link>
+              )}
+            </div>
+            <MeditationGrove content={content} counts={trackCounts} />
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  const activeCategoryId = activeCategory.id;
   const tracks = getTracksForCategory(content, activeCategoryId);
   const isProgram = activeCategory.kind === 'program';
   // 一次把当前分类所有段落的感悟条数取回来，省掉一段一次的往返
@@ -56,10 +92,10 @@ export default async function MeditationsPage({ searchParams }: Props) {
         <div className="relative mx-auto max-w-[1120px]">
           <div className="mb-12 flex items-center justify-between gap-4">
             <Link
-              href="/#meditations"
+              href="/meditations"
               className="text-sm text-white/42 underline-offset-4 transition-colors hover:text-white"
             >
-              回到首页
+              ← 所有声音
             </Link>
             {isAdmin && (
               <Link
@@ -73,44 +109,30 @@ export default async function MeditationsPage({ searchParams }: Props) {
 
           {/* 陪伴营自带头部（封面 + 金句 + 导师），不再套这一层通用大标题 */}
           {!isProgram && (
-          <section className="grid grid-cols-[0.72fr_1.28fr] gap-12 items-end max-lg:grid-cols-1 max-lg:gap-10">
-            <div className="max-w-[560px]">
-              <div className="mb-8 h-px w-20 bg-coral-soft/70" />
-              <div className="mb-5 text-[11px] font-medium tracking-[3px] text-coral-soft uppercase">
-                {content.eyebrow}
-              </div>
-              <h1
-                className="whitespace-pre-line text-[clamp(2.35rem,5.2vw,4rem)] font-semibold leading-[1.18] tracking-normal"
-                style={{ fontFamily: 'var(--font-display)' }}
-              >
-                {content.title}
-              </h1>
-              <p className="mt-7 max-w-[500px] text-[15px] leading-[2] text-white/52">
-                {content.description}
-              </p>
-              <div className="mt-9 flex items-center gap-4 text-[12px] text-white/36">
-                <span className="h-px w-10 bg-white/20" />
-                <span>{content.note}</span>
-              </div>
-            </div>
-
             <CategoryHero category={activeCategory} count={tracks.length} />
-          </section>
           )}
 
           <section className="mt-14 grid grid-cols-[220px_1fr] gap-10 max-lg:grid-cols-1 max-lg:mt-8">
+            {/*
+              换一条小径。已经有声音林当列表页了，这里就不必再做成一排
+              抢眼的筛选按钮——退成安静的一列文字，当前那条用左侧一道线标出。
+            */}
             <aside className="max-lg:overflow-x-auto">
-              <div className="flex flex-col gap-3 max-lg:flex-row max-lg:pb-2">
+              <p className="mb-4 text-[11px] font-bold uppercase tracking-[0.2em] text-white/28 max-lg:hidden">
+                Other Paths
+              </p>
+              <div className="flex flex-col gap-0.5 max-lg:flex-row max-lg:gap-2 max-lg:pb-2">
                 {content.categories.map(categoryItem => {
                   const active = categoryItem.id === activeCategoryId;
                   return (
                     <Link
                       key={categoryItem.id}
                       href={`/meditations?category=${encodeURIComponent(categoryItem.id)}`}
-                      className={`min-w-fit rounded-lg border px-5 py-4 text-[14px] font-medium no-underline transition-colors ${
+                      aria-current={active ? 'page' : undefined}
+                      className={`min-w-fit border-l-2 py-2.5 pl-4 text-[14px] no-underline transition-colors max-lg:rounded-full max-lg:border-l-0 max-lg:border max-lg:px-4 max-lg:py-2 ${
                         active
-                          ? 'border-white bg-white text-[#111512]'
-                          : 'border-white/10 bg-white/[0.045] text-white/56 hover:bg-white/10 hover:text-white'
+                          ? 'border-coral-soft font-medium text-white max-lg:border-white max-lg:bg-white max-lg:text-[#111512]'
+                          : 'border-white/10 text-white/48 hover:border-white/35 hover:text-white max-lg:border-white/12 max-lg:bg-white/[0.045]'
                       }`}
                     >
                       {categoryItem.label}
@@ -132,16 +154,20 @@ export default async function MeditationsPage({ searchParams }: Props) {
             <div>
             <CategoryNotes category={activeCategory} />
 
-            <div className="mb-8 flex items-end justify-between gap-6 max-md:block">
-              <div>
-                <div className="mb-3 text-[11px] font-medium tracking-[0.2em] text-white/32 uppercase">
-                  {content.eyebrow} · {activeCategory.label}
-                </div>
-                <h2 className="text-2xl font-semibold text-white">具体的声音</h2>
-              </div>
-              <p className="max-w-[430px] text-sm leading-relaxed text-white/42 max-md:mt-4">
-                {activeCategory.description || '选择一段声音，给自己一小块不被催促的时间。'}
+            {/*
+              这里原来还并排放一段 description。页首现在已经用大字介绍过这条小径，
+              再摆一遍就是重复；而且那字段是后台自由填的，长起来会把这一行拽得很难看。
+            */}
+            <div className="mb-8">
+              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-white/28">
+                Listen
               </p>
+              <h2
+                className="text-[1.5rem] font-medium tracking-[-0.02em] text-white"
+                style={{ fontFamily: 'var(--font-serif)' }}
+              >
+                具体的声音
+              </h2>
             </div>
 
             {tracks.length > 0 ? (
@@ -216,43 +242,57 @@ function CategoryNotes({ category }: { category: MeditationCategory }) {
   );
 }
 
-const CATEGORY_VISUALS: Record<TrackMood, string> = {
-  forest: 'bg-[linear-gradient(135deg,#1d352d_0%,#668579_52%,#d3c5ac_100%)]',
-  daily: 'bg-[linear-gradient(135deg,#6aa8c2_0%,#b6d2dd_54%,#eadfca_100%)]',
-  emotion: 'bg-[linear-gradient(135deg,#738faa_0%,#b7c7d3_54%,#e5d6d2_100%)]',
-  care: 'bg-[linear-gradient(135deg,#dcaf96_0%,#ead8c8_50%,#c7d8ce_100%)]',
-  healing: 'bg-[linear-gradient(135deg,#6f8966_0%,#bac8ad_52%,#e7dac4_100%)]',
-  body: 'bg-[linear-gradient(135deg,#687d77_0%,#aebdaf_52%,#ded8c7_100%)]',
-  kindness: 'bg-[linear-gradient(135deg,#cf9087_0%,#ead0bf_50%,#c7d8cb_100%)]',
-  // 夜空 → 海面 → 远处的一点光，取自睡眠专题那张弦月照片
-  sleep: 'bg-[linear-gradient(160deg,#05080d_0%,#0f2430_48%,#27505f_78%,#8fa0a2_100%)]',
+// 每条小径在页面顶端的一层氛围光。不再是一块占满首屏的实心渐变卡片——
+// 那东西占了最大面积却只承载三行小字。改成从右上角漫下来的一片光，
+// 让位置留给标题本身。
+const MOOD_AURA: Record<TrackMood, string> = {
+  forest: 'rgba(104,133,121,0.30)',
+  daily: 'rgba(106,168,194,0.26)',
+  emotion: 'rgba(115,143,170,0.26)',
+  care: 'rgba(220,175,150,0.24)',
+  healing: 'rgba(111,137,102,0.28)',
+  body: 'rgba(104,125,119,0.26)',
+  kindness: 'rgba(207,144,135,0.24)',
+  sleep: 'rgba(39,80,95,0.34)',
+};
+
+// 汉字符号沿用首页四条小径那套写法
+const CATEGORY_GLYPH: Record<string, string> = {
+  'walk-in': '入', 'mindful-life': '常', 'emotion': '绪',
+  'self-care': '柔', 'inner-freedom': '松', 'sleep': '眠',
 };
 
 function CategoryHero({ category, count }: { category: MeditationCategory; count: number }) {
-  const mood = category.mood || 'forest';
+  const aura = MOOD_AURA[category.mood || 'forest'];
   return (
-    <div className={`relative min-h-[280px] overflow-hidden rounded-lg border border-white/12 p-8 shadow-[0_24px_80px_rgba(0,0,0,0.18)] ${CATEGORY_VISUALS[mood]} max-md:p-6`}>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_26%_18%,rgba(255,255,255,0.25),transparent_34%),linear-gradient(180deg,transparent_0%,rgba(5,17,11,0.46)_100%)]" />
-      <div className="relative flex h-full min-h-[216px] flex-col justify-between">
-        <div className="text-[10px] font-medium uppercase tracking-[0.34em] text-white/62">
-          Mindfulness
+    <section className="relative">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-40 right-[-12%] h-[420px] w-[620px] rounded-full blur-[110px] max-md:hidden"
+        style={{ background: `radial-gradient(circle, ${aura}, transparent 70%)` }}
+      />
+      <div className="relative max-w-[720px]">
+        <div
+          className="text-[1.7rem] text-white/70"
+          style={{ fontFamily: 'var(--font-serif)' }}
+          aria-hidden="true"
+        >
+          {CATEGORY_GLYPH[category.id] || '声'}
         </div>
-        <div>
-          <div className="mb-5 h-px w-12 bg-white/48" />
-          <h2
-            className="text-[clamp(1.9rem,4vw,3rem)] font-semibold leading-[1.18] text-white"
-            style={{ fontFamily: 'var(--font-display)' }}
-          >
-            {category.heroTitle || category.label}
-          </h2>
-          <p className="mt-4 max-w-[520px] text-[15px] leading-[1.9] text-white/74">
-            {category.heroSubtitle || category.description}
-          </p>
-          <div className="mt-7 inline-flex rounded-full border border-white/18 bg-white/12 px-4 py-2 text-[12px] text-white/76 backdrop-blur-sm">
-            {count > 0 ? `${count} 段声音` : '声音开放中'}
-          </div>
+        <h1
+          className="mt-5 text-[clamp(2rem,4.4vw,3.1rem)] font-medium leading-[1.2] tracking-[-0.03em] text-white"
+          style={{ fontFamily: 'var(--font-serif)' }}
+        >
+          {category.heroTitle || category.label}
+        </h1>
+        <p className="mt-6 max-w-[560px] text-[15px] leading-[2] text-white/58">
+          {category.heroSubtitle || category.description}
+        </p>
+        <div className="mt-8 flex items-center gap-4 text-[12.5px] text-white/38">
+          <span className="h-px w-10 bg-white/20" />
+          <span>{count > 0 ? `${count} 段声音` : '声音开放中'}</span>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

@@ -72,8 +72,12 @@ export default function MeditationTrackCard({
   const cover = (
     <>
       <div className={`absolute inset-0 ${visual.shade}`} />
-      <div className="absolute left-4 top-4 text-[10px] font-medium uppercase tracking-[0.24em] text-white/58">
-        Mindfulness
+      {/*
+        原来这里写死 Mindfulness。等手碟、雨声这类声音进来，
+        卡片上顶着 MINDFULNESS 就成了假标签——所以改成跟着阶段走。
+      */}
+      <div className="absolute left-4 top-4 max-w-[60%] truncate text-[10px] font-medium uppercase tracking-[0.24em] text-white/58">
+        {track.stage || '声音'}
       </div>
       <div className="absolute right-3 top-3 rounded-md bg-white/18 px-2.5 py-1 text-[11px] font-medium text-white/86 backdrop-blur-sm">
         {track.hasAudio ? '可收听' : '开放中'}

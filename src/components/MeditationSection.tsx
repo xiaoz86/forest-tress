@@ -83,7 +83,7 @@ export default function MeditationSection({ content, isAdmin = false }: Props) {
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,18,12,0.08)_0%,rgba(6,18,12,0.66)_100%)]" />
               <div className="relative flex h-full flex-col justify-between">
                 <div className="text-[10px] font-medium uppercase tracking-[0.34em] text-white/58">
-                  Mindfulness
+                  {content.eyebrow}
                 </div>
                 <div>
                   <div className="mb-5 h-px w-12 bg-coral-soft/65" />
