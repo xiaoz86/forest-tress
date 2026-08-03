@@ -388,6 +388,7 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
                 <audio
                   controls
                   preload="none"
+                  controlsList="nodownload"
                   src={`/api/meditations/stream?track=${encodeURIComponent(track.id)}`}
                   className="mt-4 w-full"
                 />

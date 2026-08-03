@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import TrackNotes from '@/components/TrackNotes';
 import {
   buildProgramView,
   isPlayable,
@@ -15,6 +16,9 @@ type Props = {
   category: MeditationCategory;
   /** 有没有买。由服务端按开通记录算好传进来，前端不自己判断。 */
   paid: boolean;
+  /** 各段的感悟条数，服务端一次算好——否则 21 段要各发一次请求 */
+  noteCounts: Record<string, number>;
+  loggedIn: boolean;
 };
 
 // 听到八成就算走完这一段。要求听满 100% 的话，
@@ -36,12 +40,20 @@ function readListened(categoryId: string): string[] {
   }
 }
 
-export default function MeditationProgram({ content, category, paid }: Props) {
+export default function MeditationProgram({
+  content, category, paid, noteCounts, loggedIn,
+}: Props) {
   const [listened, setListened] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
   const [openPhase, setOpenPhase] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [openNotes, setOpenNotes] = useState<string | null>(null);
+  const [counts, setCounts] = useState(noteCounts);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const bumpCount = useCallback((trackId: string, delta: number) => {
+    setCounts(prev => ({ ...prev, [trackId]: Math.max(0, (prev[trackId] || 0) + delta) }));
+  }, []);
 
   // 进度只在挂载后读：服务端没有 localStorage，首帧必须和服务端一致（空数组），
   // 否则 hydration 会不匹配。同 Nav.tsx 读 cookie 的处理。
@@ -198,7 +210,19 @@ export default function MeditationProgram({ content, category, paid }: Props) {
                           done={row.done}
                           playing={playingId === row.track.id}
                           onPlay={() => setPlayingId(row.track.id)}
+                          noteCount={counts[row.track.id] || 0}
+                          notesOpen={openNotes === row.track.id}
+                          onToggleNotes={() =>
+                            setOpenNotes(openNotes === row.track.id ? null : row.track.id)
+                          }
                         />
+                        {openNotes === row.track.id && (
+                          <TrackNotes
+                            trackId={row.track.id}
+                            loggedIn={loggedIn}
+                            onCountChange={bumpCount}
+                          />
+                        )}
                       </div>
                     );
                   })}
@@ -224,6 +248,11 @@ export default function MeditationProgram({ content, category, paid }: Props) {
                   controls
                   autoPlay
                   preload="none"
+                  // 去掉原生控件里的「下载」，并挡掉右键菜单。
+                  // 注意这只是抬高门槛：地址在网络面板里仍然看得见，
+                  // 真正的边界是付费门 + 签名链接一小时过期。
+                  controlsList="nodownload noplaybackrate"
+                  onContextMenu={e => e.preventDefault()}
                   src={`/api/meditations/stream?track=${encodeURIComponent(playing.id)}`}
                   onTimeUpdate={onTimeUpdate}
                   onEnded={() => markDone(playing.id)}
@@ -275,13 +304,16 @@ function Cover({ category }: { category: MeditationCategory }) {
 }
 
 function TrackRow({
-  track, state, done, playing, onPlay,
+  track, state, done, playing, onPlay, noteCount, notesOpen, onToggleNotes,
 }: {
   track: MeditationTrack;
   state: ProgramTrackState;
   done: boolean;
   playing: boolean;
   onPlay: () => void;
+  noteCount: number;
+  notesOpen: boolean;
+  onToggleNotes: () => void;
 }) {
   const playable = isPlayable(state) && Boolean(track.hasAudio);
   const label = track.seq ? String(track.seq).padStart(2, '0') : '';
@@ -317,6 +349,21 @@ function TrackRow({
       )}
       {isPlayable(state) && !track.hasAudio && (
         <span className="shrink-0 text-[11px] text-white/32">整理中</span>
+      )}
+      {isPlayable(state) && (
+        <button
+          type="button"
+          onClick={onToggleNotes}
+          aria-expanded={notesOpen}
+          className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] tabular-nums transition-colors ${
+            notesOpen ? 'bg-white/12 text-white' : 'text-white/38 hover:bg-white/[0.06] hover:text-white/70'
+          }`}
+        >
+          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-3 w-3" aria-hidden="true">
+            <path d="M1.8 2.4h8.4v5.4H5.4L2.8 9.9V7.8H1.8z" strokeLinejoin="round" />
+          </svg>
+          {noteCount > 0 ? noteCount : '感悟'}
+        </button>
       )}
     </div>
   );

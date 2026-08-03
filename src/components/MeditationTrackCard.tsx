@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import TrackAudioPanel from '@/components/TrackAudioPanel';
 import type { MeditationTrack, TrackMood } from '@/lib/meditations';
 
 type Props = {
@@ -6,6 +7,9 @@ type Props = {
   href?: string;
   showAudio?: boolean;
   showDescription?: boolean;
+  /** 只在 showAudio 时用得上：决定能不能写感悟、已有几条 */
+  loggedIn?: boolean;
+  noteCount?: number;
 };
 
 const TRACK_VISUALS: Record<TrackMood, { cover: string; dot: string; shade: string }> = {
@@ -56,6 +60,8 @@ export default function MeditationTrackCard({
   href,
   showAudio = false,
   showDescription = true,
+  loggedIn = false,
+  noteCount = 0,
 }: Props) {
   const visual = TRACK_VISUALS[track.mood] || TRACK_VISUALS.forest;
   const coverClass = [
@@ -104,18 +110,12 @@ export default function MeditationTrackCard({
       </div>
 
       {showAudio && (
-        track.hasAudio ? (
-          <audio
-            controls
-            preload="none"
-            src={`/api/meditations/stream?track=${encodeURIComponent(track.id)}`}
-            className="mt-4 w-full"
-          />
-        ) : (
-          <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3 text-sm text-white/42">
-            音频正在整理中
-          </div>
-        )
+        <TrackAudioPanel
+          trackId={track.id}
+          hasAudio={Boolean(track.hasAudio)}
+          loggedIn={loggedIn}
+          noteCount={noteCount}
+        />
       )}
     </article>
   );

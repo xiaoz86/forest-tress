@@ -145,12 +145,17 @@ values (
 )
 on conflict (id) do nothing;
 
--- 冥想音频公开 bucket；应用也会在管理员首次上传时尝试自动创建
+-- 冥想音频 bucket。必须是私有的：陪伴营的音频要付费才能听，
+-- 公开桶给出的是永久链接，转发一次就漏了。取用一律走
+-- /api/meditations/stream —— 那里校验资格后现发短时效签名链接。
+--
+-- 注意下面是 on conflict do update：这段会覆盖已有设置。
+-- 把 public 改回 true 等于当场废掉整个付费墙。
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'meditations',
   'meditations',
-  true,
+  false,
   83886080,
   array[
     'audio/aac',
@@ -361,3 +366,31 @@ create index if not exists idx_program_orders_created
 -- 开 RLS 且不加任何 policy = 只有服务端（service role key）能读写。
 -- 这是购买凭证，绝不能让浏览器直接查——否则谁都能给自己插一条 paid。
 alter table program_orders enable row level security;
+
+-- ============================================================
+-- 2026-08-03 听后感悟（每段音频下的公开留言）
+--
+-- 这批内容是失眠、焦虑、自我接纳——写感悟等于在公开场合谈自己的状态。
+-- 所以匿名是一等公民而不是补丁：anonymous=true 时读接口永不下发
+-- author_name，但库里仍然留着，主理人才能在需要时追溯和下架。
+create table if not exists meditation_notes (
+  id uuid default gen_random_uuid() primary key,
+  track_id text not null,
+  program_id text not null default '',      -- 冗余，方便按专题聚合
+  member_id text not null,                  -- node_cards.id
+  author_name text not null default '',     -- 写下时的快照：改名不改写历史
+  anonymous boolean not null default false,
+  body text not null,
+  status text not null default 'visible',   -- visible | hidden（主理人下架）
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_meditation_notes_track
+  on meditation_notes(track_id, created_at desc);
+
+create index if not exists idx_meditation_notes_member
+  on meditation_notes(member_id, created_at desc);
+
+-- 和 program_orders 一样：开 RLS 不加 policy = 只有服务端能读写。
+-- 浏览器直连的话，匿名那层就等于没有——谁都能查出 author_name。
+alter table meditation_notes enable row level security;

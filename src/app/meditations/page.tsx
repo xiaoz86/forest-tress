@@ -4,6 +4,7 @@ import Nav from '@/components/Nav';
 import MeditationTrackCard from '@/components/MeditationTrackCard';
 import MeditationProgram from '@/components/MeditationProgram';
 import { isAdminId } from '@/lib/admin';
+import { fetchNoteCounts } from '@/lib/meditationNotes';
 import {
   fetchMeditationContent,
   fetchPaidPrograms,
@@ -43,6 +44,8 @@ export default async function MeditationsPage({ searchParams }: Props) {
   const activeCategory = getMeditationCategory(content, activeCategoryId);
   const tracks = getTracksForCategory(content, activeCategoryId);
   const isProgram = activeCategory.kind === 'program';
+  // 一次把当前分类所有段落的感悟条数取回来，省掉一段一次的往返
+  const noteCounts = await fetchNoteCounts(tracks.map(t => t.id));
 
   return (
     <>
@@ -122,6 +125,8 @@ export default async function MeditationsPage({ searchParams }: Props) {
                 content={content}
                 category={activeCategory}
                 paid={paidPrograms.has(activeCategory.id)}
+                noteCounts={noteCounts}
+                loggedIn={Boolean(memberId)}
               />
             ) : (
             <div>
@@ -146,6 +151,8 @@ export default async function MeditationsPage({ searchParams }: Props) {
                     key={track.id}
                     track={track}
                     showAudio
+                    loggedIn={Boolean(memberId)}
+                    noteCount={noteCounts[track.id] || 0}
                   />
                 ))}
               </div>
