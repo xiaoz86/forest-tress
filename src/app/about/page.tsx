@@ -286,7 +286,7 @@ export default function AboutPage() {
       </section>
 
       {/* === 织一张网 === */}
-      <section className="py-24 px-10 bg-gradient-to-b from-warm-cream to-white text-center max-md:py-16 max-md:px-5">
+      <section className="pt-24 pb-10 px-10 bg-gradient-to-b from-warm-cream to-white text-center max-md:pt-16 max-md:pb-10 max-md:px-5">
         <div className="text-center max-w-[720px] mx-auto mb-14">
           <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">织一张网</div>
           <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35]">让光继续传递</h2>
@@ -308,7 +308,7 @@ export default function AboutPage() {
       </section>
 
       {/* === 社群联结 === */}
-      <section id="community" className="py-24 px-10 bg-white max-md:py-16 max-md:px-5">
+      <section id="community" className="pt-12 pb-24 px-10 bg-white max-md:pt-10 max-md:pb-16 max-md:px-5">
         <div className="text-center max-w-[780px] mx-auto mb-14">
           <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">社群联结</div>
           <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-8">
@@ -339,29 +339,31 @@ export default function AboutPage() {
 
         <div className="grid grid-cols-2 gap-7 max-w-[820px] mx-auto max-md:grid-cols-1">
           <figure className="rounded-xl border border-moss/10 bg-warm-cream/55 p-7 text-center max-md:p-5">
-            <Image
-              src="/community/founder-xiaoz-wechat.png"
-              alt="用于添加小 Z 为好友的微信二维码"
-              width={888}
-              height={1131}
-              sizes="(max-width: 768px) calc(100vw - 80px), 340px"
-              className="mx-auto h-auto w-full max-w-[340px] rounded-[18px]"
-              unoptimized
-            />
-            <p className="mt-4 text-[13px] text-text-secondary">微信扫码，添加为好友</p>
+            <div className="relative mx-auto aspect-[888/970] w-full max-w-[340px] overflow-hidden rounded-[18px]">
+              <Image
+                src="/community/founder-xiaoz-wechat.png"
+                alt="用于添加小 Z 为好友的微信二维码"
+                width={888}
+                height={1131}
+                sizes="(max-width: 768px) calc(100vw - 80px), 340px"
+                className="absolute inset-x-0 top-0 h-auto w-full"
+                unoptimized
+              />
+            </div>
           </figure>
 
           <figure className="rounded-xl border border-moss/10 bg-warm-cream/55 p-7 text-center max-md:p-5">
-            <Image
-              src="/community/founder-wendy-wechat.jpg"
-              alt="用于添加 Wendy 为好友的微信二维码"
-              width={888}
-              height={1134}
-              sizes="(max-width: 768px) calc(100vw - 80px), 340px"
-              className="mx-auto h-auto w-full max-w-[340px] rounded-[18px]"
-              unoptimized
-            />
-            <p className="mt-4 text-[13px] text-text-secondary">微信扫码，添加为好友</p>
+            <div className="relative mx-auto aspect-[888/970] w-full max-w-[340px] overflow-hidden rounded-[18px]">
+              <Image
+                src="/community/founder-wendy-wechat.jpg"
+                alt="用于添加 Wendy 为好友的微信二维码"
+                width={888}
+                height={1134}
+                sizes="(max-width: 768px) calc(100vw - 80px), 340px"
+                className="absolute inset-x-0 top-0 h-auto w-full"
+                unoptimized
+              />
+            </div>
           </figure>
         </div>
       </section>

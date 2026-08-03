@@ -29,9 +29,9 @@ export default function LoginForm() {
   if (status === 'sent') {
     return (
       <div className="rounded-xl border border-leaf/30 bg-leaf/8 p-4 text-[13px] leading-relaxed text-forest-deep">
-        登录链接已发送（如果该邮箱属于已注册的成员）。
+        登录请求已处理。如果该邮箱属于已注册成员，请留意收件箱和垃圾邮件夹。
         <br />
-        请到邮箱（含垃圾邮件夹）查收，点击链接即可登录。
+        若暂未收到，请等待一分钟后再试。
       </div>
     );
   }

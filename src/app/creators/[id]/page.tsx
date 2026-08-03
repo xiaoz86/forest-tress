@@ -11,7 +11,6 @@ import WorksEditor from '@/components/WorksEditor';
 import AIRecommendations from '@/components/AIRecommendations';
 import ProfileEditor from '@/components/ProfileEditor';
 import PhilMemoriesManager from '@/components/PhilMemoriesManager';
-import CommunityInviteCard from '@/components/CommunityInviteCard';
 import { buildRelationGraph } from '@/lib/network';
 import { isAdminId } from '@/lib/admin';
 import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
@@ -257,12 +256,6 @@ export default async function CreatorDetail({ params }: Props) {
           >
             成为森林的一棵树
           </Link>
-        </section>
-      )}
-
-      {isOwner && (
-        <section className="bg-[#f3f7ef] px-6 py-16 border-t border-black/[0.04] max-md:px-4 max-md:py-10">
-          <CommunityInviteCard />
         </section>
       )}
 

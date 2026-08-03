@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { matchNodesAI, type MatchedNode } from '@/lib/match';
 import { generateKeywordsAI } from '@/lib/keywords';
 import { notifyNewNode, notifyWelcome, getSiteOrigin } from '@/lib/notify';
@@ -77,10 +77,13 @@ export async function POST(request: NextRequest) {
     {
       const { data: existing } = await supabase
         .from('node_cards')
-        .select('id')
+        .select('id, email')
         .ilike('email', email)
-        .limit(1);
-      if (existing && existing.length > 0) {
+        .limit(20);
+      const exactMatch = existing?.some(
+        row => typeof row.email === 'string' && row.email.trim().toLowerCase() === email,
+      );
+      if (exactMatch) {
         return NextResponse.json({ error: 'email-taken' }, { status: 409 });
       }
     }
@@ -142,7 +145,38 @@ export async function POST(request: NextRequest) {
 
     const newNode = (data?.[0] || null) as NodeCard | null;
     let matches: MatchedNode[] = [];
+    let welcomeEmailSent = false;
     if (newNode) {
+      const signed = signLoginToken(newNode.id || '');
+      if (!signed.ok) {
+        console.error('[api/join] AUTH_SECRET not set, welcome link not sent');
+      }
+
+      // 主理人通知不阻塞注册响应，但由 Next.js 保证函数生命周期持续到发送结束。
+      after(async () => {
+        const delivery = await notifyNewNode(newNode);
+        if (!delivery.ok) {
+          console.error('[api/join] host notification not accepted', {
+            reason: delivery.reason,
+            status: delivery.status,
+          });
+        }
+      });
+
+      if (signed.ok) {
+        const welcomeEmailResult = await notifyWelcome(
+          newNode,
+          `${getSiteOrigin()}/api/login/verify?token=${encodeURIComponent(signed.token)}`,
+        );
+        welcomeEmailSent = welcomeEmailResult.ok;
+        if (!welcomeEmailResult.ok) {
+          console.error('[api/join] welcome email not accepted', {
+            reason: welcomeEmailResult.reason,
+            status: welcomeEmailResult.status,
+          });
+        }
+      }
+
       const { data: allNodes } = await supabase
         .from('node_cards')
         .select('*');
@@ -181,22 +215,6 @@ export async function POST(request: NextRequest) {
           console.error('[api/join] recommendations save failed', recErr.message);
         }
       }
-
-      // 通知主理人（fire-and-forget）
-      notifyNewNode(newNode).catch(err => {
-        console.error('[api/join] notify host failed', err);
-      });
-
-      // 给本人发欢迎邮件 + 登录链接（fire-and-forget）
-      const signed = signLoginToken(newNode.id || '');
-      if (signed.ok) {
-        const magicLink = `${getSiteOrigin()}/api/login/verify?token=${encodeURIComponent(signed.token)}`;
-        notifyWelcome(newNode, magicLink).catch(err => {
-          console.error('[api/join] welcome failed', err);
-        });
-      } else {
-        console.warn('[api/join] AUTH_SECRET not set, skipping welcome magic link');
-      }
     }
 
     const res = NextResponse.json({
@@ -204,6 +222,7 @@ export async function POST(request: NextRequest) {
       data,
       matches,
       memberId: newNode?.id,
+      welcomeEmailSent,
     });
 
     if (newNode?.id) {

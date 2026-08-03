@@ -13,6 +13,134 @@ function getRecipients(): string[] {
     .filter(Boolean);
 }
 
+export type EmailSendResult =
+  | { ok: true; id: string | null }
+  | {
+      ok: false;
+      reason: 'not-configured' | 'skipped' | 'provider-error' | 'network-error';
+      status?: number;
+    };
+
+type CriticalEmailKind = 'new-node' | 'welcome' | 'login-link';
+
+type ResendMessage = {
+  from: string;
+  to: string[];
+  subject: string;
+  html: string;
+  text: string;
+};
+
+const EMAIL_TIMEOUT_MS = 8_000;
+const EMAIL_MAX_ATTEMPTS = 2;
+
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function retryDelayMs(response: Response | null, attempt: number): number {
+  const resetAfter = Number(
+    response?.headers.get('ratelimit-reset') || response?.headers.get('retry-after'),
+  );
+  if (Number.isFinite(resetAfter) && resetAfter > 0) {
+    return Math.min(resetAfter * 1_000, 2_000);
+  }
+  return 350 * (attempt + 1);
+}
+
+/**
+ * 发送关键事务邮件。等待 Resend 接受请求，并对网络错误、429 和 5xx
+ * 做一次带幂等键的安全重试，避免函数返回后请求被中断或重复发信。
+ */
+async function sendCriticalEmail(
+  kind: CriticalEmailKind,
+  message: ResendMessage,
+  idempotencyKey: string,
+): Promise<EmailSendResult> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error('[notify] critical email skipped: RESEND_API_KEY not set', { kind });
+    return { ok: false, reason: 'not-configured' };
+  }
+  if (!message.from) {
+    console.error('[notify] critical email skipped: NOTIFY_FROM not set', { kind });
+    return { ok: false, reason: 'not-configured' };
+  }
+
+  for (let attempt = 0; attempt < EMAIL_MAX_ATTEMPTS; attempt += 1) {
+    let response: Response | null = null;
+    try {
+      response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify(message),
+        signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
+      });
+
+      const body = (await response.json().catch(() => null)) as
+        | { id?: unknown; name?: unknown; type?: unknown; message?: unknown }
+        | null;
+
+      if (response.ok) {
+        const id = typeof body?.id === 'string' ? body.id : null;
+        console.log('[notify] Resend accepted critical email', { kind, id });
+        return { ok: true, id };
+      }
+
+      const errorType = String(body?.name || body?.type || 'unknown');
+      const errorMessage = typeof body?.message === 'string'
+        ? body.message.slice(0, 300)
+        : undefined;
+      const retryable =
+        (response.status === 429 && errorType === 'rate_limit_exceeded') ||
+        response.status >= 500 ||
+        (response.status === 409 && errorType === 'concurrent_idempotent_requests');
+
+      if (retryable && attempt + 1 < EMAIL_MAX_ATTEMPTS) {
+        console.warn('[notify] transient Resend error, retrying', {
+          kind,
+          status: response.status,
+          errorType,
+          errorMessage,
+          attempt: attempt + 1,
+        });
+        await wait(retryDelayMs(response, attempt));
+        continue;
+      }
+
+      console.error('[notify] Resend rejected critical email', {
+        kind,
+        status: response.status,
+        errorType,
+        errorMessage,
+      });
+      return { ok: false, reason: 'provider-error', status: response.status };
+    } catch (err) {
+      if (attempt + 1 < EMAIL_MAX_ATTEMPTS) {
+        console.warn('[notify] email request failed, retrying', {
+          kind,
+          error: err instanceof Error ? err.name : 'unknown',
+          attempt: attempt + 1,
+        });
+        await wait(retryDelayMs(response, attempt));
+        continue;
+      }
+
+      console.error('[notify] critical email request failed', {
+        kind,
+        error: err instanceof Error ? err.name : 'unknown',
+      });
+      return { ok: false, reason: 'network-error' };
+    }
+  }
+
+  return { ok: false, reason: 'network-error' };
+}
+
 /** 站点根 URL，用于在邮件里生成绝对链接。 */
 export function getSiteOrigin(): string {
   const env = process.env.SITE_ORIGIN?.trim() || process.env.NEXT_PUBLIC_SITE_ORIGIN?.trim();
@@ -94,50 +222,30 @@ function buildText(node: NodeCard): string {
 
 /**
  * 通知主理人有新节点加入。
- * 未配置 RESEND_API_KEY 时静默跳过（方便本地开发和渐进上线）。
- * 失败时只 console.error，不抛错，确保不影响主流程。
+ * 返回 Resend 是否接受请求，让调用方可以等待并记录结果。
  */
-export async function notifyNewNode(node: NodeCard): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.log('[notify] RESEND_API_KEY not set, skipping email notification');
-    return;
-  }
-
+export async function notifyNewNode(node: NodeCard): Promise<EmailSendResult> {
   const recipients = getRecipients();
   if (recipients.length === 0) {
-    console.log('[notify] no recipients configured, skipping');
-    return;
+    console.error('[notify] no recipients configured for new-node email');
+    return { ok: false, reason: 'skipped' };
   }
 
-  const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
+  const from = process.env.NOTIFY_FROM?.trim() || '';
   const subject = `🌱 新成员加入 · ${node.name || '无名之树'}${node.city ? ` (${node.city})` : ''}`;
+  const eventId = node.id || crypto.randomUUID();
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from,
-        to: recipients,
-        subject,
-        html: buildHtml(node),
-        text: buildText(node),
-      }),
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      console.error('[notify] Resend API error', res.status, body);
-    } else {
-      console.log('[notify] email sent to', recipients.join(','));
-    }
-  } catch (err) {
-    console.error('[notify] send failed', err);
-  }
+  return sendCriticalEmail(
+    'new-node',
+    {
+      from,
+      to: recipients,
+      subject,
+      html: buildHtml(node),
+      text: buildText(node),
+    },
+    `new-node/${eventId}`,
+  );
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -188,50 +296,34 @@ function buildWelcomeText(node: NodeCard, profileUrl: string, magicLink: string)
 
 /**
  * 给新成员本人发欢迎邮件 + 登录链接（magic link）。
- * 未配置 RESEND_API_KEY 或 email 为空时静默跳过。
+ * 返回 Resend 是否接受请求。
  */
 export async function notifyWelcome(
   node: NodeCard,
   magicLink: string,
-): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.log('[notify] RESEND_API_KEY not set, skipping welcome email');
-    return;
-  }
+): Promise<EmailSendResult> {
   const to = (node.email || '').trim();
   if (!to) {
-    console.log('[notify] new member has no email, skipping welcome');
-    return;
+    console.error('[notify] new member has no email, skipping welcome');
+    return { ok: false, reason: 'skipped' };
   }
-  if (!node.id) return;
+  if (!node.id) return { ok: false, reason: 'skipped' };
 
-  const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
+  const from = process.env.NOTIFY_FROM?.trim() || '';
   const profileUrl = `${getSiteOrigin()}/creators/${node.id}`;
   const subject = `🌱 欢迎加入附近森林`;
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from,
-        to: [to],
-        subject,
-        html: buildWelcomeHtml(node, profileUrl, magicLink),
-        text: buildWelcomeText(node, profileUrl, magicLink),
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      console.error('[notify] welcome Resend non-200', res.status, body);
-    }
-  } catch (err) {
-    console.error('[notify] welcome send failed', err);
-  }
+  return sendCriticalEmail(
+    'welcome',
+    {
+      from,
+      to: [to],
+      subject,
+      html: buildWelcomeHtml(node, profileUrl, magicLink),
+      text: buildWelcomeText(node, profileUrl, magicLink),
+    },
+    `welcome/${node.id}`,
+  );
 }
 
 /**
@@ -241,17 +333,12 @@ export async function notifyWelcome(
 export async function notifyLoginLink(
   node: NodeCard,
   magicLink: string,
-): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.log('[notify] RESEND_API_KEY not set, skipping login link');
-    return;
-  }
+): Promise<EmailSendResult> {
   const to = (node.email || '').trim();
-  if (!to) return;
-  if (!node.id) return;
+  if (!to) return { ok: false, reason: 'skipped' };
+  if (!node.id) return { ok: false, reason: 'skipped' };
 
-  const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
+  const from = process.env.NOTIFY_FROM?.trim() || '';
   const profileUrl = `${getSiteOrigin()}/creators/${node.id}`;
   const subject = `🔐 你的附近森林登录链接`;
 
@@ -277,22 +364,11 @@ export async function notifyLoginLink(
     `个人页：${profileUrl}`,
   ].join('\n');
 
-  try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ from, to: [to], subject, html, text }),
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      console.error('[notify] login Resend non-200', res.status, body);
-    }
-  } catch (err) {
-    console.error('[notify] login send failed', err);
-  }
+  return sendCriticalEmail(
+    'login-link',
+    { from, to: [to], subject, html, text },
+    `login-link/${node.id}/${Math.floor(Date.now() / 60_000)}`,
+  );
 }
 
 // ──────────────────────────────────────────────────────────────────

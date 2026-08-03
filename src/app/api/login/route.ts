@@ -1,10 +1,36 @@
 import { createClient } from '@supabase/supabase-js';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { signLoginToken } from '@/lib/auth';
 import { notifyLoginLink, getSiteOrigin } from '@/lib/notify';
 import type { NodeCard } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
+
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const MAX_REQUESTS_PER_IP = 10;
+const EMAIL_COOLDOWN_MS = 60 * 1000;
+const ipBuckets = new Map<string, number[]>();
+const memberCooldowns = new Map<string, number>();
+
+function rateLimited(ip: string): boolean {
+  const now = Date.now();
+  const recent = (ipBuckets.get(ip) || []).filter(time => now - time < RATE_WINDOW_MS);
+  if (recent.length >= MAX_REQUESTS_PER_IP) {
+    ipBuckets.set(ip, recent);
+    return true;
+  }
+  recent.push(now);
+  ipBuckets.set(ip, recent);
+  return false;
+}
+
+function memberCoolingDown(memberId: string): boolean {
+  const now = Date.now();
+  const lastRequest = memberCooldowns.get(memberId) || 0;
+  if (now - lastRequest < EMAIL_COOLDOWN_MS) return true;
+  memberCooldowns.set(memberId, now);
+  return false;
+}
 
 /**
  * POST /api/login  body: { email: string }
@@ -31,13 +57,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'bad-email' }, { status: 400 });
   }
   const normalized = email.trim().toLowerCase();
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+
+  // 始终返回相同的成功响应，避免暴露邮箱是否已注册。
+  if (rateLimited(ip)) {
+    console.warn('[api/login] request rate limited');
+    return NextResponse.json({ ok: true });
+  }
 
   const sb = createClient(supabaseUrl, serviceKey);
   const { data, error } = await sb
     .from('node_cards')
     .select('*')
     .ilike('email', normalized)
-    .limit(1);
+    .limit(20);
 
   if (error) {
     console.error('[api/login] supabase error', error.message);
@@ -45,17 +78,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const node = (data?.[0] || null) as NodeCard | null;
+  const node = ((data || []) as NodeCard[]).find(
+    row => row.email?.trim().toLowerCase() === normalized,
+  ) || null;
   if (node?.id) {
     const signed = signLoginToken(node.id);
     if (!signed.ok) {
       console.error('[api/login] AUTH_SECRET not configured');
-      return NextResponse.json({ error: 'auth-not-configured' }, { status: 500 });
+    } else if (!memberCoolingDown(node.id)) {
+      const magicLink = `${getSiteOrigin()}/api/login/verify?token=${encodeURIComponent(signed.token)}`;
+      // after 使用 Vercel/Next.js 的 waitUntil 生命周期保障，不阻塞响应，也不产生计时侧信道。
+      after(async () => {
+        const delivery = await notifyLoginLink(node, magicLink);
+        if (!delivery.ok) {
+          console.error('[api/login] login email not accepted', {
+            reason: delivery.reason,
+            status: delivery.status,
+          });
+        }
+      });
+    } else {
+      console.log('[api/login] member email cooldown active');
     }
-    const magicLink = `${getSiteOrigin()}/api/login/verify?token=${encodeURIComponent(signed.token)}`;
-    notifyLoginLink(node, magicLink).catch(err => {
-      console.error('[api/login] sendLoginLink failed', err);
-    });
   } else {
     console.log('[api/login] no node for email');
   }

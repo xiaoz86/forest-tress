@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useState, ChangeEvent } from 'react';
-import CommunityInviteCard from './CommunityInviteCard';
 import MatchedNodes from './MatchedNodes';
 import type { MatchedNode } from '@/lib/match';
 
@@ -97,6 +96,7 @@ export default function JoinForm() {
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [matches, setMatches] = useState<MatchedNode[]>([]);
+  const [welcomeEmailSent, setWelcomeEmailSent] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
@@ -251,6 +251,7 @@ export default function JoinForm() {
       }
 
       setMatches(Array.isArray(json.matches) ? (json.matches as MatchedNode[]) : []);
+      setWelcomeEmailSent(json.welcomeEmailSent === true);
       setStatus('success');
 
       if (photoFile && typeof json.memberId === 'string') {
@@ -299,7 +300,7 @@ export default function JoinForm() {
 
   if (status === 'success') {
     return (
-      <div className="max-w-[680px] mx-auto space-y-8">
+      <div className="max-w-[680px] mx-auto">
         <div className="bg-white rounded-3xl p-10 max-md:p-6 shadow-[0_8px_40px_rgba(26,46,26,0.06)] border border-moss/10">
           <div className="text-center mb-2">
             <div className="text-5xl mb-3">🌱</div>
@@ -307,14 +308,23 @@ export default function JoinForm() {
               你的种子已经种下了
             </h3>
             <p className="text-sm text-text-secondary leading-relaxed">
-              欢迎邮件 + 登录链接已发往 {data.email}。
-              <br />
-              点开链接就能进入你的个人页继续编辑。
+              {welcomeEmailSent ? (
+                <>
+                  欢迎邮件 + 登录链接正在发往 {data.email}。
+                  <br />
+                  请留意收件箱和垃圾邮件夹，点开链接即可继续编辑。
+                </>
+              ) : (
+                <>
+                  节点已经建立，但欢迎邮件暂时未能送出。
+                  <br />
+                  请稍后到登录页输入 {data.email}，重新获取登录链接。
+                </>
+              )}
             </p>
           </div>
           <MatchedNodes matches={matches} />
         </div>
-        <CommunityInviteCard />
       </div>
     );
   }
