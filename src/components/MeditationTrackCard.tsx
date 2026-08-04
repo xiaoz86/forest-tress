@@ -65,8 +65,8 @@ export default function MeditationTrackCard({
 }: Props) {
   const visual = TRACK_VISUALS[track.mood] || TRACK_VISUALS.forest;
   const coverClass = [
-    'relative block aspect-square overflow-hidden rounded-lg border border-white/14 no-underline',
-    'transition-transform duration-500 group-hover:-translate-y-1',
+    'relative block aspect-square overflow-hidden rounded-[20px] border border-forest-deep/[0.10] no-underline',
+    'transition-all duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_16px_36px_rgba(42,59,47,0.10)]',
     visual.cover,
   ].join(' ');
   const cover = (
@@ -75,14 +75,17 @@ export default function MeditationTrackCard({
       {/*
         原来这里写死 Mindfulness。等手碟、雨声这类声音进来，
         卡片上顶着 MINDFULNESS 就成了假标签——所以改成跟着阶段走。
+
+        封面在浅底上是淡色的，所以这一层的字全用深墨，不能用白——
+        白字压在淡渐变上根本读不出来。
       */}
-      <div className="absolute left-4 top-4 max-w-[60%] truncate text-[10px] font-medium uppercase tracking-[0.24em] text-white/58">
+      <div className="absolute left-4 top-4 max-w-[58%] truncate text-[10px] font-semibold uppercase tracking-[0.2em] text-forest-deep/60">
         {track.stage || '声音'}
       </div>
-      <div className="absolute right-3 top-3 rounded-md bg-white/18 px-2.5 py-1 text-[11px] font-medium text-white/86 backdrop-blur-sm">
+      <div className="absolute right-3 top-3 rounded-full bg-white/75 px-2.5 py-1 text-[11px] font-medium text-forest-deep backdrop-blur-sm">
         {track.hasAudio ? '可收听' : '开放中'}
       </div>
-      <div className="absolute inset-0 flex items-center justify-center text-white/88">
+      <div className="absolute inset-0 flex items-center justify-center text-forest-deep/45">
         <TrackGlyph mood={track.mood} />
       </div>
     </>
@@ -99,15 +102,18 @@ export default function MeditationTrackCard({
       )}
 
       <div>
-        <div className="mt-5 flex items-center gap-2 text-[12px] font-medium tracking-[0.08em] text-white/38">
+        <div className="mt-5 flex items-center gap-2 text-[12px] font-medium tracking-[0.08em] text-ink-soft">
           <span className={`h-1.5 w-1.5 rounded-full ${visual.dot}`} />
-          <span>{track.duration} · {track.stage}</span>
+          <span>{[track.duration, track.stage].filter(Boolean).join(' · ')}</span>
         </div>
-        <h3 className="mt-2 text-[clamp(1.05rem,2.2vw,1.35rem)] font-semibold text-white leading-[1.45]">
+        <h3
+          className="mt-2 text-[clamp(1.05rem,2.2vw,1.3rem)] font-semibold leading-[1.45] text-forest-deep"
+          style={{ fontFamily: 'var(--font-serif)' }}
+        >
           {track.title}
         </h3>
-        {showDescription && (
-          <p className="mt-2 text-[13.5px] text-white/45 leading-[1.85]">
+        {showDescription && track.intention && (
+          <p className="mt-2 text-[13.5px] leading-[1.85] text-ink-soft">
             {track.intention}
           </p>
         )}

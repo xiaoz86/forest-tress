@@ -45,6 +45,8 @@ export type MeditationCategory = {
   /** 免费试听前几段 */
   freeCount?: number;
   priceCents?: number;
+  /** 收款码图片地址。没配的话解锁面板退回「加主理人微信」那条路。 */
+  payQrUrl?: string;
 };
 
 export type MeditationTrack = {
@@ -206,6 +208,15 @@ export const DEFAULT_MEDITATION_CONTENT: MeditationContent = {
         { id: 'sleep-w3', label: '第三周 · 接纳与自我关爱', order: 3, unlockAfter: 5, mood: 'care' },
       ],
     },
+    {
+      id: 'ambient',
+      label: '纯声音',
+      kind: 'ambient',
+      description: '手碟、颂钵、雨声。没有引导，放着就好。',
+      heroTitle: '纯声音',
+      heroSubtitle: '没有人说话，只有声音本身',
+      mood: 'body',
+    },
   ],
   tracks: [
     {
@@ -245,6 +256,38 @@ export const DEFAULT_MEDITATION_CONTENT: MeditationContent = {
       mood: 'care',
     },
     ...buildSleepProgramTracks(),
+    // 纯声音的示例条目。名字是 Wendy 点过的三类，音频还没有；
+    // 真正入库要走 seed-ambient.mjs，管理页也能自己加。
+    {
+      id: 'ambient-handpan',
+      title: '手碟',
+      intention: '金属的余韵一圈圈散开，适合什么都不做的时候',
+      duration: '',
+      stage: '纯声音',
+      categoryId: 'ambient',
+      mood: 'body',
+      loopable: true,
+    },
+    {
+      id: 'ambient-bowl',
+      title: '颂钵',
+      intention: '低频的振动，适合入睡时放着',
+      duration: '',
+      stage: '纯声音',
+      categoryId: 'ambient',
+      mood: 'healing',
+      loopable: true,
+    },
+    {
+      id: 'ambient-rain',
+      title: '雨声',
+      intention: '没有旋律的雨，把注意力放在别处',
+      duration: '',
+      stage: '纯声音',
+      categoryId: 'ambient',
+      mood: 'forest',
+      loopable: true,
+    },
   ],
 };
 
@@ -350,6 +393,7 @@ export function normalizeMeditationContent(input: unknown): MeditationContent {
       phases: normalizePhases(r.phases, fallbackCategory.phases),
       freeCount: cleanInt(r.freeCount, fallbackCategory.freeCount, 0, 99),
       priceCents: cleanInt(r.priceCents, fallbackCategory.priceCents, 0, 10_000_00),
+      payQrUrl: cleanOptional(r.payQrUrl, fallbackCategory.payQrUrl || '', 800),
     });
     if (categories.length >= 8) break;
   }

@@ -35,14 +35,26 @@ if (!url || !key) {
 }
 const sb = createClient(url, key);
 
-/** 从 `D01 觉察呼吸.mp3` / `d1-xxx.mp3` / `01.mp3` 里抠出 1..21 */
-function dayOf(name) {
-  const base = name.split('/').pop() || '';
+function inRange(n) {
+  return n >= 1 && n <= 21 ? n : 0;
+}
+
+/**
+ * 从路径里抠出 1..21。
+ *
+ * 两种情况都要认：
+ *   sleep-d01/1785729168607.mp3   编号在目录上（脚本传的）
+ *   D01 觉察呼吸.mp3               编号在文件名上（手工拖进去的）
+ * 只看 basename 的话，前一种会拿时间戳去匹配，永远对不上。
+ */
+function dayOf(fullPath) {
+  const dir = fullPath.match(/(?:^|\/)sleep-d(\d{1,2})(?:\/|$)/i);
+  if (dir) return inRange(Number(dir[1]));
+
+  const base = fullPath.split('/').pop() || '';
   const m = base.match(/(?:^|[^0-9a-z])d\s*_?-?(\d{1,2})(?![0-9])/i)
     || base.match(/^(\d{1,2})(?![0-9])/);
-  if (!m) return 0;
-  const n = Number(m[1]);
-  return n >= 1 && n <= 21 ? n : 0;
+  return m ? inRange(Number(m[1])) : 0;
 }
 
 /** 递归列桶里的对象（Supabase 的 list 不递归，得自己下钻） */
@@ -76,7 +88,10 @@ async function probeDuration(path) {
   }
 }
 
-const files = (await listAll(PREFIX)).filter(f => /\.(mp3|m4a|wav|aac|ogg|webm|mp4|flac)$/i.test(f.path));
+const files = (await listAll(PREFIX))
+  // _trash/ 是回收站，里面的文件不该被重新关联回来
+  .filter(f => !f.path.startsWith('_trash/'))
+  .filter(f => /\.(mp3|m4a|wav|aac|ogg|webm|mp4|flac)$/i.test(f.path));
 console.log(`桶里扫到 ${files.length} 个音频文件${PREFIX ? `（前缀 ${PREFIX}）` : ''}\n`);
 
 const { data: row, error } = await sb

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TrackNotes from '@/components/TrackNotes';
+import UnlockPanel from '@/components/UnlockPanel';
 import {
   buildProgramView,
   isPlayable,
@@ -204,7 +205,15 @@ export default function MeditationProgram({
                       pv.tracks[i - 1]?.state === 'free';
                     return (
                       <div key={row.track.id}>
-                        {seam && <Paywall lockedCount={locked} price={price} />}
+                        {seam && (
+                          <UnlockPanel
+                            programId={category.id}
+                            priceCents={category.priceCents ?? 0}
+                            lockedCount={locked}
+                            loggedIn={loggedIn}
+                            payQrUrl={category.payQrUrl}
+                          />
+                        )}
                         <TrackRow
                           track={row.track}
                           state={row.state}
@@ -221,6 +230,7 @@ export default function MeditationProgram({
                           <TrackNotes
                             trackId={row.track.id}
                             loggedIn={loggedIn}
+                            dark
                             onCountChange={bumpCount}
                           />
                         )}
@@ -379,34 +389,6 @@ function TrackRow({
   );
 }
 
-function Paywall({ lockedCount, price }: { lockedCount: number; price: string }) {
-  return (
-    <div
-      id="unlock"
-      className="scroll-mt-24 border-t border-coral-soft/25 bg-[linear-gradient(160deg,rgba(232,168,142,0.13),rgba(30,42,68,0.22))] px-4 py-5"
-    >
-      <div className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-coral-soft">
-        还有 {lockedCount} 段
-      </div>
-      <h3 className="text-[15px] font-semibold text-white">注册附近森林，解锁完整旅程</h3>
-      <p className="mt-1 text-[12.5px] leading-[1.75] text-white/50">
-        三周的声音就都在这里了。一次付清，之后随时回来听。
-      </p>
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <a
-          href="/login"
-          className="rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] no-underline"
-        >
-          注册并解锁
-        </a>
-        <span className="text-[13px] font-bold tabular-nums text-white">¥{price}</span>
-        <a href="/login" className="text-[12px] text-white/45 no-underline hover:text-white/70">
-          已注册？登录
-        </a>
-      </div>
-    </div>
-  );
-}
 
 function IconPlay({ playing }: { playing: boolean }) {
   return playing ? (

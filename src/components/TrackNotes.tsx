@@ -7,8 +7,49 @@ type Props = {
   trackId: string;
   /** 没登录只能看，不能写 */
   loggedIn: boolean;
+  /** 睡眠陪伴营是深色底，其余是林间的淡绿底——这个组件两边都要用 */
+  dark?: boolean;
   onCountChange?: (trackId: string, delta: number) => void;
 };
+
+// 两套底色下的用色。深色那套是原来的；浅色这套全部换成深墨，
+// 白字压在淡绿底上是读不出来的。
+const TONE = {
+  dark: {
+    wrap: 'border-t border-white/[0.06] bg-black/20',
+    field: 'border-white/12 bg-white/[0.04] text-white placeholder:text-white/28 focus:border-white/28',
+    hint: 'text-white/55',
+    faint: 'text-white/32',
+    count: 'text-white/28',
+    submit: 'bg-white text-[#111512]',
+    err: 'text-coral-soft',
+    link: 'text-coral-soft',
+    prompt: 'text-white/42',
+    empty: 'text-white/30',
+    avatar: 'bg-white/10 text-white/70',
+    author: 'text-white/78',
+    time: 'text-white/30',
+    body: 'text-white/62',
+    del: 'text-white/32 hover:text-coral-soft',
+  },
+  light: {
+    wrap: 'border-t border-forest/10 bg-white/45',
+    field: 'border-forest/15 bg-white/80 text-ink placeholder:text-ink-soft/60 focus:border-forest/40',
+    hint: 'text-ink-soft',
+    faint: 'text-ink-soft/75',
+    count: 'text-ink-soft/60',
+    submit: 'bg-forest text-white',
+    err: 'text-clay',
+    link: 'text-clay',
+    prompt: 'text-ink-soft',
+    empty: 'text-ink-soft/70',
+    avatar: 'bg-forest/12 text-forest',
+    author: 'text-forest-deep',
+    time: 'text-ink-soft/65',
+    body: 'text-ink-soft',
+    del: 'text-ink-soft/60 hover:text-clay',
+  },
+} as const;
 
 function when(iso: string): string {
   const d = new Date(iso);
@@ -20,7 +61,8 @@ function when(iso: string): string {
   return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
 }
 
-export default function TrackNotes({ trackId, loggedIn, onCountChange }: Props) {
+export default function TrackNotes({ trackId, loggedIn, dark = false, onCountChange }: Props) {
+  const t = dark ? TONE.dark : TONE.light;
   const [notes, setNotes] = useState<TrackNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [body, setBody] = useState('');
@@ -82,7 +124,7 @@ export default function TrackNotes({ trackId, loggedIn, onCountChange }: Props) 
   }, [trackId, onCountChange]);
 
   return (
-    <div className="border-t border-white/[0.06] bg-black/20 px-4 py-4">
+    <div className={`${t.wrap} px-4 py-4`}>
       {loggedIn ? (
         <div className="mb-4">
           <textarea
@@ -90,54 +132,54 @@ export default function TrackNotes({ trackId, loggedIn, onCountChange }: Props) 
             onChange={e => setBody(e.target.value.slice(0, NOTE_MAX_CHARS))}
             placeholder="听完之后，心里剩下什么？"
             rows={2}
-            className="w-full resize-y rounded-lg border border-white/12 bg-white/[0.04] px-3 py-2.5 text-[13.5px] leading-[1.75] text-white placeholder:text-white/28 focus:border-white/28 focus:outline-none"
+            className={`w-full resize-y rounded-xl border ${t.field} px-3 py-2.5 text-[13.5px] leading-[1.75] focus:outline-none`}
           />
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <label className="flex cursor-pointer items-center gap-2 text-[12px] text-white/55">
+            <label className={`flex cursor-pointer items-center gap-2 text-[12px] ${t.hint}`}>
               <input
                 type="checkbox"
                 checked={anonymous}
                 onChange={e => setAnonymous(e.target.checked)}
-                className="h-3.5 w-3.5 accent-[#e8a88e]"
+                className={`h-3.5 w-3.5 ${dark ? "accent-[#e8a88e]" : "accent-[#2f513d]"}`}
               />
               匿名发布
             </label>
-            <span className="text-[11px] text-white/32">
+            <span className={`text-[11px] ${t.faint}`}>
               {anonymous ? '会显示为「森林里的一个人」' : '会带上你的名字'}
               ，所有人可见
             </span>
-            <span className="ml-auto text-[11px] tabular-nums text-white/28">
+            <span className={`ml-auto text-[11px] tabular-nums ${t.count}`}>
               {body.length} / {NOTE_MAX_CHARS}
             </span>
             <button
               type="button"
               onClick={submit}
               disabled={busy || !body.trim()}
-              className="rounded-full bg-white px-4 py-1.5 text-[12.5px] font-semibold text-[#111512] transition-opacity disabled:opacity-35"
+              className={`rounded-full ${t.submit} px-4 py-1.5 text-[12.5px] font-semibold transition-opacity disabled:opacity-35`}
             >
               {busy ? '发布中' : '写下感悟'}
             </button>
           </div>
-          {error && <p className="mt-2 text-[12px] text-coral-soft">{error}</p>}
+          {error && <p className={`mt-2 text-[12px] ${t.err}`}>{error}</p>}
         </div>
       ) : (
-        <p className="mb-4 text-[12.5px] text-white/42">
-          <a href="/login" className="text-coral-soft underline-offset-2 hover:underline">登录</a>
+        <p className={`mb-4 text-[12.5px] ${t.prompt}`}>
+          <a href="/login" className={`${t.link} underline-offset-2 hover:underline`}>登录</a>
           {' '}之后可以写下自己的感悟。
         </p>
       )}
 
       {loading ? (
-        <p className="text-[12.5px] text-white/30">正在读…</p>
+        <p className={`text-[12.5px] ${t.empty}`}>正在读…</p>
       ) : notes.length === 0 ? (
-        <p className="text-[12.5px] text-white/30">还没有人写下感悟。</p>
+        <p className={`text-[12.5px] ${t.empty}`}>还没有人写下感悟。</p>
       ) : (
         <ul className="flex list-none flex-col gap-3.5 p-0">
           {notes.map(note => (
             <li key={note.id} className="flex gap-2.5">
               <span
                 aria-hidden="true"
-                className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-white/10 text-[11px] font-semibold text-white/70"
+                className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full ${t.avatar} text-[11px] font-semibold`}
               >
                 {note.avatarUrl
                   // eslint-disable-next-line @next/next/no-img-element
@@ -146,19 +188,19 @@ export default function TrackNotes({ trackId, loggedIn, onCountChange }: Props) 
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-[12.5px] font-semibold text-white/78">{note.author}</span>
-                  <span className="text-[11px] text-white/30">{when(note.createdAt)}</span>
+                  <span className={`text-[12.5px] font-semibold ${t.author}`}>{note.author}</span>
+                  <span className={`text-[11px] ${t.time}`}>{when(note.createdAt)}</span>
                   {note.mine && (
                     <button
                       type="button"
                       onClick={() => remove(note.id)}
-                      className="ml-auto text-[11px] text-white/32 transition-colors hover:text-coral-soft"
+                      className={`ml-auto text-[11px] transition-colors ${t.del}`}
                     >
                       撤回
                     </button>
                   )}
                 </div>
-                <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-[1.8] text-white/62">
+                <p className={`mt-1 whitespace-pre-wrap break-words text-[13px] leading-[1.8] ${t.body}`}>
                   {note.body}
                 </p>
               </div>
