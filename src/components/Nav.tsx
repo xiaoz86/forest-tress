@@ -14,16 +14,24 @@ type NavLink =
 // 中间那排：品牌已经指向首页，这里就不再重复放「首页」
 // icon 沿用首页四条小径那套汉字符号，手机菜单排成两列时靠它认路
 const baseLinks: (NavLink & { icon: string })[] = [
-  { href: '/meditations', label: '林间归处', type: 'route', icon: '息' },
+  { href: '/meditations', label: '林间探索', type: 'route', icon: '息' },
   { href: '/phil-coach', label: '回到自己', type: 'route', icon: '伴' },
   { href: '/shares', label: '个体创造', type: 'route', icon: '创' },
   { href: '/creators', label: '遇见附近', type: 'route', icon: '见' },
   { href: '/about', label: '生态社区', type: 'route', icon: '林' },
 ];
 
-function readMemberId(): string | null {
+/**
+ * 读 nf_uid —— 那是专门留给浏览器看的明文副本。
+ *
+ * 真正的登录凭证 nf_member 现在是 httpOnly 的，脚本读不到（也不该读到）。
+ * 这里拿到的 id 只用来决定导航尾部显示「个人中心」还是「登录」，
+ * 以及个人中心链到哪儿。伪造它最多让自己看到一个别人的公开主页，
+ * 拿不到任何权限——权限一律由服务端验签名。
+ */
+function readDisplayId(): string | null {
   if (typeof document === 'undefined') return null;
-  const m = document.cookie.match(/(?:^|;\s*)nf_member=([^;]+)/);
+  const m = document.cookie.match(/(?:^|;\s*)nf_uid=([^;]+)/);
   return m ? decodeURIComponent(m[1]) : null;
 }
 
@@ -33,10 +41,10 @@ export default function Nav() {
   const pathname = usePathname();
   const isHome = pathname === '/';
 
-  // 登录态：挂载后读 nf_member cookie（值即节点 id）→ 决定尾部展示「个人中心」还是「加入森林/登录」。
+  // 登录态：挂载后读 nf_uid cookie → 决定尾部展示「个人中心」还是「加入森林/登录」。
   // 必须在挂载后读：SSR 无 document，且首帧需与服务端一致（null）以避免 hydration 不匹配。
   useEffect(() => {
-    const id = readMemberId();
+    const id = readDisplayId();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMemberId(prev => (prev === id ? prev : id));
   }, [pathname]);

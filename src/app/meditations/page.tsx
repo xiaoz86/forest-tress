@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { cookies } from 'next/headers';
 import Nav from '@/components/Nav';
 import MeditationTrackCard from '@/components/MeditationTrackCard';
 import MeditationProgram from '@/components/MeditationProgram';
@@ -7,6 +6,7 @@ import MeditationAmbient from '@/components/MeditationAmbient';
 import MeditationGrove from '@/components/MeditationGrove';
 import { isAdminId } from '@/lib/admin';
 import { fetchNoteCounts } from '@/lib/meditationNotes';
+import { readMemberId } from '@/lib/session';
 import {
   fetchMeditationContent,
   fetchPaidPrograms,
@@ -26,12 +26,11 @@ type Props = {
 };
 
 export default async function MeditationsPage({ searchParams }: Props) {
-  const [{ category }, rawContent, cookieStore] = await Promise.all([
+  const [{ category }, rawContent] = await Promise.all([
     searchParams,
     fetchMeditationContent(),
-    cookies(),
   ]);
-  const memberId = cookieStore.get('nf_member')?.value || '';
+  const memberId = await readMemberId();
   const isAdmin = isAdminId(memberId);
 
   // 音频「在哪」在这里就全部摘掉，只留「有没有」——播放统一走 stream 路由

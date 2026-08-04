@@ -1,17 +1,16 @@
 import Link from 'next/link';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Nav from '@/components/Nav';
 import OrdersBoard from '@/components/OrdersBoard';
 import { isAdminId } from '@/lib/admin';
+import { readMemberId } from '@/lib/session';
 
 export const metadata = {
   title: '开通确认 · 附近森林',
 };
 
 export default async function OrdersPage() {
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get('nf_member')?.value || '';
+  const memberId = await readMemberId();
   // 这页能看到谁买了什么，不是管理员就别进来
   if (!isAdminId(memberId)) redirect('/meditations');
 

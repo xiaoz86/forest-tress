@@ -6,10 +6,10 @@ import Link from 'next/link';
 const ENTRANCES = [
   {
     icon: '息',
-    title: '林间归处',
+    title: '林间探索',
     body: '从正念声音、身心放松与自我关怀开始，把注意力重新带回此刻。',
     href: '/meditations',
-    cta: '进入「林间呼吸」',
+    cta: '进入「林间探索」',
   },
   {
     icon: '伴',

@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
@@ -14,6 +13,7 @@ import PhilMemoriesManager from '@/components/PhilMemoriesManager';
 import { buildRelationGraph } from '@/lib/network';
 import { isAdminId } from '@/lib/admin';
 import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
+import { readMemberId } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,9 +49,7 @@ export default async function CreatorDetail({ params }: Props) {
   if (!me) notFound();
 
   const graph = buildRelationGraph(me, all, 8);
-
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get('nf_member')?.value || '';
+  const memberId = await readMemberId();
   const isMember = Boolean(memberId);
   const isOwner = memberId === me.id;
   const isAdmin = isAdminId(memberId);

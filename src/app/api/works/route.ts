@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
 import type { Work } from '@/lib/supabase';
+import { readMemberId } from '@/lib/session';
 
 const BUCKET = 'works';
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -43,9 +43,7 @@ export async function POST(request: NextRequest) {
 
   const nodeId = (form.get('nodeId') as string | null)?.trim();
   if (!nodeId) return NextResponse.json({ error: 'missing-node-id' }, { status: 400 });
-
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get('nf_member')?.value;
+  const memberId = await readMemberId();
   const isOwner = !!memberId && memberId === nodeId;
   const isAdmin = isAdminId(memberId);
   if (!isOwner && !isAdmin) {
@@ -161,9 +159,7 @@ export async function DELETE(request: NextRequest) {
   if (!nodeId || !workId) {
     return NextResponse.json({ error: 'missing-params' }, { status: 400 });
   }
-
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get('nf_member')?.value;
+  const memberId = await readMemberId();
   const isOwner = !!memberId && memberId === nodeId;
   const isAdmin = isAdminId(memberId);
   if (!isOwner && !isAdmin) {
@@ -217,9 +213,7 @@ export async function PATCH(request: NextRequest) {
   if (!nodeId || !workId) {
     return NextResponse.json({ error: 'missing-params' }, { status: 400 });
   }
-
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get('nf_member')?.value;
+  const memberId = await readMemberId();
   const isOwner = !!memberId && memberId === nodeId;
   const isAdmin = isAdminId(memberId);
   if (!isOwner && !isAdmin) {

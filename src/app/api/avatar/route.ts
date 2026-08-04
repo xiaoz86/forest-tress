@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
+import { readMemberId } from '@/lib/session';
 
 const BUCKET = 'avatars';
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -38,8 +38,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 允许本人上传，或管理员替任意成员上传
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get('nf_member')?.value;
+  const memberId = await readMemberId();
   const isOwner = !!memberId && memberId === id;
   const isAdmin = isAdminId(memberId);
   if (!isOwner && !isAdmin) {

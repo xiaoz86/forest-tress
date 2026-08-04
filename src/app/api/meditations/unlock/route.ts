@@ -1,15 +1,12 @@
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
 import { ensureOrder, findLatestOrder, listOrders, setOrderStatus } from '@/lib/programOrders';
 import { fetchMeditationContent } from '@/lib/meditations';
+import { readMemberId } from '@/lib/session';
 
 export const runtime = 'nodejs';
 
-async function viewer() {
-  const store = await cookies();
-  return store.get('nf_member')?.value || '';
-}
+const viewer = readMemberId;
 
 /**
  * GET  ?program=sleep        取自己当前的申请状态

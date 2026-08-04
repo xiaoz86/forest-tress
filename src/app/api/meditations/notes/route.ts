@@ -1,6 +1,6 @@
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
+import { readMemberId } from '@/lib/session';
 import {
   NOTE_MAX_CHARS,
   createTrackNote,
@@ -15,10 +15,7 @@ import {
 
 export const runtime = 'nodejs';
 
-async function viewer() {
-  const store = await cookies();
-  return store.get('nf_member')?.value || '';
-}
+const viewer = readMemberId;
 
 export async function GET(request: NextRequest) {
   const trackId = request.nextUrl.searchParams.get('track')?.trim();

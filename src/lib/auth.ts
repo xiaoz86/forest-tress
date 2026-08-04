@@ -79,6 +79,46 @@ export const MEMBER_COOKIE = 'nf_member';
 export const MEMBER_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 年
 
 // ──────────────────────────────────────────────────────────────
+// 登录态 cookie 的签名
+//
+// 原来 cookie 里直接放明文成员 id。但成员 id 在 /creators/<id> 这类公开
+// 链接里到处都是，等于「用户名即密码」——抄一个设进 cookie 就冒充成功，
+// 抄到管理员的就拿到后台。所以现在存 `<id>.<签发时刻>.<签名>`，
+// 没有 AUTH_SECRET 就伪造不出来。
+// ──────────────────────────────────────────────────────────────
+
+export function signSessionValue(memberId: string): string {
+  const secret = getSecret();
+  // 没配 secret 时不能退回明文——那等于把洞留着。宁可登录不上。
+  if (!secret || !memberId) return '';
+  const issued = Math.floor(Date.now() / 1000);
+  const payload = `${memberId}.${issued}`;
+  return `${payload}.${sign(`session.${payload}`, secret)}`;
+}
+
+/** 验签并取出成员 id；不合法一律返回空串（＝未登录） */
+export function verifySessionValue(value: string): string {
+  const secret = getSecret();
+  if (!secret || !value) return '';
+
+  const parts = value.split('.');
+  if (parts.length !== 3) return '';
+  const [memberId, issuedStr, sig] = parts;
+  if (!memberId || !issuedStr || !sig) return '';
+
+  const expected = sign(`session.${memberId}.${issuedStr}`, secret);
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return '';
+
+  const issued = Number(issuedStr);
+  if (!Number.isFinite(issued)) return '';
+  if (issued * 1000 + MEMBER_COOKIE_MAX_AGE * 1000 < Date.now()) return '';
+
+  return memberId;
+}
+
+// ──────────────────────────────────────────────────────────────
 // 管理动作签名（如 phil-coach 登记审核链接）：HMAC 防伪造
 // ──────────────────────────────────────────────────────────────
 
