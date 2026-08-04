@@ -115,16 +115,27 @@ export default async function MeditationsPage({ searchParams }: Props) {
               ← 所有声音
             </Link>
             {isAdmin && (
-              <Link
-                href="/meditations/admin"
-                className={`rounded-full border px-4 py-2 text-sm font-medium no-underline transition-colors ${
-                  isProgram
-                    ? 'border-white/14 bg-white/[0.055] text-white/62 hover:bg-white/10 hover:text-white'
-                    : 'border-forest/15 bg-white/70 text-forest hover:bg-white'
-                }`}
-              >
-                管理冥想
-              </Link>
+              <div className="flex items-center gap-2.5">
+                {/* 开通确认只对陪伴营有意义，别的分类不放这个入口 */}
+                {isProgram && (
+                  <Link
+                    href="/meditations/orders"
+                    className="rounded-full border border-coral-soft/35 bg-coral-soft/12 px-4 py-2 text-sm font-medium text-coral-soft no-underline transition-colors hover:bg-coral-soft/20"
+                  >
+                    开通确认
+                  </Link>
+                )}
+                <Link
+                  href="/meditations/admin"
+                  className={`rounded-full border px-4 py-2 text-sm font-medium no-underline transition-colors ${
+                    isProgram
+                      ? 'border-white/14 bg-white/[0.055] text-white/62 hover:bg-white/10 hover:text-white'
+                      : 'border-forest/15 bg-white/70 text-forest hover:bg-white'
+                  }`}
+                >
+                  管理冥想
+                </Link>
+              </div>
             )}
           </div>
 
