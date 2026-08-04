@@ -35,17 +35,48 @@ const KIND_GROUPS: { kind: MeditationKind; eyebrow: string; title: string; note:
   },
 ];
 
-// 纸底上不铺整块渐变——那会把版面压得很闷。
-// 每条小径只留一点自己的颜色：汉字符号和顶端那道细线。
-const MOOD_INK: Record<TrackMood, { text: string; rule: string; tint: string }> = {
-  forest: { text: '#3f6350', rule: '#6b8f5e', tint: 'rgba(107,143,94,0.07)' },
-  daily: { text: '#3d6070', rule: '#7ba7bc', tint: 'rgba(123,167,188,0.07)' },
-  emotion: { text: '#465a72', rule: '#738faa', tint: 'rgba(115,143,170,0.07)' },
-  care: { text: '#8a5a41', rule: '#dcaf96', tint: 'rgba(220,175,150,0.09)' },
-  healing: { text: '#4a6440', rule: '#8fb573', tint: 'rgba(143,181,115,0.08)' },
-  body: { text: '#4a5c56', rule: '#8aa09a', tint: 'rgba(138,160,154,0.08)' },
-  kindness: { text: '#8b504c', rule: '#cf9087', tint: 'rgba(207,144,135,0.08)' },
-  sleep: { text: '#2f4654', rule: '#4a6b7d', tint: 'rgba(74,107,125,0.08)' },
+/**
+ * 每条小径自己的光。
+ *
+ * 上一版把透明度压到 0.07，结果三张卡看上去一模一样——「跟着主题走」
+ * 等于没做。现在给到能一眼分出来的程度：一片光从左上角斜下来，
+ * 到六成处散尽。深墨的字压在最淡的那一端，所以照样读得清。
+ *
+ * 想的是同一片林子里不同位置的光：苔绿、晨蓝、雾灰、午后的暖、夜里的深。
+ */
+const MOOD_INK: Record<TrackMood, { text: string; rule: string; wash: string }> = {
+  forest: {
+    text: '#33604a', rule: '#6b8f5e',
+    wash: 'linear-gradient(152deg, rgba(122,166,112,0.30) 0%, rgba(168,201,160,0.13) 40%, transparent 70%)',
+  },
+  daily: {
+    text: '#2f5c70', rule: '#7ba7bc',
+    wash: 'linear-gradient(152deg, rgba(118,171,196,0.30) 0%, rgba(180,212,224,0.13) 40%, transparent 70%)',
+  },
+  emotion: {
+    text: '#3b5170', rule: '#738faa',
+    wash: 'linear-gradient(152deg, rgba(112,142,178,0.28) 0%, rgba(178,196,218,0.12) 40%, transparent 70%)',
+  },
+  care: {
+    text: '#8a5334', rule: '#dcaf96',
+    wash: 'linear-gradient(152deg, rgba(226,169,132,0.34) 0%, rgba(240,212,190,0.14) 40%, transparent 70%)',
+  },
+  healing: {
+    text: '#41652f', rule: '#8fb573',
+    wash: 'linear-gradient(152deg, rgba(150,190,116,0.30) 0%, rgba(196,220,172,0.13) 40%, transparent 70%)',
+  },
+  body: {
+    text: '#3f5b53', rule: '#8aa09a',
+    wash: 'linear-gradient(152deg, rgba(126,160,150,0.30) 0%, rgba(184,206,198,0.13) 40%, transparent 70%)',
+  },
+  kindness: {
+    text: '#8b4644', rule: '#cf9087',
+    wash: 'linear-gradient(152deg, rgba(212,138,128,0.30) 0%, rgba(236,196,188,0.13) 40%, transparent 70%)',
+  },
+  sleep: {
+    text: '#26485c', rule: '#4a6b7d',
+    wash: 'linear-gradient(152deg, rgba(58,102,126,0.34) 0%, rgba(140,176,192,0.15) 40%, transparent 72%)',
+  },
 };
 
 // 汉字符号沿用首页四条小径那套：一个字概括这条路在做什么
@@ -87,9 +118,13 @@ export default function MeditationGrove({ content, counts }: Props) {
                 <p className="ml-auto text-[12.5px] text-ink-soft max-md:hidden">{group.note}</p>
               </div>
 
+              {/*
+                只有一条的时候用宽卡。三列格子里孤零零摆一张、右边空掉三分之二，
+                看着像出了错——纯声音现在就是这个情况。
+              */}
               <div
                 className={
-                  group.kind === 'program'
+                  items.length === 1
                     ? 'grid grid-cols-1 gap-5'
                     : 'grid grid-cols-3 gap-5 max-lg:grid-cols-2 max-md:grid-cols-1'
                 }
@@ -99,7 +134,7 @@ export default function MeditationGrove({ content, counts }: Props) {
                     key={category.id}
                     category={category}
                     count={counts[category.id] || 0}
-                    wide={group.kind === 'program'}
+                    wide={items.length === 1}
                   />
                 ))}
               </div>
@@ -107,6 +142,45 @@ export default function MeditationGrove({ content, counts }: Props) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// 没上封面时的兜底底色。原来写死成睡眠那套夜空——挂到纯声音上就不对了，
+// 所以改成跟着各自的主题走，和卡片正面是同一族颜色。
+const COVER_FALLBACK: Record<TrackMood, string> = {
+  forest: 'linear-gradient(165deg,#1d3529 0%,#3f6350 52%,#93a98c 100%)',
+  daily: 'linear-gradient(165deg,#1b2f3a 0%,#3d6070 52%,#9db8c4 100%)',
+  emotion: 'linear-gradient(165deg,#20293a 0%,#465a72 52%,#a3b2c4 100%)',
+  care: 'linear-gradient(165deg,#3a2418 0%,#8a5334 52%,#dcbba0 100%)',
+  healing: 'linear-gradient(165deg,#1e3319 0%,#41652f 52%,#a8c295 100%)',
+  body: 'linear-gradient(165deg,#1e2b27 0%,#3f5b53 52%,#a0b3ab 100%)',
+  kindness: 'linear-gradient(165deg,#3a1e1d 0%,#8b4644 52%,#d8aaa4 100%)',
+  sleep: 'linear-gradient(180deg,#04060a 0%,#04060a 52%,#0d1c24 58%,#1b333f 82%,#2a4b59 100%)',
+};
+
+/** 宽卡右侧的封面。没上传图时用同主题的渐变顶着，不留白块。 */
+function WideCover({ category }: { category: MeditationCategory }) {
+  const mood = category.mood || 'forest';
+  const base = 'relative w-[240px] shrink-0 aspect-square overflow-hidden rounded-[20px] border border-forest-deep/[0.08] shadow-[0_10px_30px_rgba(42,59,47,0.10)] max-lg:w-[180px] max-md:w-[140px]';
+
+  if (category.coverUrl) {
+    return (
+      <div className={base}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={category.coverUrl} alt="" className="h-full w-full object-cover" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={base} style={{ background: COVER_FALLBACK[mood] }}>
+      {/* 睡眠那条留着弦月——封面照片就是这个意象，没图时也别丢了 */}
+      {mood === 'sleep' && (
+        <span className="absolute left-[54%] top-[30%] aspect-square w-[26%] rounded-full bg-[#f2ead6] shadow-[0_0_22px_rgba(242,234,214,0.32)]">
+          <span className="absolute inset-0 translate-x-[-28%] translate-y-[-13%] rounded-full bg-[#04060a]" />
+        </span>
+      )}
     </div>
   );
 }
@@ -127,7 +201,7 @@ function PathCard({
       className={`group relative flex flex-col overflow-hidden rounded-[26px] border border-forest-deep/[0.10] bg-white/72 no-underline transition-all duration-300 hover:-translate-y-1 hover:border-forest-deep/20 hover:bg-white/90 hover:shadow-[0_18px_44px_rgba(42,59,47,0.09)] ${
         wide ? 'p-9 max-md:p-7' : 'p-8 max-md:p-7'
       }`}
-      style={{ backgroundImage: `linear-gradient(160deg, ${ink.tint}, transparent 62%)` }}
+      style={{ backgroundImage: ink.wash }}
     >
       {/* 顶端那道细线是这条小径唯一的颜色标记 */}
       <span
@@ -136,8 +210,8 @@ function PathCard({
         style={{ background: ink.rule }}
       />
 
-      <div className={`flex h-full ${wide ? 'items-end gap-10 max-md:flex-col max-md:items-start max-md:gap-6' : 'flex-col'}`}>
-        <div className={wide ? 'flex-1' : 'flex-1'}>
+      <div className={`flex h-full ${wide ? 'items-center gap-10 max-md:flex-col-reverse max-md:items-start max-md:gap-6' : 'flex-col'}`}>
+        <div className="flex-1">
           <div
             className="text-[1.6rem]"
             style={{ fontFamily: 'var(--font-serif)', color: ink.text }}
@@ -177,19 +251,25 @@ function PathCard({
           >
             {category.description}
           </p>
+
+          <div className="mt-7 flex items-center gap-3">
+            <span className="rounded-full border border-forest/15 bg-white/70 px-3.5 py-1.5 text-[12px] font-medium text-forest">
+              {count > 0 ? `${count} 段声音` : '声音开放中'}
+            </span>
+            <span
+              aria-hidden="true"
+              className="text-[13px] text-forest-mid transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+            >
+              ↗
+            </span>
+          </div>
         </div>
 
-        <div className={`flex items-center gap-3 ${wide ? 'shrink-0' : 'mt-7'}`}>
-          <span className="rounded-full border border-forest/15 bg-white/70 px-3.5 py-1.5 text-[12px] font-medium text-forest">
-            {count > 0 ? `${count} 段声音` : '声音开放中'}
-          </span>
-          <span
-            aria-hidden="true"
-            className="text-[13px] text-forest-mid transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-          >
-            ↗
-          </span>
-        </div>
+        {/*
+          宽卡右边原来是一大片空白：文字只占一半，一个小胶囊挂在最右下角。
+          把封面放进来填上——陪伴营本来就有封面，没上传时是同色调的渐变。
+        */}
+        {wide && <WideCover category={category} />}
       </div>
     </Link>
   );
