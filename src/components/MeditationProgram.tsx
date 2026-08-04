@@ -211,7 +211,6 @@ export default function MeditationProgram({
                             priceCents={category.priceCents ?? 0}
                             lockedCount={locked}
                             loggedIn={loggedIn}
-                            payQrUrl={category.payQrUrl}
                           />
                         )}
                         <TrackRow

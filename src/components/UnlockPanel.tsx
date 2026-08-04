@@ -20,12 +20,13 @@ type Props = {
  * 没有它，人工开通很快会变成负担。
  */
 export default function UnlockPanel({
-  programId, priceCents, lockedCount, loggedIn, payQrUrl,
+  programId, priceCents, lockedCount, loggedIn,
 }: Props) {
   const [order, setOrder] = useState<ProgramOrder | null>(null);
   const [loading, setLoading] = useState(loggedIn);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [qrFailed, setQrFailed] = useState(false);
 
   const price = (priceCents / 100).toFixed(0);
 
@@ -113,25 +114,31 @@ export default function UnlockPanel({
             <p className="mt-2 text-[11.5px] text-white/40">金额 ¥{(order.amountCents / 100).toFixed(0)}</p>
           </div>
 
-          {payQrUrl && (
+          {/*
+            走 API 而不是直接指向图片文件：那条路由会验有没有待确认的申请，
+            所以收款码只在「付款那一刻」取得到。没配图时 404，
+            onError 把这块收起来，退到下面「加微信」那条路。
+          */}
+          {!qrFailed && (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
-              src={payQrUrl}
+              src={`/api/meditations/pay-qr?program=${encodeURIComponent(programId)}`}
               alt="收款码"
-              className="h-[132px] w-[132px] rounded-xl border border-white/12 bg-white/5 object-contain p-1.5"
+              onError={() => setQrFailed(true)}
+              className="h-[144px] w-[144px] rounded-xl border border-white/12 bg-white p-2"
             />
           )}
         </div>
 
-        <ol className="mt-5 flex list-none flex-col gap-1.5 p-0 text-[12.5px] leading-[1.7] text-white/52">
-          <li>1. 扫码付 ¥{(order.amountCents / 100).toFixed(0)}，备注填 <b className="text-white">{order.code}</b></li>
-          <li>2. 主理人对上账后开通，通常当天</li>
-          <li>3. 开通后这一页会直接变成可听的样子</li>
-        </ol>
-
-        {!payQrUrl && (
-          <p className="mt-4 text-[12px] leading-[1.75] text-white/42">
-            还没配收款码。可以先到{' '}
+        {!qrFailed ? (
+          <ol className="mt-5 flex list-none flex-col gap-1.5 p-0 text-[12.5px] leading-[1.7] text-white/52">
+            <li>1. 扫码付 ¥{(order.amountCents / 100).toFixed(0)}，<b className="text-white">备注填 {order.code}</b></li>
+            <li>2. 主理人对上账后开通，通常当天</li>
+            <li>3. 开通后这一页会直接变成可听的样子</li>
+          </ol>
+        ) : (
+          <p className="mt-4 text-[12.5px] leading-[1.8] text-white/48">
+            收款码还没配好。可以先到{' '}
             <a href="/about#community" className="text-coral-soft no-underline hover:underline">生态社区</a>
             {' '}页加主理人微信，把口令 <b className="text-white">{order.code}</b> 一起发过去。
           </p>
