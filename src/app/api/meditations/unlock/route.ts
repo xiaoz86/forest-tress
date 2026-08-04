@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
-import { claimOrder, ensureOrder, findLatestOrder, listOrders, setOrderStatus } from '@/lib/programOrders';
-import { notifyUnlockClaim, getSiteOrigin } from '@/lib/notify';
-import { createClient } from '@supabase/supabase-js';
+import { ensureOrder, findLatestOrder, listOrders, setOrderStatus } from '@/lib/programOrders';
 import { fetchMeditationContent } from '@/lib/meditations';
 import { readMemberId } from '@/lib/session';
 
 export const runtime = 'nodejs';
-
-/** 只为取个昵称发通知，取不到也不影响开通 */
-function adminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  return url && key ? createClient(url, key) : null;
-}
 
 const viewer = readMemberId;
 
@@ -66,23 +57,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'not-a-program' }, { status: 400 });
   }
 
-  // 用户点「我已完成付款」：立刻放行，同时把口令发给主理人去核对
+  // 用户点「我已完成付款」：必须带一张付款截图。
+  //
+  // 截图不是验证——伪造截图的工具满地都是，OCR 分辨不出真假。
+  // 它挡的是「顺手点一下白嫖」：伪造付款凭证的心理成本远高于点个按钮。
+  // 同时给主理人留下金额/时间/备注，核对时有东西可对。
   if (payload.action === 'claim') {
-    const order = await claimOrder(memberId, programId);
-    if (!order) {
-      return NextResponse.json({ error: 'no-pending-order' }, { status: 409 });
-    }
-    const { data: card } = await adminClient()
-      ?.from('node_cards').select('name').eq('id', memberId).maybeSingle() ?? { data: null };
-    // 邮件发不出去也不能挡住用户——权限已经给了，通知只是主理人那边的事
-    void notifyUnlockClaim({
-      memberName: String(card?.name || '一位森林里的朋友'),
-      code: order.code,
-      programLabel: category.label,
-      amountYuan: Math.round(order.amountCents / 100),
-      boardUrl: `${getSiteOrigin()}/meditations/orders`,
-    }).catch(err => console.error('[unlock] claim notify failed', err));
-    return NextResponse.json({ order });
+    return NextResponse.json({ error: 'proof-required' }, { status: 400 });
   }
 
   const result = await ensureOrder(memberId, programId, category.priceCents ?? 0);

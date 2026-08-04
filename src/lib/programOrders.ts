@@ -36,10 +36,12 @@ export type ProgramOrder = {
   createdAt: string;
 };
 
-/** 给主理人看的，比上面多了「是谁」 */
+/** 给主理人看的，比上面多了「是谁」和付款截图 */
 export type AdminOrder = ProgramOrder & {
   memberId: string;
   memberName: string;
+  /** 有没有传截图。真正的图走 /api/meditations/proof 取，路径不下发。 */
+  hasProof: boolean;
 };
 
 function client() {
@@ -160,6 +162,7 @@ export async function listOrders(limit = 100): Promise<AdminOrder[]> {
       ...toOrder(row),
       memberId: String(row.member_id),
       memberName: names.get(String(row.member_id)) || '（已删除的节点）',
+      hasProof: Boolean(row.proof_path),
     }))
     // claimed 排最前：那些人已经在听了，等着你去收款记录里核对。
     // pending 次之（还没付），已结的沉底。
@@ -173,12 +176,17 @@ export async function listOrders(limit = 100): Promise<AdminOrder[]> {
 export async function claimOrder(
   memberId: string,
   programId: string,
+  proofPath: string,
 ): Promise<ProgramOrder | null> {
   const sb = client();
   if (!sb || !memberId) return null;
   const { data, error } = await sb
     .from('program_orders')
-    .update({ status: 'claimed', claimed_at: new Date().toISOString() })
+    .update({
+      status: 'claimed',
+      claimed_at: new Date().toISOString(),
+      proof_path: proofPath,
+    })
     .eq('member_id', memberId)
     .eq('program_id', programId)
     .eq('status', 'pending')
@@ -210,4 +218,13 @@ export async function setOrderStatus(
     .eq('id', orderId);
   if (error) console.error('[program-orders] update failed', error.message);
   return !error;
+}
+
+/** 取某一单的截图路径。只在主理人取图那条路由里用，永不下发给浏览器。 */
+export async function findProofPath(orderId: string): Promise<string> {
+  const sb = client();
+  if (!sb) return '';
+  const { data } = await sb
+    .from('program_orders').select('proof_path').eq('id', orderId).maybeSingle();
+  return String(data?.proof_path || '');
 }

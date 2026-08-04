@@ -399,3 +399,9 @@ alter table meditation_notes enable row level security;
 -- 个人收款码没有回调，服务器无从知道钱到没到；与其让每个人付完干等，
 -- 不如先给，核对不上再撤。status 多一档 claimed（介于 pending 和 paid 之间）。
 alter table program_orders add column if not exists claimed_at timestamptz;
+
+-- 2026-08-04 付款截图：claim 时必须上传，存私有桶，只有主理人能看。
+-- 注意它不是「验证」——伪造截图的工具满地都是，OCR 分辨不出来。
+-- 它的作用是威慑（伪造凭证的心理成本远高于点一个按钮）和证据
+-- （主理人手里有金额/时间/备注可以和收款记录对照）。
+alter table program_orders add column if not exists proof_path text;

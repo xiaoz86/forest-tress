@@ -45,7 +45,7 @@ export default async function OrdersPage() {
               开通确认
             </h1>
             <p className="mt-4 max-w-[560px] text-[14px] leading-[1.9] text-white/48">
-              对着微信或支付宝的收款记录，把备注里那四个字输进来，确认收到款就开通。
+              对着支付宝的收款记录，把备注里那四个字输进来，确认收到款就开通。
             </p>
           </header>
 

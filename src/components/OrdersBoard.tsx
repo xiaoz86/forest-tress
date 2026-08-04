@@ -155,6 +155,20 @@ export default function OrdersBoard() {
                 {o.code}
               </span>
 
+              {/* 截图点开看大图——核对时要看清金额、时间和备注 */}
+              {o.hasProof ? (
+                <a
+                  href={`/api/meditations/proof?order=${encodeURIComponent(o.id)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 rounded-md border border-white/16 px-2 py-1 text-[11px] text-white/60 no-underline transition-colors hover:border-white/40 hover:text-white"
+                >
+                  看截图
+                </a>
+              ) : (
+                <span className="shrink-0 text-[11px] text-white/25">无截图</span>
+              )}
+
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13.5px] text-white/80">{o.memberName}</span>
                 <span className="block text-[11.5px] tabular-nums text-white/35">

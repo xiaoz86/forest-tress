@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProgramOrder } from '@/lib/programOrders';
 
 type Props = {
@@ -27,6 +27,7 @@ export default function UnlockPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [qrFailed, setQrFailed] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const price = (priceCents / 100).toFixed(0);
 
@@ -64,27 +65,30 @@ export default function UnlockPanel({
     }
   }, [programId, busy]);
 
-  /** 「我已完成付款」——立刻放行，主理人事后核对 */
-  const claim = useCallback(async () => {
+  /** 传付款截图 → 解锁。截图不做真伪判断（做不到），它是威慑和给主理人的证据。 */
+  const submitProof = useCallback(async (file: File) => {
     if (busy) return;
     setBusy(true);
     setError('');
     try {
-      const res = await fetch('/api/meditations/unlock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ program: programId, action: 'claim' }),
-      });
+      const body = new FormData();
+      body.append('program', programId);
+      body.append('proof', file);
+      const res = await fetch('/api/meditations/claim', { method: 'POST', body });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError('没能确认，刷新页面再试一次。');
+        setError(
+          data.error === 'bad-file-type' ? '只收图片（jpg / png / webp）。'
+            : data.error === 'file-too-large' ? '图片太大了，压一下再传。'
+            : data.error === 'proof-required' ? '需要先选一张付款截图。'
+            : '没能提交，过一会再试。',
+        );
         return;
       }
-      setOrder(data.order);
       // 权限是服务端渲染时算的，得整页刷新才能让 21 段真的解锁
       window.location.reload();
     } catch {
-      setError('没能确认，刷新页面再试一次。');
+      setError('没能提交，过一会再试。');
     } finally {
       setBusy(false);
     }
@@ -146,32 +150,50 @@ export default function UnlockPanel({
             onError 把这块收起来，退到下面「加微信」那条路。
           */}
           {!qrFailed && (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={`/api/meditations/pay-qr?program=${encodeURIComponent(programId)}`}
-              alt="收款码"
-              onError={() => setQrFailed(true)}
-              className="h-[144px] w-[144px] rounded-xl border border-white/12 bg-white p-2"
-            />
+            <div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/meditations/pay-qr?program=${encodeURIComponent(programId)}`}
+                alt="支付宝收款码"
+                onError={() => setQrFailed(true)}
+                className="h-[144px] w-[144px] rounded-xl border border-white/12 bg-white p-2"
+              />
+              {/* 码是支付宝的，不写清楚会有人拿微信扫然后扫不出来 */}
+              <p className="mt-2 text-center text-[11.5px] text-white/45">支付宝扫码</p>
+            </div>
           )}
         </div>
 
         {!qrFailed ? (
           <>
             <ol className="mt-5 flex list-none flex-col gap-1.5 p-0 text-[12.5px] leading-[1.7] text-white/52">
-              <li>1. 扫码付 ¥{(order.amountCents / 100).toFixed(0)}，<b className="text-white">备注填 {order.code}</b></li>
-              <li>2. 付完点下面这个按钮，<b className="text-white">21 段立刻就能听</b></li>
+              <li>1. 支付宝扫码付 ¥{(order.amountCents / 100).toFixed(0)}，<b className="text-white">备注填 {order.code}</b></li>
+              <li>2. 上传付款截图，<b className="text-white">完成解锁</b></li>
             </ol>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="mt-4">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  // 清空 value：同一张图选第二次也要能触发 change
+                  e.target.value = '';
+                  if (f) void submitProof(f);
+                }}
+              />
               <button
                 type="button"
-                onClick={claim}
+                onClick={() => fileRef.current?.click()}
                 disabled={busy}
                 className="rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] disabled:opacity-40"
               >
-                {busy ? '处理中' : '我已完成付款'}
+                {busy ? '提交中' : '上传付款截图'}
               </button>
-              <span className="text-[12px] text-white/42">不用等确认，先听起来</span>
+              <p className="mt-2.5 text-[11.5px] leading-[1.7] text-white/38">
+                截图只有主理人看得到，用来和收款记录核对。
+              </p>
             </div>
             {error && <p className="mt-2 text-[12px] text-coral-soft">{error}</p>}
           </>
