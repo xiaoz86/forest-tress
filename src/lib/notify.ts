@@ -21,7 +21,7 @@ export type EmailSendResult =
       status?: number;
     };
 
-type CriticalEmailKind = 'new-node' | 'welcome' | 'login-link';
+type CriticalEmailKind = 'new-node' | 'welcome' | 'login-link' | 'unlock-claim';
 
 type ResendMessage = {
   from: string;
@@ -606,4 +606,69 @@ export async function notifyPhilGuest(params: {
   } catch (err) {
     console.error('[notify] guest send failed', err);
   }
+}
+
+/**
+ * 有人点了「我已完成付款」。
+ *
+ * 这封信是整套人工核对的关键：个人收款码没有回调，主理人不看后台
+ * 就永远不知道有人在等。用户那边已经先放行了，所以这封信要的不是
+ * 「快去开通」，而是「去收款记录里核一下这个口令」。
+ */
+export async function notifyUnlockClaim(params: {
+  memberName: string;
+  code: string;
+  programLabel: string;
+  amountYuan: number;
+  boardUrl: string;
+}): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.log('[notify] RESEND_API_KEY not set, skipping unlock claim notification');
+    return;
+  }
+  const override = process.env.PHIL_FEEDBACK_EMAILS?.trim();
+  const recipients = override
+    ? override.split(',').map(s => s.trim()).filter(Boolean)
+    : Array.from(new Set([...getRecipients(), 'wendyjhwu@hotmail.com']));
+  if (recipients.length === 0) return;
+
+  const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
+  const text = [
+    `${params.memberName} 说已经付款，${params.programLabel} 已经先开给 ta 了。`,
+    ``,
+    `请到收款记录里核对这一笔：`,
+    `  备注口令：${params.code}`,
+    `  金额：¥${params.amountYuan}`,
+    ``,
+    `核对上就在看板点「已收到款」；找不到这笔就点「驳回」，权限会立刻收回。`,
+    params.boardUrl,
+  ].join('\n');
+
+  const html = `<!DOCTYPE html>
+<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
+<div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:28px;">
+  <p style="margin:0 0 18px;font-size:15px;color:#243229;line-height:1.8;">
+    <strong>${escape(params.memberName)}</strong> 说已经付款，${escape(params.programLabel)} 已经先开给 ta 了。
+  </p>
+  <div style="background:#f0f5ec;border-radius:12px;padding:18px;margin-bottom:18px;">
+    <div style="font-size:12px;color:#5c675f;margin-bottom:6px;">收款记录里找这个备注</div>
+    <div style="font-size:30px;font-weight:700;letter-spacing:4px;color:#243229;font-family:ui-monospace,Menlo,monospace;">${escape(params.code)}</div>
+    <div style="font-size:13px;color:#5c675f;margin-top:8px;">金额 ¥${params.amountYuan}</div>
+  </div>
+  <p style="margin:0 0 20px;font-size:13.5px;color:#5c675f;line-height:1.8;">
+    核对上就点「已收到款」；找不到这笔就点「驳回」，权限会立刻收回。
+  </p>
+  <a href="${escape(params.boardUrl)}" style="display:inline-block;background:#2f513d;color:#fff;text-decoration:none;padding:12px 24px;border-radius:999px;font-size:14px;font-weight:600;">
+    打开开通确认
+  </a>
+</div>
+</body></html>`;
+
+  await sendCriticalEmail(
+    'unlock-claim',
+    { from, to: recipients, subject: `💰 ${params.memberName} 已付款 · 口令 ${params.code}`, text, html },
+    // 同一单只发一次：用户手抖多点几下不该把主理人邮箱刷屏
+    `unlock-claim-${params.code}`,
+  );
 }

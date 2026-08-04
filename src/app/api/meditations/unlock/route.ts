@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
-import { ensureOrder, findLatestOrder, listOrders, setOrderStatus } from '@/lib/programOrders';
+import { claimOrder, ensureOrder, findLatestOrder, listOrders, setOrderStatus } from '@/lib/programOrders';
+import { notifyUnlockClaim, getSiteOrigin } from '@/lib/notify';
+import { createClient } from '@supabase/supabase-js';
 import { fetchMeditationContent } from '@/lib/meditations';
 import { readMemberId } from '@/lib/session';
 
 export const runtime = 'nodejs';
+
+/** 只为取个昵称发通知，取不到也不影响开通 */
+function adminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return url && key ? createClient(url, key) : null;
+}
 
 const viewer = readMemberId;
 
@@ -41,7 +50,7 @@ export async function POST(request: NextRequest) {
   const memberId = await viewer();
   if (!memberId) return NextResponse.json({ error: 'not-logged-in' }, { status: 401 });
 
-  let payload: { program?: unknown };
+  let payload: { program?: unknown; action?: unknown };
   try {
     payload = await request.json();
   } catch {
@@ -55,6 +64,25 @@ export async function POST(request: NextRequest) {
   const category = content.categories.find(c => c.id === programId);
   if (!category || category.kind !== 'program') {
     return NextResponse.json({ error: 'not-a-program' }, { status: 400 });
+  }
+
+  // 用户点「我已完成付款」：立刻放行，同时把口令发给主理人去核对
+  if (payload.action === 'claim') {
+    const order = await claimOrder(memberId, programId);
+    if (!order) {
+      return NextResponse.json({ error: 'no-pending-order' }, { status: 409 });
+    }
+    const { data: card } = await adminClient()
+      ?.from('node_cards').select('name').eq('id', memberId).maybeSingle() ?? { data: null };
+    // 邮件发不出去也不能挡住用户——权限已经给了，通知只是主理人那边的事
+    void notifyUnlockClaim({
+      memberName: String(card?.name || '一位森林里的朋友'),
+      code: order.code,
+      programLabel: category.label,
+      amountYuan: Math.round(order.amountCents / 100),
+      boardUrl: `${getSiteOrigin()}/meditations/orders`,
+    }).catch(err => console.error('[unlock] claim notify failed', err));
+    return NextResponse.json({ order });
   }
 
   const result = await ensureOrder(memberId, programId, category.priceCents ?? 0);

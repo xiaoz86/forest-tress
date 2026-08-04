@@ -64,6 +64,32 @@ export default function UnlockPanel({
     }
   }, [programId, busy]);
 
+  /** 「我已完成付款」——立刻放行，主理人事后核对 */
+  const claim = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await fetch('/api/meditations/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ program: programId, action: 'claim' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError('没能确认，刷新页面再试一次。');
+        return;
+      }
+      setOrder(data.order);
+      // 权限是服务端渲染时算的，得整页刷新才能让 21 段真的解锁
+      window.location.reload();
+    } catch {
+      setError('没能确认，刷新页面再试一次。');
+    } finally {
+      setBusy(false);
+    }
+  }, [programId, busy]);
+
   const shell = 'scroll-mt-24 border-t border-coral-soft/25 bg-[linear-gradient(160deg,rgba(232,168,142,0.13),rgba(30,42,68,0.22))] px-5 py-6';
 
   if (!loggedIn) {
@@ -131,11 +157,24 @@ export default function UnlockPanel({
         </div>
 
         {!qrFailed ? (
-          <ol className="mt-5 flex list-none flex-col gap-1.5 p-0 text-[12.5px] leading-[1.7] text-white/52">
-            <li>1. 扫码付 ¥{(order.amountCents / 100).toFixed(0)}，<b className="text-white">备注填 {order.code}</b></li>
-            <li>2. 主理人对上账后开通，通常当天</li>
-            <li>3. 开通后这一页会直接变成可听的样子</li>
-          </ol>
+          <>
+            <ol className="mt-5 flex list-none flex-col gap-1.5 p-0 text-[12.5px] leading-[1.7] text-white/52">
+              <li>1. 扫码付 ¥{(order.amountCents / 100).toFixed(0)}，<b className="text-white">备注填 {order.code}</b></li>
+              <li>2. 付完点下面这个按钮，<b className="text-white">21 段立刻就能听</b></li>
+            </ol>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={claim}
+                disabled={busy}
+                className="rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] disabled:opacity-40"
+              >
+                {busy ? '处理中' : '我已完成付款'}
+              </button>
+              <span className="text-[12px] text-white/42">不用等确认，先听起来</span>
+            </div>
+            {error && <p className="mt-2 text-[12px] text-coral-soft">{error}</p>}
+          </>
         ) : (
           <p className="mt-4 text-[12.5px] leading-[1.8] text-white/48">
             收款码还没配好。可以先到{' '}
@@ -143,6 +182,23 @@ export default function UnlockPanel({
             {' '}页加主理人微信，把口令 <b className="text-white">{order.code}</b> 一起发过去。
           </p>
         )}
+      </div>
+    );
+  }
+
+  // 说了已付款：权限已经给了，这里只是告诉人后面还会有一次核对，
+  // 免得账对不上时被撤销显得突然
+  if (order && order.status === 'claimed') {
+    return (
+      <div id="unlock" className={shell}>
+        <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-leaf">
+          已开通
+        </div>
+        <h3 className="text-[15px] font-semibold text-white">21 段都可以听了</h3>
+        <p className="mt-1.5 text-[12.5px] leading-[1.75] text-white/52">
+          主理人会在收款记录里核对口令 <b className="text-white">{order.code}</b>，
+          对上就没有别的事了。万一没找到这笔款，会先联系你。
+        </p>
       </div>
     );
   }

@@ -344,7 +344,7 @@ create table if not exists program_orders (
   member_id text not null,                  -- nf_member cookie 里那个节点 id
   program_id text not null,                 -- 对应 meditation category id，如 'sleep'
   code text not null,                       -- 四位口令，付款备注里填这个
-  status text not null default 'pending',   -- pending | paid | rejected
+  status text not null default 'pending',   -- pending | claimed | paid | rejected
   amount_cents int not null default 6800,
   note text default '',                     -- 主理人备注（驳回原因等）
   created_at timestamptz default now(),
@@ -394,3 +394,8 @@ create index if not exists idx_meditation_notes_member
 -- 和 program_orders 一样：开 RLS 不加 policy = 只有服务端能读写。
 -- 浏览器直连的话，匿名那层就等于没有——谁都能查出 author_name。
 alter table meditation_notes enable row level security;
+
+-- 2026-08-04 「我已完成付款」：用户自助确认后立刻放行，主理人事后核对。
+-- 个人收款码没有回调，服务器无从知道钱到没到；与其让每个人付完干等，
+-- 不如先给，核对不上再撤。status 多一档 claimed（介于 pending 和 paid 之间）。
+alter table program_orders add column if not exists claimed_at timestamptz;

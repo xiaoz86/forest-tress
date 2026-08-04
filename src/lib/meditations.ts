@@ -605,11 +605,14 @@ export async function fetchPaidPrograms(memberId: string): Promise<Set<string>> 
   if (!memberId || !supabaseUrl || !serviceKey) return new Set();
 
   const sb = createClient(supabaseUrl, serviceKey);
+  // claimed 也算数：用户点了「我已完成付款」就立刻能听，主理人事后核对。
+  // 个人收款码没有回调，服务器无从知道钱到没到——与其让人干等，
+  // 不如先给，核对不上再撤。¥68 的风险有限，而干等的代价是每一单都要付的。
   const { data, error } = await sb
     .from('program_orders')
     .select('program_id')
     .eq('member_id', memberId)
-    .eq('status', 'paid');
+    .in('status', ['claimed', 'paid']);
   if (error || !data) return new Set();
   return new Set(data.map(row => String(row.program_id)));
 }

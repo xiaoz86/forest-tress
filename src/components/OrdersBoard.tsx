@@ -14,8 +14,9 @@ import type { AdminOrder } from '@/lib/programOrders';
  */
 
 const STATUS_LABEL: Record<string, string> = {
-  pending: '待确认',
-  paid: '已开通',
+  pending: '未付款',
+  claimed: '待核对',
+  paid: '已核对',
   rejected: '已驳回',
 };
 
@@ -85,9 +86,10 @@ export default function OrdersBoard() {
     );
   }, [orders, q]);
 
-  const pendingCount = orders.filter(o => o.status === 'pending').length;
+  // 看板顶上那个数字要的是「等你核对的有几笔」，不是「有几笔还没付」
+  const pendingCount = orders.filter(o => o.status === 'claimed').length;
   // 输满四位且只剩一条时，回车直接开通——这是最常走的那条路
-  const soleMatch = q.length >= 4 && shown.length === 1 && shown[0].status === 'pending'
+  const soleMatch = q.length >= 4 && shown.length === 1 && shown[0].status === 'claimed'
     ? shown[0]
     : null;
 
@@ -127,7 +129,7 @@ export default function OrdersBoard() {
             </button>
           )}
           <span className="ml-auto text-[12.5px] text-white/40">
-            待确认 <b className="text-[14px] text-white tabular-nums">{pendingCount}</b>
+            待核对 <b className="text-[14px] text-white tabular-nums">{pendingCount}</b>
           </span>
         </div>
       </div>
@@ -146,7 +148,7 @@ export default function OrdersBoard() {
             <li key={o.id} className="flex flex-wrap items-center gap-x-5 gap-y-2 py-3.5">
               <span
                 className={`w-[5.5rem] shrink-0 text-[17px] font-bold tracking-[0.14em] tabular-nums ${
-                  o.status === 'pending' ? 'text-white' : 'text-white/35'
+                  o.status === 'claimed' ? 'text-white' : 'text-white/35'
                 }`}
                 style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
               >
@@ -163,8 +165,10 @@ export default function OrdersBoard() {
 
               <span
                 className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                  o.status === 'pending'
+                  o.status === 'claimed'
                     ? 'bg-coral-soft/15 text-coral-soft'
+                    : o.status === 'pending'
+                      ? 'bg-white/10 text-white/50'
                     : o.status === 'paid'
                       ? 'bg-leaf/15 text-leaf'
                       : 'bg-white/10 text-white/45'
@@ -173,7 +177,7 @@ export default function OrdersBoard() {
                 {STATUS_LABEL[o.status] || o.status}
               </span>
 
-              {o.status === 'pending' ? (
+              {o.status === 'pending' || o.status === 'claimed' ? (
                 <span className="flex shrink-0 gap-2">
                   <button
                     type="button"

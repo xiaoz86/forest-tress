@@ -15,7 +15,16 @@ import { createClient } from '@supabase/supabase-js';
 const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 const CODE_LEN = 4;
 
-export type OrderStatus = 'pending' | 'paid' | 'rejected';
+/**
+ * pending  —— 点了解锁、拿到口令，还没说付款
+ * claimed  —— 用户说付了。这一刻就放行，主理人事后核对
+ * paid     —— 主理人在收款记录里对上了
+ * rejected —— 没找到这笔款，权限收回
+ *
+ * claimed 这一档是为了消掉「付完钱干等」那段时间。个人收款码没有回调，
+ * 服务器无从知道钱到没到；与其让每个人都等，不如先给，核对不上再撤。
+ */
+export type OrderStatus = 'pending' | 'claimed' | 'paid' | 'rejected';
 
 export type ProgramOrder = {
   id: string;
@@ -124,7 +133,11 @@ export async function ensureOrder(
   return { ok: false, reason: 'failed' };
 }
 
-/** 主理人看板：待确认的排前面，其余按时间倒序 */
+function rank(status: OrderStatus): number {
+  return status === 'claimed' ? 2 : status === 'pending' ? 1 : 0;
+}
+
+/** 主理人看板：待核对的排前面，其余按时间倒序 */
 export async function listOrders(limit = 100): Promise<AdminOrder[]> {
   const sb = client();
   if (!sb) return [];
@@ -148,7 +161,34 @@ export async function listOrders(limit = 100): Promise<AdminOrder[]> {
       memberId: String(row.member_id),
       memberName: names.get(String(row.member_id)) || '（已删除的节点）',
     }))
-    .sort((a, b) => Number(b.status === 'pending') - Number(a.status === 'pending'));
+    // claimed 排最前：那些人已经在听了，等着你去收款记录里核对。
+    // pending 次之（还没付），已结的沉底。
+    .sort((a, b) => rank(b.status) - rank(a.status));
+}
+
+/**
+ * 用户点「我已完成付款」。只能作用在自己那条 pending 单上——
+ * 带上 member_id 一起 where，别人的单动不了。
+ */
+export async function claimOrder(
+  memberId: string,
+  programId: string,
+): Promise<ProgramOrder | null> {
+  const sb = client();
+  if (!sb || !memberId) return null;
+  const { data, error } = await sb
+    .from('program_orders')
+    .update({ status: 'claimed', claimed_at: new Date().toISOString() })
+    .eq('member_id', memberId)
+    .eq('program_id', programId)
+    .eq('status', 'pending')
+    .select('*')
+    .maybeSingle();
+  if (error) {
+    console.error('[program-orders] claim failed', error.message);
+    return null;
+  }
+  return data ? toOrder(data) : null;
 }
 
 export async function setOrderStatus(
