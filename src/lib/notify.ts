@@ -637,46 +637,37 @@ export async function notifyUnlockClaim(params: {
 
   const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
   const text = [
-    `${params.memberName} 说已经付款，${params.programLabel} 已经先开给 ta 了。`,
+    `${params.memberName} 刚说付了 ¥${params.amountYuan}，${params.programLabel} 已经开好了。`,
     ``,
-    `请到支付宝收款记录里核对这一笔：`,
-    `  备注口令：${params.code}`,
-    `  金额：¥${params.amountYuan}`,
+    `支付宝收款记录里搜：${params.code}`,
     ``,
-    params.proofUrl ? `ta 传的付款截图：\n${params.proofUrl}\n` : `（这一单没有截图）\n`,
-    `注意截图不构成凭证——伪造工具满地都是，仍要以收款记录为准。`,
+    `对上就点「已收到款」，没找到就点「驳回」。`,
     ``,
-    `核对上就在看板点「已收到款」；找不到这笔就点「驳回」，权限会立刻收回。`,
-    params.boardUrl,
-  ].join('\n');
+    `打开确认：${params.boardUrl}`,
+    params.proofUrl ? `看截图：${params.proofUrl}` : '',
+  ].filter(Boolean).join('\n');
 
   const html = `<!DOCTYPE html>
-<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
-<div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:28px;">
-  <p style="margin:0 0 18px;font-size:15px;color:#243229;line-height:1.8;">
-    <strong>${escape(params.memberName)}</strong> 说已经付款，${escape(params.programLabel)} 已经先开给 ta 了。
+<html><body style="margin:0;padding:24px;background:#eef3ea;font-family:-apple-system,'PingFang SC',sans-serif;">
+<div style="max-width:440px;margin:0 auto;background:#fff;border-radius:16px;padding:26px;">
+  <p style="margin:0 0 20px;font-size:15px;color:#243229;line-height:1.85;">
+    <strong>${escape(params.memberName)}</strong> 刚说付了 ¥${params.amountYuan}，${escape(params.programLabel)} 已经开好了。
   </p>
-  <div style="background:#f0f5ec;border-radius:12px;padding:18px;margin-bottom:18px;">
-    <div style="font-size:12px;color:#5c675f;margin-bottom:6px;">支付宝收款记录里找这个备注</div>
-    <div style="font-size:30px;font-weight:700;letter-spacing:4px;color:#243229;font-family:ui-monospace,Menlo,monospace;">${escape(params.code)}</div>
-    <div style="font-size:13px;color:#5c675f;margin-top:8px;">金额 ¥${params.amountYuan}</div>
+  <div style="background:#eef3ea;border-radius:12px;padding:16px 18px;margin-bottom:20px;">
+    <div style="font-size:12.5px;color:#5c675f;margin-bottom:6px;">支付宝收款记录里搜</div>
+    <div style="font-size:30px;font-weight:700;letter-spacing:5px;color:#243229;font-family:ui-monospace,Menlo,monospace;">${escape(params.code)}</div>
   </div>
-  <p style="margin:0 0 6px;font-size:13.5px;color:#5c675f;line-height:1.8;">
-    核对上就点「已收到款」；找不到这笔就点「驳回」，权限会立刻收回。
+  <p style="margin:0 0 22px;font-size:14px;color:#5c675f;line-height:1.85;">
+    对上就点「已收到款」，没找到就点「驳回」。
   </p>
-  <p style="margin:0 0 20px;font-size:12px;color:#8a9690;line-height:1.7;">
-    截图不构成凭证——伪造工具满地都是。仍以支付宝收款记录为准。
-  </p>
-  <a href="${escape(params.boardUrl)}" style="display:inline-block;background:#2f513d;color:#fff;text-decoration:none;padding:12px 24px;border-radius:999px;font-size:14px;font-weight:600;">
-    打开开通确认
-  </a>
-  ${params.proofUrl ? `<a href="${escape(params.proofUrl)}" style="display:inline-block;margin-left:10px;border:1px solid #d5ddd2;color:#2f513d;text-decoration:none;padding:11px 20px;border-radius:999px;font-size:14px;font-weight:600;">看付款截图</a>` : ''}
+  <a href="${escape(params.boardUrl)}" style="display:inline-block;background:#2f513d;color:#fff;text-decoration:none;padding:12px 24px;border-radius:999px;font-size:14px;font-weight:600;">打开确认</a>
+  ${params.proofUrl ? `<a href="${escape(params.proofUrl)}" style="display:inline-block;margin-left:8px;border:1px solid #d5ddd2;color:#2f513d;text-decoration:none;padding:11px 20px;border-radius:999px;font-size:14px;font-weight:600;">看截图</a>` : ''}
 </div>
 </body></html>`;
 
   await sendCriticalEmail(
     'unlock-claim',
-    { from, to: recipients, subject: `💰 ${params.memberName} 已付款 · 口令 ${params.code}`, text, html },
+    { from, to: recipients, subject: `${params.memberName} 付了 ¥${params.amountYuan} · 备注 ${params.code}`, text, html },
     // 同一单只发一次：用户手抖多点几下不该把主理人邮箱刷屏
     `unlock-claim-${params.code}`,
   );
