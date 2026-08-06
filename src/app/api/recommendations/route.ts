@@ -1,9 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { matchNodesAI } from '@/lib/match';
 import { isAdminId } from '@/lib/admin';
-import { MEMBER_COOKIE } from '@/lib/auth';
+import { getAuthenticatedMemberId } from '@/lib/session';
 import { toRecommendationSnapshot } from '../join/route';
 import type { NodeCard } from '@/lib/supabase';
 
@@ -34,8 +33,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'missing-node-id' }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get(MEMBER_COOKIE)?.value;
+  const memberId = await getAuthenticatedMemberId();
   const isOwner = !!memberId && memberId === nodeId;
   const isAdmin = isAdminId(memberId);
   if (!isOwner && !isAdmin) {

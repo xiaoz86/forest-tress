@@ -24,13 +24,13 @@ const KIND_GROUPS: { kind: MeditationKind; eyebrow: string; title: string; note:
   {
     kind: 'program',
     eyebrow: 'Program',
-    title: '陪伴营',
+    title: '睡眠-系列',
     note: '有次序的一整段旅程。一周一周走，不急着走完。',
   },
   {
     kind: 'ambient',
     eyebrow: 'Ambient',
-    title: '纯声音',
+    title: '声音',
     note: '没有引导。手碟、颂钵、雨声，放着就好。',
   },
 ];

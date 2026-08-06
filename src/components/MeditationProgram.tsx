@@ -17,6 +17,8 @@ type Props = {
   category: MeditationCategory;
   /** 有没有买。由服务端按开通记录算好传进来，前端不自己判断。 */
   paid: boolean;
+  /** 自己说付了、传了截图，主理人还没核对。这一档也能听，但得让人知道账还没对完。 */
+  claimPending?: boolean;
   /** 各段的感悟条数，服务端一次算好——否则 21 段要各发一次请求 */
   noteCounts: Record<string, number>;
   loggedIn: boolean;
@@ -42,7 +44,7 @@ function readListened(categoryId: string): string[] {
 }
 
 export default function MeditationProgram({
-  content, category, paid, noteCounts, loggedIn,
+  content, category, paid, claimPending = false, noteCounts, loggedIn,
 }: Props) {
   const [listened, setListened] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
@@ -160,6 +162,22 @@ export default function MeditationProgram({
           />
         </div>
       </section>
+
+      {/*
+        传了截图、主理人还没核对的那一档。内容已经全开，所以付费墙那块不再出现，
+        这条就得单独摆出来——一是让人知道账还没对完，二是给传错图的人一个换图入口。
+        没有它，拍糊了的人只能等驳回，而驳回会把已经拿到的权限一并收走。
+      */}
+      {claimPending && (
+        <div className="mt-7 overflow-hidden rounded-2xl border border-white/10">
+          <UnlockPanel
+            programId={category.id}
+            priceCents={category.priceCents ?? 0}
+            lockedCount={0}
+            loggedIn={loggedIn}
+          />
+        </div>
+      )}
 
       {/* ---- 三周 ---- */}
       <section className="mt-7 flex flex-col gap-4">
@@ -279,7 +297,11 @@ export default function MeditationProgram({
                 />
               </>
             ) : view.paid ? (
-              <div className="flex-1 text-[13px] text-white/50">选一段开始听。听到八成就算走完。</div>
+              <div className="flex-1 text-[13px] text-white/50">
+                {claimPending
+                  ? '已经开好了。主理人对完收款记录就转正，一般当天。'
+                  : '选一段开始听。听到八成就算走完。'}
+              </div>
             ) : (
               <>
                 <div className="min-w-0 flex-1">

@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
 import { findLatestOrder } from '@/lib/programOrders';
+import { getAuthenticatedMemberId } from '@/lib/session';
 
 export const runtime = 'nodejs';
 
@@ -24,8 +24,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'not-configured' }, { status: 503 });
   }
 
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get('nf_member')?.value || '';
+  const memberId = await getAuthenticatedMemberId();
   if (!memberId) return NextResponse.json({ error: 'not-logged-in' }, { status: 401 });
 
   const programId = new URL(request.url).searchParams.get('program')?.trim() || '';

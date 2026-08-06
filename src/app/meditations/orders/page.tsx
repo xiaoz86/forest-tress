@@ -1,19 +1,45 @@
 import Link from 'next/link';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import Nav from '@/components/Nav';
 import OrdersBoard from '@/components/OrdersBoard';
 import { isAdminId } from '@/lib/admin';
+import { getAuthenticatedMemberId } from '@/lib/session';
 
 export const metadata = {
   title: '开通确认 · 附近森林',
 };
 
 export default async function OrdersPage() {
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get('nf_member')?.value || '';
-  // 这页能看到谁买了什么，不是管理员就别进来
-  if (!isAdminId(memberId)) redirect('/meditations');
+  const memberId = await getAuthenticatedMemberId();
+  // 这页能看到谁买了什么，不是管理员就别进来。
+  //
+  // 不 redirect：这一页最常见的入口是付款通知邮件里的「打开确认」，
+  // 而手机邮件客户端的内置浏览器和 Safari 不共享登录态，第一次点几乎必然没有。
+  // 一跳走，?code 也丢了，人看到的就是「链接坏了」。停在这里把话说清楚。
+  if (!isAdminId(memberId)) {
+    return (
+      <>
+        <Nav />
+        <main className="min-h-screen bg-[#0f1411] px-8 pb-24 pt-32 text-white max-md:px-5">
+          <div className="mx-auto max-w-[680px] rounded-lg border border-white/10 bg-white/[0.045] p-8">
+            <div className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-coral-soft">
+              Unlock Requests
+            </div>
+            <h1 className="text-2xl font-semibold">需要管理员权限</h1>
+            <p className="mt-4 text-sm leading-relaxed text-white/52">
+              这台设备还没登录。用注册邮箱登录之后，回到那封通知邮件再点一次「打开确认」，
+              就会直接落到对应的那一条。
+            </p>
+            <Link
+              href="/login"
+              className="mt-6 inline-flex rounded-full bg-white px-5 py-2 text-sm font-semibold text-[#111512] no-underline"
+            >
+              去登录
+            </Link>
+          </div>
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
@@ -46,7 +72,8 @@ export default async function OrdersPage() {
               开通确认
             </h1>
             <p className="mt-4 max-w-[560px] text-[14px] leading-[1.9] text-white/48">
-              对着微信或支付宝的收款记录，把备注里那四个字输进来，确认收到款就开通。
+              点开截图，对着微信或支付宝的收款记录核一眼金额和时间。对上就点「已收到款」，
+              找不到这笔就点「驳回」，权限会立刻收回。
             </p>
           </header>
 

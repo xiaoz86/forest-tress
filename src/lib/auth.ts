@@ -77,6 +77,43 @@ export function verifyLoginToken(token: string): VerifyResult {
 
 export const MEMBER_COOKIE = 'nf_member';
 export const MEMBER_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 年
+export const SESSION_COOKIE = 'nf_session';
+
+/**
+ * 服务器信任的会话凭证。nf_member 还要给前端读，只用来展示个人页入口；
+ * 付费、解锁和管理权限只认这个 HttpOnly 签名 cookie。
+ */
+export function signMemberSession(memberId: string): SignResult {
+  const secret = getSecret();
+  if (!secret) return { ok: false, reason: 'no-secret' };
+  const expiresAt = Math.floor(Date.now() / 1000) + MEMBER_COOKIE_MAX_AGE;
+  const payload = `${memberId}.${expiresAt}`;
+  const sig = sign(`session.${payload}`, secret);
+  return { ok: true, token: `${payload}.${sig}`, expiresAt };
+}
+
+export function verifyMemberSession(token: string): VerifyResult {
+  const secret = getSecret();
+  if (!secret) return { ok: false, reason: 'no-secret' };
+
+  const parts = token.split('.');
+  if (parts.length !== 3) return { ok: false, reason: 'malformed' };
+  const [memberId, expStr, sig] = parts;
+  if (!memberId || !expStr || !sig) return { ok: false, reason: 'malformed' };
+
+  const expected = sign(`session.${memberId}.${expStr}`, secret);
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return { ok: false, reason: 'bad-sig' };
+  }
+
+  const exp = Number(expStr);
+  if (!Number.isFinite(exp) || exp * 1000 < Date.now()) {
+    return { ok: false, reason: 'expired' };
+  }
+  return { ok: true, memberId };
+}
 
 // ──────────────────────────────────────────────────────────────
 // 管理动作签名（如 phil-coach 登记审核链接）：HMAC 防伪造
@@ -95,4 +132,61 @@ export function verifyAdminAction(payload: string, sig: string): boolean {
   const a = Buffer.from(sig);
   const b = Buffer.from(expected);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+// ──────────────────────────────────────────────────────────────
+// 邮件里的「点开就能看」链接：凭证在链接上，不靠 cookie
+// ──────────────────────────────────────────────────────────────
+
+const VIEW_LINK_TTL_SECONDS = 60 * 60 * 24 * 7; // 和登录链接同寿命：一周内翻回旧邮件还点得开
+
+/**
+ * 签一条只对某一件东西有效的查看链接，返回 `${expiry}.${sig}`。
+ *
+ * 和 magic link 是同一把 secret、同一套 HMAC，区别只在换到手的东西：
+ * magic link 换来一整个会话，这个只换 scope + subject 指定的那一件，
+ * 到期即止，也不写任何 cookie。
+ *
+ * 存在的理由是手机：邮件客户端的内置浏览器和 Safari 不共享 cookie，
+ * 点开必然「未登录」。把凭证放进链接，人在邮件里点一下就看见图，
+ * 不用先跳去登录再绕回来。
+ */
+export function signViewLink(
+  scope: string,
+  subject: string,
+  ttlSeconds: number = VIEW_LINK_TTL_SECONDS,
+): string | null {
+  const secret = getSecret();
+  if (!secret || !scope || !subject) return null;
+  const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds;
+  return `${expiresAt}.${sign(`view.${scope}.${subject}.${expiresAt}`, secret)}`;
+}
+
+export type ViewLinkVerdict =
+  | { ok: true }
+  | { ok: false; reason: 'no-secret' | 'malformed' | 'bad-sig' | 'expired' };
+
+/** 校验 signViewLink 签出来的 token。scope 和 subject 必须和签发时一模一样。 */
+export function verifyViewLink(scope: string, subject: string, token: string): ViewLinkVerdict {
+  const secret = getSecret();
+  if (!secret) return { ok: false, reason: 'no-secret' };
+  if (!scope || !subject || !token) return { ok: false, reason: 'malformed' };
+
+  const parts = token.split('.');
+  if (parts.length !== 2) return { ok: false, reason: 'malformed' };
+  const [expStr, sig] = parts;
+  if (!expStr || !sig) return { ok: false, reason: 'malformed' };
+
+  const expected = sign(`view.${scope}.${subject}.${expStr}`, secret);
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return { ok: false, reason: 'bad-sig' };
+  }
+
+  const exp = Number(expStr);
+  if (!Number.isFinite(exp) || exp * 1000 < Date.now()) {
+    return { ok: false, reason: 'expired' };
+  }
+  return { ok: true };
 }

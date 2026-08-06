@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyLoginToken, MEMBER_COOKIE, MEMBER_COOKIE_MAX_AGE } from '@/lib/auth';
+import {
+  verifyLoginToken,
+  signMemberSession,
+  MEMBER_COOKIE,
+  MEMBER_COOKIE_MAX_AGE,
+  SESSION_COOKIE,
+} from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
@@ -26,5 +32,15 @@ export async function GET(request: NextRequest) {
     path: '/',
     maxAge: MEMBER_COOKIE_MAX_AGE,
   });
+  const session = signMemberSession(verdict.memberId);
+  if (session.ok) {
+    res.cookies.set(SESSION_COOKIE, session.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: MEMBER_COOKIE_MAX_AGE,
+    });
+  }
   return res;
 }

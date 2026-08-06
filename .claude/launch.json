@@ -14,6 +14,20 @@
       "runtimeArgs": ["NEXT_PUBLIC_SUPABASE_URL=", "npm", "run", "dev"],
       "port": 3100,
       "autoPort": true
+    },
+    {
+      "name": "dev-no-mail",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["NOTIFY_FROM=", "npm", "run", "dev"],
+      "port": 3200,
+      "autoPort": true
+    },
+    {
+      "name": "dev-test-mail",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["ORDER_NOTIFY_EMAILS=1826741794@qq.com", "npm", "run", "dev"],
+      "port": 3300,
+      "autoPort": true
     }
   ]
 }

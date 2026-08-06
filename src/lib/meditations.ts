@@ -598,7 +598,20 @@ export function canAccessTrack(
   return (track.seq ?? 0) <= (category.freeCount ?? 0);
 }
 
-/** 这个人买过哪些陪伴营。没登录就是空集。 */
+/**
+ * 这个人能听哪些陪伴营。没登录就是空集。
+ *
+ * 两种算数：主理人确认过的（status = paid），以及自己说付了、传了截图、
+ * 还没被处理的（pending + claimed_at）。后者是「先开后审」：人转完账
+ * 到手机上就能听，主理人对账在后面跟着走；对不上就驳回，权限当场收回。
+ *
+ * 先开后审只给第一次：confirmed_at 非空说明这一单被处理过（多半是驳回过），
+ * 那之后再传截图就得等人确认。否则驳回等于没有——传张图、被驳、再传一张，
+ * 权限自己就回来了，而每一轮还会给两位主理人各刷一封通知。
+ *
+ * 代价是一段时间的白听，收益是不用让付了钱的人干等主理人醒过来——
+ * 这笔账在这个体量上是划算的。真要收紧，只要把 claimed_at 那一支去掉。
+ */
 export async function fetchPaidPrograms(memberId: string): Promise<Set<string>> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -607,11 +620,20 @@ export async function fetchPaidPrograms(memberId: string): Promise<Set<string>> 
   const sb = createClient(supabaseUrl, serviceKey);
   const { data, error } = await sb
     .from('program_orders')
-    .select('program_id')
+    .select('program_id,status,claimed_at,confirmed_at')
     .eq('member_id', memberId)
-    .eq('status', 'paid');
-  if (error || !data) return new Set();
-  return new Set(data.map(row => String(row.program_id)));
+    .in('status', ['paid', 'pending']);
+  if (error || !data) {
+    // 查询一坏，所有人当场变成没买过——付费墙立起来，音频 403。
+    // 不留这行日志的话，线上只会看到「大家都说听不了」，日志里一片安静。
+    if (error) console.error('[meditations] fetchPaidPrograms failed', error.message);
+    return new Set();
+  }
+  return new Set(
+    data
+      .filter(row => row.status === 'paid' || (row.claimed_at && !row.confirmed_at))
+      .map(row => String(row.program_id)),
+  );
 }
 
 export async function fetchMeditationContent(): Promise<MeditationContent> {

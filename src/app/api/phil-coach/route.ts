@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { MEMBER_COOKIE } from '@/lib/auth';
+import { getAuthenticatedMemberId } from '@/lib/session';
 import { createChatCompletion, getLLMConfig, type ChatMessage } from '@/lib/llm';
 import { getPhilPath } from '@/lib/philCoach';
 import { COACH_WISDOM } from '@/lib/philCoachWisdom';
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
   // 轻登记闸门（方案A + 审核流）：第一条小径免登记；之后需登记且
   // 经主理人在邮件里点击「通过开通」后（status=approved）才能继续。
   const cookieStore = await cookies();
-  const memberIdRaw = cookieStore.get(MEMBER_COOKIE)?.value;
+  const memberIdRaw = (await getAuthenticatedMemberId()) || undefined;
   const guestId = cookieStore.get(GUEST_COOKIE)?.value;
   const assistantTurns = messages.filter(m => m.role === 'assistant').length;
   if (!memberIdRaw && assistantTurns >= GUEST_FREE_TURNS) {

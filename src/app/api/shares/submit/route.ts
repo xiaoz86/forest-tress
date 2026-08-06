@@ -1,8 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { MEMBER_COOKIE } from '@/lib/auth';
 import { notifyShareSubmission } from '@/lib/notify';
+import { getAuthenticatedMemberId } from '@/lib/session';
 import {
   DEFAULT_SHARE_CONTENT,
   SHARE_CONTENT_ID,
@@ -100,8 +99,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'supabase-not-configured' }, { status: 500 });
   }
 
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get(MEMBER_COOKIE)?.value;
+  const memberId = await getAuthenticatedMemberId();
   if (!memberId) {
     return NextResponse.json({ error: 'login-required' }, { status: 401 });
   }

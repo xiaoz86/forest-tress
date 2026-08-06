@@ -167,7 +167,10 @@ values (
     'audio/wav',
     'audio/webm',
     'audio/x-m4a',
-    'video/mp4'
+    'video/mp4',
+    'image/jpeg',
+    'image/png',
+    'image/webp'
   ]
 )
 on conflict (id) do update set
@@ -349,8 +352,15 @@ create table if not exists program_orders (
   note text default '',                     -- 主理人备注（驳回原因等）
   created_at timestamptz default now(),
   confirmed_at timestamptz,
-  confirmed_by text                         -- 哪个管理员点的确认
+  confirmed_by text,                        -- 哪个管理员点的确认
+  claimed_at timestamptz,                   -- 用户说「我付好了」并传上截图的时刻
+  proof_path text default ''                -- 付款截图在私有桶里的对象路径
 );
+
+-- 已部署的库单独执行（幂等）。
+-- claimed_at 非空 = 先开后审：人转完账就能听，主理人对账在后面跟着走。
+alter table program_orders add column if not exists claimed_at timestamptz;
+alter table program_orders add column if not exists proof_path text default '';
 
 -- 口令只在「待确认」之间保证唯一；单子结掉之后可以循环使用，
 -- 所以是部分唯一索引，不是普通 unique。

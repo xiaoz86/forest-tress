@@ -3,7 +3,13 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import { matchNodesAI, type MatchedNode } from '@/lib/match';
 import { generateKeywordsAI } from '@/lib/keywords';
 import { notifyNewNode, notifyWelcome, getSiteOrigin } from '@/lib/notify';
-import { signLoginToken, MEMBER_COOKIE, MEMBER_COOKIE_MAX_AGE } from '@/lib/auth';
+import {
+  signLoginToken,
+  signMemberSession,
+  MEMBER_COOKIE,
+  MEMBER_COOKIE_MAX_AGE,
+  SESSION_COOKIE,
+} from '@/lib/auth';
 import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
 
 const MAX_WORKS_AT_JOIN = 12;
@@ -232,6 +238,16 @@ export async function POST(request: NextRequest) {
         path: '/',
         maxAge: MEMBER_COOKIE_MAX_AGE,
       });
+      const session = signMemberSession(newNode.id);
+      if (session.ok) {
+        res.cookies.set(SESSION_COOKIE, session.token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: MEMBER_COOKIE_MAX_AGE,
+        });
+      }
     }
 
     return res;

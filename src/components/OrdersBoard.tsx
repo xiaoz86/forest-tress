@@ -6,11 +6,11 @@ import type { AdminOrder } from '@/lib/programOrders';
 /**
  * 开通确认看板。
  *
- * 主理人真实的动作是：看着收款记录里的备注 → 输那四个字 → 回车 → 确认。
- * 所以搜索框是主路径，列表是兜底——不是反过来。
+ * 主理人真实的动作是：点开截图 → 对着收款记录看金额和时间 → 确认或驳回。
+ * 所以待确认的那几条排在最上面，每条都带「看截图」，列表就是主路径。
  *
- * 兜底要应付「忘了写备注」的人：那种情况只能按时间和金额猜，
- * 所以时间必须显示到分钟。
+ * 搜索框留着按名字或短号找人（人多了要找特定一条，通知邮件也带短号过来）。
+ * 时间显示到分钟：对账全靠这个和金额。
  */
 
 const STATUS_LABEL: Record<string, string> = {
@@ -18,6 +18,12 @@ const STATUS_LABEL: Record<string, string> = {
   paid: '已开通',
   rejected: '已驳回',
 };
+
+/** 说了「我付好了」的那些：权限已经先开出去，这里等的是对账，不是开通。 */
+function statusLabel(o: AdminOrder): string {
+  if (o.status === 'pending' && o.claimedAt) return '待核对';
+  return STATUS_LABEL[o.status] || o.status;
+}
 
 function when(iso: string): string {
   const d = new Date(iso);
@@ -32,6 +38,10 @@ export default function OrdersBoard() {
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState('');
   const searchRef = useRef<HTMLInputElement | null>(null);
+  // 回车直接开通这个快捷键，只认主理人自己一个字一个字敲进去的口令。
+  // 邮件预填的那次不算：手机上键盘一弹，一个「换行」就把单确认掉了，
+  // 而这时人还没看过截图——原来手抄口令那一步本身就是「我确实看到款了」。
+  const typedRef = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -52,6 +62,10 @@ export default function OrdersBoard() {
 
   useEffect(() => {
     void load();
+    // 通知邮件里的「打开确认」带着口令过来，直接填进搜索框：
+    // 手机上再手输一遍那四个字，是这条路上最容易劝退人的一步。
+    const fromEmail = new URLSearchParams(window.location.search).get('code');
+    if (fromEmail) setQuery(fromEmail.trim().toUpperCase());
     searchRef.current?.focus();
   }, [load]);
 
@@ -95,16 +109,16 @@ export default function OrdersBoard() {
     <div>
       <div className="mb-8">
         <label htmlFor="order-search" className="mb-2 block text-[12px] font-medium text-white/50">
-          输入付款备注里的口令
+          搜名字或短号
         </label>
         <div className="flex flex-wrap items-center gap-3">
           <input
             id="order-search"
             ref={searchRef}
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => { typedRef.current = true; setQuery(e.target.value); }}
             onKeyDown={e => {
-              if (e.key === 'Enter' && soleMatch) void act(soleMatch.id, 'paid');
+              if (e.key === 'Enter' && typedRef.current && soleMatch) void act(soleMatch.id, 'paid');
             }}
             placeholder="4K2M"
             autoComplete="off"
@@ -112,7 +126,7 @@ export default function OrdersBoard() {
             className="w-[220px] rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3 text-[22px] font-bold uppercase tracking-[0.2em] text-white placeholder:text-white/20 focus:border-white/40 focus:outline-none"
             style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
           />
-          {soleMatch && (
+          {soleMatch && typedRef.current && (
             <span className="text-[12.5px] text-leaf">
               回车即可开通 · {soleMatch.memberName}
             </span>
@@ -170,8 +184,19 @@ export default function OrdersBoard() {
                       : 'bg-white/10 text-white/45'
                 }`}
               >
-                {STATUS_LABEL[o.status] || o.status}
+                {statusLabel(o)}
               </span>
+
+              {o.hasProof && (
+                <a
+                  href={`/api/meditations/proof?order=${encodeURIComponent(o.id)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 text-[12px] text-white/45 no-underline hover:text-white"
+                >
+                  看截图
+                </a>
+              )}
 
               {o.status === 'pending' ? (
                 <span className="flex shrink-0 gap-2">

@@ -1,6 +1,5 @@
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { MEMBER_COOKIE } from '@/lib/auth';
+import { getAuthenticatedMemberId } from '@/lib/session';
 import { notifyPhilFeedback } from '@/lib/notify';
 import { memoryClient } from '@/lib/philCoachMemory';
 
@@ -54,8 +53,7 @@ export async function POST(request: NextRequest) {
   if (!sb) return NextResponse.json({ error: 'not-configured' }, { status: 500 });
 
   // 登录用户带上节点身份（可选）
-  const store = await cookies();
-  const memberId = store.get(MEMBER_COOKIE)?.value?.trim() || null;
+  const memberId = (await getAuthenticatedMemberId()) || null;
 
   let nodeName: string | undefined;
   let nodeId: string | null = null;

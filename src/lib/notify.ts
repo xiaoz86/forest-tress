@@ -21,7 +21,7 @@ export type EmailSendResult =
       status?: number;
     };
 
-type CriticalEmailKind = 'new-node' | 'welcome' | 'login-link';
+type CriticalEmailKind = 'new-node' | 'welcome' | 'login-link' | 'program-claim';
 
 type ResendMessage = {
   from: string;
@@ -606,4 +606,85 @@ export async function notifyPhilGuest(params: {
   } catch (err) {
     console.error('[notify] guest send failed', err);
   }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// 有人说自己付款了：通知主理人去收款记录里对账
+// ──────────────────────────────────────────────────────────────────
+
+/**
+ * 「有人付款了，去对一下账」。
+ *
+ * 这封信一天可能来好几封，所以只写主理人当场要用的东西：
+ * 谁、多少钱、以及两个按钮。设计理由留在代码注释里，不塞进正文——
+ * 第一封读着有用的话，第十封就是噪音。
+ *
+ * 对账靠截图：金额、时间、付款人一眼能和收款记录对上，
+ * 所以不再让人在备注里手抄口令。截图不构成凭证，仍以收款记录为准。
+ *
+ * 截图链接自带签名（signViewLink），手机上没登录过也点得开；
+ * 看板链接不带，因为那边是要动权限的地方，只认登录态。
+ */
+export async function notifyProgramClaim(params: {
+  memberName: string;
+  programTitle: string;
+  amountCents: number;
+  code: string;
+  orderId: string;
+  boardUrl: string;
+  /** 带签名的截图直链。签不出来（没配 AUTH_SECRET）时为 null，正文就不放这个按钮。 */
+  proofUrl: string | null;
+}): Promise<EmailSendResult> {
+  // 正式通知发给两位主理人（小 Z + Wendy）——谁先看到谁去对账。
+  // 本地或测试想只发给自己，配 ORDER_NOTIFY_EMAILS 覆盖收件人。
+  const override = process.env.ORDER_NOTIFY_EMAILS?.trim();
+  const recipients = override
+    ? override.split(',').map(s => s.trim()).filter(Boolean)
+    : Array.from(new Set([...getRecipients(), 'wendyjhwu@hotmail.com']));
+  if (recipients.length === 0) return { ok: false, reason: 'skipped' };
+
+  const from = process.env.NOTIFY_FROM?.trim() || '';
+  const name = params.memberName || '一位成员';
+  const yuan = (params.amountCents / 100).toFixed(0);
+  // 手机通知栏只放得下这么多，重要的东西要在前半句里
+  const subject = `${name} 付了 ¥${yuan} · ${params.programTitle}`;
+
+  const button = (href: string, label: string, primary: boolean) =>
+    `<a href="${href}" style="display:inline-block;margin:0 6px 8px 0;padding:11px 22px;border-radius:999px;font-weight:600;font-size:14px;text-decoration:none;${
+      primary
+        ? 'background:#2d4a2d;color:#fff;'
+        : 'background:#fff;color:#2d4a2d;border:1px solid #cbdcc0;'
+    }">${label}</a>`;
+
+  const html = `<!DOCTYPE html>
+<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:26px 30px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
+    <p style="margin:0 0 18px;font-size:15px;color:#2a2a2a;line-height:1.8;">
+      <strong>${escape(name)}</strong> 刚说付了 ¥${yuan}，${escape(params.programTitle)}已经开好了。
+    </p>
+    <p style="margin:0 0 20px;font-size:14px;color:#2a2a2a;line-height:1.8;">
+      截图上的金额和时间，对着收款记录看一眼。<br />
+      对上就点「已收到款」，没找到就点「驳回」。
+    </p>
+    <p style="margin:0;">
+      ${button(params.boardUrl, '打开确认', true)}
+      ${params.proofUrl ? button(params.proofUrl, '看截图', false) : ''}
+    </p>
+  </div>
+</body></html>`;
+
+  const text = [
+    `${name} 刚说付了 ¥${yuan}，${params.programTitle}已经开好了。`,
+    `截图上的金额和时间，对着收款记录看一眼。`,
+    `对上就点「已收到款」，没找到就点「驳回」。`,
+    ``,
+    `打开确认：${params.boardUrl}`,
+    params.proofUrl ? `看截图：${params.proofUrl}` : '',
+  ].filter(Boolean).join('\n');
+
+  return sendCriticalEmail(
+    'program-claim',
+    { from, to: recipients, subject, html, text },
+    `program-claim/${params.orderId}/${Math.floor(Date.now() / 60_000)}`,
+  );
 }

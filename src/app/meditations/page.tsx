@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { cookies } from 'next/headers';
 import Nav from '@/components/Nav';
 import MeditationTrackCard from '@/components/MeditationTrackCard';
 import MeditationProgram from '@/components/MeditationProgram';
@@ -7,6 +6,8 @@ import MeditationAmbient from '@/components/MeditationAmbient';
 import MeditationGrove from '@/components/MeditationGrove';
 import { isAdminId } from '@/lib/admin';
 import { fetchNoteCounts } from '@/lib/meditationNotes';
+import { findLatestOrder } from '@/lib/programOrders';
+import { getAuthenticatedMemberId } from '@/lib/session';
 import {
   fetchMeditationContent,
   fetchPaidPrograms,
@@ -26,12 +27,11 @@ type Props = {
 };
 
 export default async function MeditationsPage({ searchParams }: Props) {
-  const [{ category }, rawContent, cookieStore] = await Promise.all([
+  const [{ category }, rawContent, memberId] = await Promise.all([
     searchParams,
     fetchMeditationContent(),
-    cookies(),
+    getAuthenticatedMemberId(),
   ]);
-  const memberId = cookieStore.get('nf_member')?.value || '';
   const isAdmin = isAdminId(memberId);
 
   // 音频「在哪」在这里就全部摘掉，只留「有没有」——播放统一走 stream 路由
@@ -43,6 +43,22 @@ export default async function MeditationsPage({ searchParams }: Props) {
   const activeCategory = category
     ? content.categories.find(item => item.id === category)
     : undefined;
+
+  // 「已经能听了，但主理人还没核对」这一档要说出来：页面一下全开，
+  // 人反而会以为流程走完了，忘了自己那笔转账还等着对账。
+  const activeOrder =
+    memberId && activeCategory?.kind === 'program'
+      ? await findLatestOrder(memberId, activeCategory.id)
+      : null;
+  // 只在「权限真的先开了」时才说这句话——被驳回过的那一档还没开，
+  // 那种情况面板会自己走「等主理人确认」的分支。
+  const claimPendingProgram =
+    activeOrder &&
+    activeOrder.status === 'pending' &&
+    activeOrder.claimedAt &&
+    !activeOrder.judgedBefore
+      ? activeOrder.programId
+      : '';
 
   if (!activeCategory) {
     const trackCounts: Record<string, number> = {};
@@ -188,6 +204,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
                 content={content}
                 category={activeCategory}
                 paid={paidPrograms.has(activeCategory.id)}
+                claimPending={claimPendingProgram === activeCategory.id}
                 noteCounts={noteCounts}
                 loggedIn={Boolean(memberId)}
               />

@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
 import {
@@ -8,6 +7,7 @@ import {
   fetchPaidPrograms,
   resolveAudioPath,
 } from '@/lib/meditations';
+import { getAuthenticatedMemberId } from '@/lib/session';
 
 export const runtime = 'nodejs';
 
@@ -45,8 +45,7 @@ export async function GET(request: NextRequest) {
 
   // 资格检查必须在「有没有音频」之前：否则没买的人能靠 404 和 403 的区别，
   // 探出后面哪些段落已经传了音频。这道门要无条件地先关上。
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get('nf_member')?.value || '';
+  const memberId = await getAuthenticatedMemberId();
   // 主理人要能在管理页试听全部音频，包括还没人买的那些
   if (!isAdminId(memberId)) {
     const paid = await fetchPaidPrograms(memberId);

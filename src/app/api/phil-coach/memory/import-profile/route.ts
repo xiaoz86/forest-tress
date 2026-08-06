@@ -1,6 +1,5 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { MEMBER_COOKIE } from '@/lib/auth';
+import { getAuthenticatedMemberId } from '@/lib/session';
 import { PROFILE_PATH, normalizePhilProfileName } from '@/lib/philCoach';
 import { buildProfileSummary, memoryClient } from '@/lib/philCoachMemory';
 
@@ -12,9 +11,8 @@ export const runtime = 'nodejs';
  * 已有种子原位刷新，没有时新增。仅本人。
  */
 export async function POST() {
-  const store = await cookies();
-  const memberId = store.get(MEMBER_COOKIE)?.value;
-  if (!memberId || !memberId.trim()) {
+  const memberId = await getAuthenticatedMemberId();
+  if (!memberId) {
     return NextResponse.json({ error: 'not-logged-in' }, { status: 401 });
   }
 

@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { cookies } from 'next/headers';
 import Nav from '@/components/Nav';
 import ShareAdminEditor from '@/components/ShareAdminEditor';
 import { isAdminId } from '@/lib/admin';
+import { getAuthenticatedMemberId } from '@/lib/session';
 import { fetchShareContent } from '@/lib/shares';
 
 export const dynamic = 'force-dynamic';
@@ -13,11 +13,10 @@ export const metadata = {
 };
 
 export default async function ShareAdminPage() {
-  const [content, cookieStore] = await Promise.all([
+  const [content, memberId] = await Promise.all([
     fetchShareContent(),
-    cookies(),
+    getAuthenticatedMemberId(),
   ]);
-  const memberId = cookieStore.get('nf_member')?.value || '';
   const isAdmin = isAdminId(memberId);
 
   if (!isAdmin) {

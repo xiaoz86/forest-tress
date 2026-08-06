@@ -1,6 +1,5 @@
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { MEMBER_COOKIE } from '@/lib/auth';
+import { getAuthenticatedMemberId } from '@/lib/session';
 import { createChatCompletion } from '@/lib/llm';
 import { PROFILE_PATH, normalizePhilProfileName } from '@/lib/philCoach';
 import {
@@ -12,9 +11,8 @@ import {
 export const runtime = 'nodejs';
 
 async function requireMember(): Promise<string | null> {
-  const store = await cookies();
-  const id = store.get(MEMBER_COOKIE)?.value;
-  return id && id.trim() ? id : null;
+  const id = await getAuthenticatedMemberId();
+  return id ? id : null;
 }
 
 /** GET /api/phil-coach/memory —— 列出自己留住的记忆（登录检测也复用此接口） */

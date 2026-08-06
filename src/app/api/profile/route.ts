@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
-import { MEMBER_COOKIE } from '@/lib/auth';
+import { getAuthenticatedMemberId } from '@/lib/session';
 
 export const runtime = 'nodejs';
 
@@ -56,8 +55,7 @@ export async function PATCH(request: NextRequest) {
   const nodeId = request.nextUrl.searchParams.get('id')?.trim();
   if (!nodeId) return NextResponse.json({ error: 'missing-id' }, { status: 400 });
 
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get(MEMBER_COOKIE)?.value;
+  const memberId = await getAuthenticatedMemberId();
   const isOwner = !!memberId && memberId === nodeId;
   const isAdmin = isAdminId(memberId);
   if (!isOwner && !isAdmin) {

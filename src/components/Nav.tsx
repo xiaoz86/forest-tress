@@ -14,40 +14,68 @@ type NavLink =
 // 中间那排：品牌已经指向首页，这里就不再重复放「首页」
 // icon 沿用首页四条小径那套汉字符号，手机菜单排成两列时靠它认路
 const baseLinks: (NavLink & { icon: string })[] = [
-  { href: '/meditations', label: '林间归处', type: 'route', icon: '息' },
+  { href: '/meditations', label: '林间探索', type: 'route', icon: '息' },
   { href: '/phil-coach', label: '回到自己', type: 'route', icon: '伴' },
   { href: '/shares', label: '个体创造', type: 'route', icon: '创' },
   { href: '/creators', label: '遇见附近', type: 'route', icon: '见' },
   { href: '/about', label: '生态社区', type: 'route', icon: '林' },
 ];
 
-function readMemberId(): string | null {
-  if (typeof document === 'undefined') return null;
-  const m = document.cookie.match(/(?:^|;\s*)nf_member=([^;]+)/);
-  return m ? decodeURIComponent(m[1]) : null;
+/**
+ * 登录态问服务器，不读 cookie。
+ *
+ * nf_member 前端可写：读它的话，任何人在控制台敲一行就能让导航说「已登录」；
+ * 更常见的是另一种难堪——老浏览器里只剩 nf_member，界面显示「个人中心」，
+ * 而服务端所有接口都认 nf_session、当你没登录。以服务器的说法为准。
+ */
+type Session = { memberId: string | null; legacy: boolean };
+
+async function fetchSession(): Promise<Session> {
+  try {
+    const res = await fetch('/api/session', { cache: 'no-store' });
+    if (!res.ok) return { memberId: null, legacy: false };
+    const data = await res.json();
+    return {
+      memberId: typeof data.memberId === 'string' ? data.memberId : null,
+      legacy: Boolean(data.legacy),
+    };
+  } catch {
+    return { memberId: null, legacy: false };
+  }
 }
 
 export default function Nav() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [memberId, setMemberId] = useState<string | null>(null);
+  // undefined = 还没问到答案。和「确定没登录」分开，才不会在拿到答案前
+  // 先把一个登录着的人指去注册。
+  const [session, setSession] = useState<Session | undefined>(undefined);
   const pathname = usePathname();
   const isHome = pathname === '/';
 
-  // 登录态：挂载后读 nf_member cookie（值即节点 id）→ 决定尾部展示「个人中心」还是「加入森林/登录」。
-  // 必须在挂载后读：SSR 无 document，且首帧需与服务端一致（null）以避免 hydration 不匹配。
+  // 登录态：挂载后问一次 /api/session。整个站内跳转期间不会变
+  // （登录和退出都是整页加载），所以只问一次。
   useEffect(() => {
-    const id = readMemberId();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMemberId(prev => (prev === id ? prev : id));
-  }, [pathname]);
+    let alive = true;
+    void fetchSession().then(next => {
+      if (alive) setSession(next);
+    });
+    return () => { alive = false; };
+  }, []);
+
+  const memberId = session?.memberId ?? null;
+  const pending = session === undefined;
 
   // 在非主页时，锚点链接需要先回主页再定位
   const resolveHref = (link: NavLink): string =>
     link.type === 'route' ? link.href : isHome ? link.href : `/${link.href}`;
 
+  // 注册过、但会话是换签名 cookie 之前留下的：指去登录，别让人再走一遍注册向导
+  // ——那条路的终点是「这个邮箱已经注册过」。
   const cta: NavLink = memberId
     ? { href: `/creators/${memberId}`, label: '个人中心', type: 'route' }
-    : { href: '#join', label: '种下一棵树', type: 'anchor' };
+    : session?.legacy
+      ? { href: '/login', label: '登录', type: 'route' }
+      : { href: '#join', label: '种下一棵树', type: 'anchor' };
 
   const ctaClass =
     'inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-forest px-6 text-[16px] font-medium text-white no-underline shadow-[0_14px_28px_rgba(47,81,61,0.18)] transition-all hover:-translate-y-0.5 hover:bg-forest-dark';
@@ -91,15 +119,28 @@ export default function Nav() {
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          {!memberId && (
+          {/* 登录态未知时先不出这个链接，免得一个登录着的人看它闪一下 */}
+          {!pending && !memberId && (
             <Link
               href="/login"
-              className="text-[16px] font-medium text-[#33403a]/85 no-underline transition-colors hover:text-forest max-md:hidden"
+              className="text-[16px] font-medium text-[#33403a]/85 no-underline transition-colors hover:text-forest"
             >
               登录
             </Link>
           )}
-          {cta.type === 'route' ? (
+          {/*
+            答案没回来之前，按钮占着位置但不可点：默认渲染成「种下一棵树」的话，
+            回访的老成员一进来最大的那个按钮就指着注册向导，误点要填七步才被告知「已注册」。
+          */}
+          {pending ? (
+            <span
+              aria-hidden="true"
+              className={`${ctaClass} max-md:min-h-[40px] max-md:px-4 max-md:text-[12.5px] pointer-events-none opacity-0`}
+            >
+              种下一棵树
+              <span aria-hidden="true">↗</span>
+            </span>
+          ) : cta.type === 'route' ? (
             <Link href={cta.href} className={`${ctaClass} max-md:min-h-[40px] max-md:px-4 max-md:text-[12.5px]`}>
               {cta.label}
               <span aria-hidden="true">↗</span>
@@ -154,7 +195,7 @@ export default function Nav() {
                 <span className="text-[15px] font-medium text-[#33403a]">{link.label}</span>
               </Link>
             ))}
-            {!memberId && (
+            {!pending && !memberId && (
               <Link
                 href="/login"
                 onClick={() => setMenuOpen(false)}

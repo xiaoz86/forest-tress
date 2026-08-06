@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { cookies } from 'next/headers';
 import Nav from '@/components/Nav';
 import MeditationAdminEditor from '@/components/MeditationAdminEditor';
 import { isAdminId } from '@/lib/admin';
 import { fetchMeditationContent } from '@/lib/meditations';
+import { getAuthenticatedMemberId } from '@/lib/session';
 
 export const metadata = {
   title: '冥想管理 · 附近森林',
@@ -11,11 +11,10 @@ export const metadata = {
 };
 
 export default async function MeditationAdminPage() {
-  const [content, cookieStore] = await Promise.all([
+  const [content, memberId] = await Promise.all([
     fetchMeditationContent(),
-    cookies(),
+    getAuthenticatedMemberId(),
   ]);
-  const memberId = cookieStore.get('nf_member')?.value || '';
   const isAdmin = isAdminId(memberId);
 
   if (!isAdmin) {

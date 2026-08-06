@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
 import {
@@ -7,6 +6,7 @@ import {
   MEDITATION_CONTENT_ID,
   normalizeMeditationContent,
 } from '@/lib/meditations';
+import { getAuthenticatedMemberId } from '@/lib/session';
 
 const BUCKET = 'meditations';
 const MAX_BYTES = 80 * 1024 * 1024;
@@ -33,8 +33,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'supabase-not-configured' }, { status: 500 });
   }
 
-  const cookieStore = await cookies();
-  const memberId = cookieStore.get('nf_member')?.value;
+  const memberId = await getAuthenticatedMemberId();
   if (!isAdminId(memberId)) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }

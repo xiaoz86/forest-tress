@@ -1,9 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from 'next/link';
-import { cookies } from 'next/headers';
 import Nav from '@/components/Nav';
 import ShareSubmitForm from '@/components/ShareSubmitForm';
 import { isAdminId } from '@/lib/admin';
+import { getAuthenticatedMemberId } from '@/lib/session';
 import { fetchShareContent, getPublishedShares, getShareBadgeLabel, type ShareEntry } from '@/lib/shares';
 
 export const dynamic = 'force-dynamic';
@@ -14,11 +14,10 @@ export const metadata = {
 };
 
 export default async function SharesPage() {
-  const [content, cookieStore] = await Promise.all([
+  const [content, memberId] = await Promise.all([
     fetchShareContent(),
-    cookies(),
+    getAuthenticatedMemberId(),
   ]);
-  const memberId = cookieStore.get('nf_member')?.value || '';
   const isAdmin = isAdminId(memberId);
   const publishedShares = getPublishedShares(content);
 
