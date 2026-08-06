@@ -880,13 +880,17 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
 const TTS_PREF_KEY = 'nf_phil_read_aloud';
 const TTS_VOICE_KEY = 'nf_phil_tts_voice';
 
-/** 可选的嗓音。键名要和 /api/phil-coach/tts 里的白名单对上。 */
+/**
+ * 可选的嗓音。键名要和 /api/phil-coach/tts 里的白名单对上。
+ * 两个都是克隆出来的真人嗓音，标签就写「女声」「男声」——
+ * 原来那两个（phil-coach / anna）是音色的内部名字，对听的人没有意义。
+ */
 export const PHIL_COACH_VOICES = [
-  { id: 'phil', label: 'phil-coach' },
-  { id: 'anna', label: 'anna' },
+  { id: 'female', label: '女声' },
+  { id: 'male', label: '男声' },
 ] as const;
 export type PhilVoiceId = (typeof PHIL_COACH_VOICES)[number]['id'];
-const DEFAULT_VOICE_ID: PhilVoiceId = 'phil';
+const DEFAULT_VOICE_ID: PhilVoiceId = 'female';
 
 /** 让 phil-coach 的回复用自然的嗓音读出来（服务端神经网络合成） */
 export function useServerSpeech() {

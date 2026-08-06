@@ -11,14 +11,16 @@ const WINDOW_MS = 5 * 60 * 1000;
 const MAX_PER_WINDOW = 60;
 const buckets = new Map<string, number[]>();
 
-// 两个音色：phil 是克隆音色（PHIL_COACH_TTS_VOICE，由 scripts/clone-phil-voice.mjs 上传后得到），
-// anna 是官方音色，留作备选。前端只能传这两个键名——绝不把任意字符串透传给上游。
-const ANNA_VOICE = 'FunAudioLLM/CosyVoice2-0.5B:anna';
+// 两个音色都是克隆的真人嗓音（scripts/clone-phil-voice.mjs 上传参考音得到 uri）：
+// 一把女声、一把男声，让人挑一个听着舒服的。官方的 anna 只当兜底——
+// 环境变量没配时不能让朗读整个哑掉，但那个声音是「播报腔」，不该是默认。
+// 前端只能传这两个键名，绝不把任意字符串透传给上游。
+const FALLBACK_VOICE = 'FunAudioLLM/CosyVoice2-0.5B:anna';
 const VOICES: Record<string, string> = {
-  phil: process.env.PHIL_COACH_TTS_VOICE?.trim() || ANNA_VOICE,
-  anna: ANNA_VOICE,
+  female: process.env.PHIL_COACH_TTS_VOICE_FEMALE?.trim() || FALLBACK_VOICE,
+  male: process.env.PHIL_COACH_TTS_VOICE_MALE?.trim() || FALLBACK_VOICE,
 };
-const DEFAULT_VOICE_KEY = 'phil';
+const DEFAULT_VOICE_KEY = 'female';
 
 function rateLimited(ip: string): boolean {
   const now = Date.now();
