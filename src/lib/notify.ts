@@ -1,8 +1,10 @@
 import type { NodeCard } from './supabase';
 import type { ShareEntry } from './shares';
 
-// 默认收件人（主理人）。可通过 NOTIFY_EMAILS 环境变量覆盖，逗号分隔支持多个。
-const DEFAULT_RECIPIENTS = ['1826741794@qq.com'];
+// 默认收件人：两位主理人。可通过 NOTIFY_EMAILS 环境变量覆盖，逗号分隔支持多个。
+// 写死两个人是为了「环境变量忘了配」时也不会退化成只通知一个人——
+// 新成员加入、林间分享投稿这些信，谁先看到谁去接。
+const DEFAULT_RECIPIENTS = ['1826741794@qq.com', 'wendyjhwu@hotmail.com'];
 
 function getRecipients(): string[] {
   const raw = process.env.NOTIFY_EMAILS?.trim();
