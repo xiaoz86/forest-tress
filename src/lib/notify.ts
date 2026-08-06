@@ -615,9 +615,12 @@ export async function notifyPhilGuest(params: {
 /**
  * 「有人付款了，去对一下账」。
  *
- * 这封信一天可能来好几封，所以只写主理人当场要用的东西：
- * 谁、多少钱、以及两个按钮。设计理由留在代码注释里，不塞进正文——
- * 第一封读着有用的话，第十封就是噪音。
+ * 这封信是整套人工核对的起点：个人收款码没有回调，主理人不看后台就
+ * 永远不知道有人在等。用户那边权限已经先放行了，所以这封信要的不是
+ * 「快去开通」，而是「去收款记录里核一下」。
+ *
+ * 一天可能来好几封，所以只写主理人当场要用的东西：谁、多少钱、两个按钮。
+ * 设计理由留在代码注释里，不塞进正文——第一封读着有用的话，第十封就是噪音。
  *
  * 对账靠截图：金额、时间、付款人一眼能和收款记录对上，
  * 所以不再让人在备注里手抄口令。截图不构成凭证，仍以收款记录为准。
@@ -650,7 +653,7 @@ export async function notifyProgramClaim(params: {
   const subject = `${name} 付了 ¥${yuan} · ${params.programTitle}`;
 
   const button = (href: string, label: string, primary: boolean) =>
-    `<a href="${href}" style="display:inline-block;margin:0 6px 8px 0;padding:11px 22px;border-radius:999px;font-weight:600;font-size:14px;text-decoration:none;${
+    `<a href="${escape(href)}" style="display:inline-block;margin:0 6px 8px 0;padding:11px 22px;border-radius:999px;font-weight:600;font-size:14px;text-decoration:none;${
       primary
         ? 'background:#2d4a2d;color:#fff;'
         : 'background:#fff;color:#2d4a2d;border:1px solid #cbdcc0;'

@@ -82,6 +82,12 @@ export const SESSION_COOKIE = 'nf_session';
 /**
  * 服务器信任的会话凭证。nf_member 还要给前端读，只用来展示个人页入口；
  * 付费、解锁和管理权限只认这个 HttpOnly 签名 cookie。
+ *
+ * 为什么非做不可：成员 id 在 /creators/<id> 这类公开链接里到处都是，
+ * 明文放 cookie 等于「用户名即密码」——抄一个设进 cookie 就冒充成功，
+ * 抄到管理员的就拿到后台。签名之后，没有 AUTH_SECRET 就伪造不出来。
+ *
+ * 没配 secret 时不退回明文：那等于把洞留着。宁可登录不上。
  */
 export function signMemberSession(memberId: string): SignResult {
   const secret = getSecret();

@@ -605,12 +605,15 @@ export function canAccessTrack(
  * 还没被处理的（pending + claimed_at）。后者是「先开后审」：人转完账
  * 到手机上就能听，主理人对账在后面跟着走；对不上就驳回，权限当场收回。
  *
+ * 之所以只能这样：个人收款码没有回调，服务器无从知道钱到没到。
+ * 要么让每个付完的人干等主理人醒过来，要么先给、核对不上再撤。
+ *
  * 先开后审只给第一次：confirmed_at 非空说明这一单被处理过（多半是驳回过），
  * 那之后再传截图就得等人确认。否则驳回等于没有——传张图、被驳、再传一张，
  * 权限自己就回来了，而每一轮还会给两位主理人各刷一封通知。
  *
- * 代价是一段时间的白听，收益是不用让付了钱的人干等主理人醒过来——
- * 这笔账在这个体量上是划算的。真要收紧，只要把 claimed_at 那一支去掉。
+ * 代价是一段时间的白听：¥68 的风险有限，而干等的代价是每一单都要付的。
+ * 真要收紧，只要把 claimed_at 那一支去掉。
  */
 export async function fetchPaidPrograms(memberId: string): Promise<Set<string>> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   const memberId = await viewer();
   if (!memberId) return NextResponse.json({ error: 'not-logged-in' }, { status: 401 });
 
-  let payload: { program?: unknown };
+  let payload: { program?: unknown; action?: unknown };
   try {
     payload = await request.json();
   } catch {
@@ -57,6 +57,13 @@ export async function POST(request: NextRequest) {
   const category = content.categories.find(c => c.id === programId);
   if (!category || category.kind !== 'program') {
     return NextResponse.json({ error: 'not-a-program' }, { status: 400 });
+  }
+
+  // 早先有过「点一下就算付了」的版本（POST {action:'claim'}）。开权限必须
+  // 见到截图：点个按钮几乎没有心理成本，传一张伪造的付款凭证不一样。
+  // 缓存里还留着旧页面的人会打到这里，给一句明确的话，别让他以为开通了。
+  if (payload.action === 'claim') {
+    return NextResponse.json({ error: 'proof-required' }, { status: 400 });
   }
 
   const result = await ensureOrder(memberId, programId, category.priceCents ?? 0);

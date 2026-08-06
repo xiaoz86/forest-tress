@@ -85,8 +85,8 @@ export default function UnlockPanel({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(
-          data.error === 'bad-file-type' ? '这张图传不了，用手机截图再试一次。'
-            : data.error === 'file-too-large' ? '图太大了，8MB 以内。'
+          data.error === 'bad-file-type' ? '只收图片（jpg / png / webp）。用手机截图再试一次。'
+            : data.error === 'file-too-large' ? '图太大了（8MB 以内），压一下再传。'
               : data.error === 'too-soon' ? '刚传过一张，等一分钟再换。'
                 // 钱已经付出去了，这里不能只说「再试」就没了下文
                 : '没能传上去。再试一次；还是不行就到「生态社区」页加主理人微信，把截图直接发过去。',
@@ -143,7 +143,12 @@ export default function UnlockPanel({
     const openedNow = claimed && !order.judgedBefore;
     return (
       <div id="unlock" className={shell}>
-        <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-coral-soft">
+        {/* 已经开好的那档用绿色：它是「成了」，不该和还没付款的珊瑚色警示同色 */}
+        <div
+          className={`mb-1 text-[10px] font-bold uppercase tracking-[0.18em] ${
+            openedNow ? 'text-leaf' : 'text-coral-soft'
+          }`}
+        >
           {openedNow ? '已开通 · 等核对' : claimed ? '已收到截图' : '等待确认'}
         </div>
         <h3 className="text-[15px] font-semibold text-white">
@@ -151,7 +156,7 @@ export default function UnlockPanel({
             ? '三周的声音已经开好了'
             : claimed
               ? '截图收到了，等主理人确认'
-              : `扫码付 ¥${(order.amountCents / 100).toFixed(0)}，然后传张截图`}
+              : `支付宝扫码付 ¥${(order.amountCents / 100).toFixed(0)}，然后传张截图`}
         </h3>
 
         {/*
@@ -161,14 +166,16 @@ export default function UnlockPanel({
           已经说过付款的人不用再看收款码，收起来省得又扫一次。
         */}
         {!claimed && !qrFailed && (
-          <div className="mt-4">
+          <div className="mt-4 w-[144px]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/api/meditations/pay-qr?program=${encodeURIComponent(programId)}`}
-              alt="收款码"
+              alt="支付宝收款码"
               onError={() => setQrFailed(true)}
               className="h-[144px] w-[144px] rounded-xl border border-white/12 bg-white p-2"
             />
+            {/* 码是支付宝的，不写清楚会有人拿微信扫然后扫不出来 */}
+            <p className="mt-2 text-center text-[11.5px] text-white/45">支付宝扫码</p>
           </div>
         )}
 
@@ -180,7 +187,7 @@ export default function UnlockPanel({
           </p>
         ) : !qrFailed ? (
           <ol className="mt-5 flex list-none flex-col gap-1.5 p-0 text-[12.5px] leading-[1.7] text-white/52">
-            <li>1. 扫码付 ¥{(order.amountCents / 100).toFixed(0)}</li>
+            <li>1. 支付宝扫码付 ¥{(order.amountCents / 100).toFixed(0)}</li>
             <li>2. 回来传一张付款截图，<b className="text-white">当场就能听</b></li>
             <li>3. 主理人对完收款记录，这一单就转正</li>
           </ol>
@@ -200,6 +207,8 @@ export default function UnlockPanel({
             className="hidden"
             onChange={e => {
               const picked = e.target.files?.[0];
+              // 清空 value：同一张图选第二次也要能触发 change
+              e.target.value = '';
               if (picked) void upload(picked);
             }}
           />
@@ -217,6 +226,9 @@ export default function UnlockPanel({
           </button>
           {!claimed && <span className="text-[11.5px] text-white/38">传完当场就能听</span>}
         </div>
+        <p className="mt-2.5 text-[11.5px] leading-[1.7] text-white/38">
+          截图只有主理人看得到，用来和收款记录核对。
+        </p>
 
         {error && <p className="mt-2 text-[12px] text-coral-soft">{error}</p>}
       </div>

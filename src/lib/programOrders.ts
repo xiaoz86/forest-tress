@@ -4,7 +4,7 @@ import { createHash } from 'crypto';
 /**
  * 陪伴营的开通申请。
  *
- * 第一版不接商户号：钱走微信/支付宝收款码，网站只管开权限。
+ * 第一版不接商户号：钱走支付宝个人收款码，网站只管开权限。
  * 用户点解锁 → 建一条 pending 单 → 扫码付款 → 回来传一张付款截图
  * → 权限当场先开 → 主理人对着收款记录核一眼，确认或驳回。
  *
@@ -29,7 +29,11 @@ export type ProgramOrder = {
   amountCents: number;
   note: string;
   createdAt: string;
-  /** 用户点「我付好了」并传上截图的时刻。到这一刻权限就先开了，主理人事后核对。 */
+  /**
+   * 用户点「我付好了」并传上截图的时刻。到这一刻权限就先开了，主理人事后核对。
+   * 个人收款码没有回调，服务器无从知道钱到没到；与其让每个人付完干等，
+   * 不如先给，核对不上再撤。
+   */
   claimedAt: string | null;
   /** 有没有截图可看。对象路径不下发给浏览器——桶是私有的，给了也只是误导。 */
   hasProof: boolean;
@@ -171,7 +175,13 @@ export async function ensureOrder(
   return { ok: false, reason: 'failed' };
 }
 
-/** 主理人看板：待确认的排前面，其余按时间倒序 */
+function orderRank(o: ProgramOrder): number {
+  if (o.status === 'pending' && o.claimedAt) return 2;
+  if (o.status === 'pending') return 1;
+  return 0;
+}
+
+/** 主理人看板：待核对的排前面，其余按时间倒序 */
 export async function listOrders(limit = 100): Promise<AdminOrder[]> {
   const sb = client();
   if (!sb) return [];
@@ -195,7 +205,9 @@ export async function listOrders(limit = 100): Promise<AdminOrder[]> {
       memberId: String(row.member_id),
       memberName: names.get(String(row.member_id)) || '（已删除的节点）',
     }))
-    .sort((a, b) => Number(b.status === 'pending') - Number(a.status === 'pending'));
+    // 传了截图的排最前：那些人已经在听了，等着你去收款记录里核对。
+    // 只点过解锁、还没付款的次之，已结的沉底。
+    .sort((a, b) => orderRank(b) - orderRank(a));
 }
 
 export async function setOrderStatus(

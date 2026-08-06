@@ -49,7 +49,9 @@ const LOGIN_BUTTON = `<p style="margin:24px 0 0;"><a href="/login" style="displa
  *      每次都要被踢去登录再绕回来，而这时人正想赶紧对一眼账。
  *   2. 管理员的登录态——看板里那个「看截图」走的是这条。
  *
- * 图片本身始终从私有桶里现取现回，浏览器拿不到对象地址。
+ * 图片本身始终从私有桶里现取现回，浏览器拿不到对象地址：
+ * 里面是别人的支付宝账单片段——姓名、金额、时间都在上面，属于用户的支付信息，
+ * 不该有第二个人看得到。所以这条路由既不下发路径，也不接受路径参数，只认订单 id。
  */
 export async function GET(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -60,7 +62,11 @@ export async function GET(request: NextRequest) {
 
   const orderId = request.nextUrl.searchParams.get('order')?.trim() || '';
   const token = request.nextUrl.searchParams.get('t')?.trim() || '';
-  if (!orderId) return NextResponse.json({ error: 'missing-order' }, { status: 400 });
+  // 这条链接是从邮件里点开的，落在新标签页——出错时不能甩一坨 JSON，
+  // 手机上打开只会看到 {"error":"..."}，谁也不知道该干什么。
+  if (!orderId) {
+    return page('链接不完整', '这个链接少了订单号，回到「开通确认」页面找那一笔吧。', 400);
+  }
 
   const signed = token ? verifyViewLink(PROOF_VIEW_SCOPE, orderId, token) : null;
   if (!signed?.ok) {
@@ -75,6 +81,14 @@ export async function GET(request: NextRequest) {
           410,
         );
       }
+      // 已经登录、但不是主理人：再说一遍「去登录」是死循环，得说清楚是账号不对
+      if (memberId) {
+        return page(
+          '这个链接只有主理人能打开',
+          '当前登录的账号没有权限看付款截图。换主理人账号登录后，再点一次邮件里的链接。',
+          403,
+        );
+      }
       return page(
         '需要先登录',
         `手机上还没登录过。登录之后，回到邮件再点一次「看截图」就能看到了。${LOGIN_BUTTON}`,
@@ -85,7 +99,7 @@ export async function GET(request: NextRequest) {
 
   const order = await getOrderById(orderId);
   if (!order || !order.proofPath) {
-    return page('没有这张截图', '这条申请还没有传过付款截图。', 404);
+    return page('这一笔没有截图', '可能是早期的申请，那时还没要求传截图。', 404);
   }
 
   const sb = createClient(supabaseUrl, serviceKey);
@@ -120,8 +134,13 @@ export async function GET(request: NextRequest) {
  * POST（multipart：program + file）
  * 用户点「付好了」并传一张截图。传完这一刻权限就先开出去，主理人事后对账。
  *
- * 截图不构成凭证——伪造工具满地都是。它的作用是让主理人在收款记录里
- * 少翻两页（金额、时间、备注一眼能对上），最终以收款记录为准。
+ * 截图不构成验证——伪造工具满地都是，OCR 也分辨不出来，所以这里
+ * 不做任何「金额对不对」的判断：那只会给出一种验过了的错觉。
+ *
+ * 它真正的作用有两个：
+ *   1. 威慑——点一个按钮几乎没有心理成本，上传一张伪造的付款凭证不一样；
+ *   2. 证据——主理人手里有金额和时间，可以和收款记录对照。
+ * 把关仍然在主理人那一步：对不上就驳回，权限当场收回。
  */
 export async function POST(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -191,7 +210,7 @@ export async function POST(request: NextRequest) {
       const label = content.categories.find(c => c.id === order.programId)?.label || order.programId;
       const detail = await getOrderById(order.id);
       const sent = await notifyProgramClaim({
-        memberName: detail?.memberName || '',
+        memberName: detail?.memberName || '一位森林里的朋友',
         programTitle: label,
         amountCents: updated.amountCents,
         code: updated.code,

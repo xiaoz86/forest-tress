@@ -14,16 +14,21 @@ import type { AdminOrder } from '@/lib/programOrders';
  */
 
 const STATUS_LABEL: Record<string, string> = {
-  pending: '待确认',
-  paid: '已开通',
+  pending: '未付款',
+  paid: '已核对',
   rejected: '已驳回',
 };
 
-/** 说了「我付好了」的那些：权限已经先开出去，这里等的是对账，不是开通。 */
+/**
+ * 「待核对」和「未付款」是两回事：
+ * 前者已经传了截图、权限也先开出去了，等的是你去收款记录里核一眼；
+ * 后者只是点过解锁、还没付钱，不用你做任何事。
+ */
 function statusLabel(o: AdminOrder): string {
-  if (o.status === 'pending' && o.claimedAt) return '待核对';
+  if (o.status === 'pending') return o.claimedAt ? '待核对' : '未付款';
   return STATUS_LABEL[o.status] || o.status;
 }
+
 
 function when(iso: string): string {
   const d = new Date(iso);
@@ -99,11 +104,14 @@ export default function OrdersBoard() {
     );
   }, [orders, q]);
 
-  const pendingCount = orders.filter(o => o.status === 'pending').length;
-  // 输满四位且只剩一条时，回车直接开通——这是最常走的那条路
-  const soleMatch = q.length >= 4 && shown.length === 1 && shown[0].status === 'pending'
-    ? shown[0]
-    : null;
+  // 看板顶上那个数字要的是「等你核对的有几笔」，不是「有几笔还没付」
+  const pendingCount = orders.filter(o => o.status === 'pending' && o.claimedAt).length;
+  // 输满四位且只剩一条待核对时，回车直接确认——这是最常走的那条路。
+  // 还没付款的那种不能这样确认：那笔钱根本还没来。
+  const soleMatch =
+    q.length >= 4 && shown.length === 1 && shown[0].status === 'pending' && shown[0].claimedAt
+      ? shown[0]
+      : null;
 
   return (
     <div>
@@ -141,7 +149,7 @@ export default function OrdersBoard() {
             </button>
           )}
           <span className="ml-auto text-[12.5px] text-white/40">
-            待确认 <b className="text-[14px] text-white tabular-nums">{pendingCount}</b>
+            待核对 <b className="text-[14px] text-white tabular-nums">{pendingCount}</b>
           </span>
         </div>
       </div>
@@ -160,12 +168,26 @@ export default function OrdersBoard() {
             <li key={o.id} className="flex flex-wrap items-center gap-x-5 gap-y-2 py-3.5">
               <span
                 className={`w-[5.5rem] shrink-0 text-[17px] font-bold tracking-[0.14em] tabular-nums ${
-                  o.status === 'pending' ? 'text-white' : 'text-white/35'
+                  o.status === 'pending' && o.claimedAt ? 'text-white' : 'text-white/35'
                 }`}
                 style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}
               >
                 {o.code}
               </span>
+
+              {/* 截图点开看大图——核对时要看清金额和时间 */}
+              {o.hasProof ? (
+                <a
+                  href={`/api/meditations/proof?order=${encodeURIComponent(o.id)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 rounded-md border border-white/16 px-2 py-1 text-[11px] text-white/60 no-underline transition-colors hover:border-white/40 hover:text-white"
+                >
+                  看截图
+                </a>
+              ) : (
+                <span className="shrink-0 text-[11px] text-white/25">无截图</span>
+              )}
 
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13.5px] text-white/80">{o.memberName}</span>
@@ -175,28 +197,20 @@ export default function OrdersBoard() {
                 </span>
               </span>
 
+              {/* 珊瑚色只留给「等你核对」那一档，别让还没付款的也来抢注意力 */}
               <span
                 className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                  o.status === 'pending'
+                  o.status === 'pending' && o.claimedAt
                     ? 'bg-coral-soft/15 text-coral-soft'
-                    : o.status === 'paid'
-                      ? 'bg-leaf/15 text-leaf'
-                      : 'bg-white/10 text-white/45'
+                    : o.status === 'pending'
+                      ? 'bg-white/10 text-white/50'
+                      : o.status === 'paid'
+                        ? 'bg-leaf/15 text-leaf'
+                        : 'bg-white/10 text-white/45'
                 }`}
               >
                 {statusLabel(o)}
               </span>
-
-              {o.hasProof && (
-                <a
-                  href={`/api/meditations/proof?order=${encodeURIComponent(o.id)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="shrink-0 text-[12px] text-white/45 no-underline hover:text-white"
-                >
-                  看截图
-                </a>
-              )}
 
               {o.status === 'pending' ? (
                 <span className="flex shrink-0 gap-2">

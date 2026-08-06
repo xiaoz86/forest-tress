@@ -123,7 +123,7 @@ export default function Nav() {
           {!pending && !memberId && (
             <Link
               href="/login"
-              className="text-[16px] font-medium text-[#33403a]/85 no-underline transition-colors hover:text-forest"
+              className="text-[16px] font-medium text-[#33403a]/85 no-underline transition-colors hover:text-forest max-md:hidden"
             >
               登录
             </Link>

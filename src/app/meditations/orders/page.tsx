@@ -24,16 +24,23 @@ export default async function OrdersPage() {
             <div className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-coral-soft">
               Unlock Requests
             </div>
-            <h1 className="text-2xl font-semibold">需要管理员权限</h1>
+            {/*
+              「没登录」和「登录了但不是主理人」要分开说：
+              对后者再喊一句「去登录」是死循环——他刚登录完。
+            */}
+            <h1 className="text-2xl font-semibold">
+              {memberId ? '这一页只有主理人能看' : '需要先登录'}
+            </h1>
             <p className="mt-4 text-sm leading-relaxed text-white/52">
-              这台设备还没登录。用注册邮箱登录之后，回到那封通知邮件再点一次「打开确认」，
-              就会直接落到对应的那一条。
+              {memberId
+                ? '当前登录的账号没有开通确认的权限。换主理人账号登录后，再点一次邮件里的「打开确认」。'
+                : '这台设备还没登录。用注册邮箱登录之后，回到那封通知邮件再点一次「打开确认」，就会直接落到对应的那一条。'}
             </p>
             <Link
-              href="/login"
+              href={memberId ? '/meditations' : '/login'}
               className="mt-6 inline-flex rounded-full bg-white px-5 py-2 text-sm font-semibold text-[#111512] no-underline"
             >
-              去登录
+              {memberId ? '回到声音林' : '去登录'}
             </Link>
           </div>
         </main>
@@ -72,7 +79,7 @@ export default async function OrdersPage() {
               开通确认
             </h1>
             <p className="mt-4 max-w-[560px] text-[14px] leading-[1.9] text-white/48">
-              点开截图，对着微信或支付宝的收款记录核一眼金额和时间。对上就点「已收到款」，
+              点开截图，对着支付宝的收款记录核一眼金额和时间。对上就点「已收到款」，
               找不到这笔就点「驳回」，权限会立刻收回。
             </p>
           </header>

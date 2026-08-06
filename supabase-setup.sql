@@ -347,7 +347,7 @@ create table if not exists program_orders (
   member_id text not null,                  -- nf_member cookie 里那个节点 id
   program_id text not null,                 -- 对应 meditation category id，如 'sleep'
   code text not null,                       -- 四位口令，付款备注里填这个
-  status text not null default 'pending',   -- pending | paid | rejected
+  status text not null default 'pending',   -- pending | claimed | paid | rejected
   amount_cents int not null default 6800,
   note text default '',                     -- 主理人备注（驳回原因等）
   created_at timestamptz default now(),
@@ -358,7 +358,16 @@ create table if not exists program_orders (
 );
 
 -- 已部署的库单独执行（幂等）。
--- claimed_at 非空 = 先开后审：人转完账就能听，主理人对账在后面跟着走。
+-- ============================================================
+-- 2026-08-04 付款截图与「先开后审」
+--
+-- 个人收款码没有回调，服务器无从知道钱到没到；与其让每个人付完干等，
+-- 不如先给，核对不上再撤。不新增 status 档位：claimed_at 非空即为已认领，
+-- 口令在核对完之前一直占着（部分唯一索引管的就是 pending 这一档）。
+--
+-- proof_path 是那张付款截图。注意它不是「验证」——伪造截图的工具满地都是，
+-- OCR 也分辨不出来。它的作用是威慑（伪造凭证的心理成本远高于点一个按钮）
+-- 和证据（主理人手里有金额和时间，可以和收款记录对照）。
 alter table program_orders add column if not exists claimed_at timestamptz;
 alter table program_orders add column if not exists proof_path text default '';
 
@@ -404,3 +413,4 @@ create index if not exists idx_meditation_notes_member
 -- 和 program_orders 一样：开 RLS 不加 policy = 只有服务端能读写。
 -- 浏览器直连的话，匿名那层就等于没有——谁都能查出 author_name。
 alter table meditation_notes enable row level security;
+
