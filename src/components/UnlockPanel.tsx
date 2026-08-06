@@ -112,9 +112,6 @@ export default function UnlockPanel({
     return (
       <div id="unlock" className={shell}>
         <Head lockedCount={lockedCount} />
-        <p className="mt-1 text-[12.5px] leading-[1.75] text-white/52">
-          三周的声音就都在这里了。一次付清，之后随时回来听。
-        </p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <a href="/login" className="rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] no-underline">
             注册并解锁
@@ -260,9 +257,6 @@ export default function UnlockPanel({
   return (
     <div id="unlock" className={shell}>
       <Head lockedCount={lockedCount} />
-      <p className="mt-1 text-[12.5px] leading-[1.75] text-white/52">
-        三周的声音就都在这里了。一次付清，之后随时回来听。
-      </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
