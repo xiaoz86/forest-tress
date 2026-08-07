@@ -32,7 +32,7 @@ export default function StorySection({ children }: { children?: ReactNode }) {
   const [lead, ...rest] = STORIES;
 
   return (
-    <section id="stories" className="px-8 py-24 max-md:px-5 max-md:py-16">
+    <section id="stories" className="px-8 py-24 max-md:px-7 max-md:py-16">
       <div className="mx-auto max-w-[1080px]">
         <div className="mb-12 grid grid-cols-[1fr_0.85fr] items-end gap-10 max-md:grid-cols-1 max-md:gap-5">
           <div>

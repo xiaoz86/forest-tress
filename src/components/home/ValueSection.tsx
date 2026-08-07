@@ -24,7 +24,7 @@ const VALUES = [
 
 export default function ValueSection() {
   return (
-    <section className="px-8 py-24 max-md:px-5 max-md:py-16">
+    <section className="px-8 py-24 max-md:px-7 max-md:py-16">
       <div className="mx-auto max-w-[1080px]">
         <div className="mb-14 text-center">
           <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">

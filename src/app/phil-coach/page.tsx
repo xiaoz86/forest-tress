@@ -52,7 +52,7 @@ export default function PhilCoachPage() {
   return (
     <>
       <Nav />
-      <main className="relative min-h-screen overflow-hidden bg-[#0f1411] px-8 pb-24 pt-32 text-white max-md:px-5 max-md:pt-28">
+      <main className="relative min-h-screen overflow-hidden bg-[#0f1411] px-8 pb-24 pt-32 text-white max-md:px-7 max-md:pt-28">
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(160deg,rgba(255,255,255,0.055),transparent_44%,rgba(232,201,160,0.05))]" />
 
         <div className="relative mx-auto max-w-[1120px]">

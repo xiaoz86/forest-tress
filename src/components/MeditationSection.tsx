@@ -17,7 +17,7 @@ export default function MeditationSection({ content, isAdmin = false }: Props) {
   return (
     <section
       id="meditations"
-      className="relative overflow-hidden bg-[#0f1411] px-8 py-24 text-white max-md:px-5 max-md:py-16"
+      className="relative overflow-hidden bg-[#0f1411] px-8 py-24 text-white max-md:px-7 max-md:py-16"
     >
       <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(160deg,rgba(255,255,255,0.055),transparent_42%,rgba(232,201,160,0.045))]" />
 

@@ -77,7 +77,7 @@ export default async function LaunchPage() {
 
         {/* 文章正文 — 自渲染 prose 样式 */}
         <article
-          className="launch-prose mx-auto max-w-[760px] px-6 pt-2 pb-16 max-md:px-5 max-md:pb-10"
+          className="launch-prose mx-auto max-w-[760px] px-6 pt-2 pb-16 max-md:px-7 max-md:pb-10"
           dangerouslySetInnerHTML={{ __html: html }}
         />
 

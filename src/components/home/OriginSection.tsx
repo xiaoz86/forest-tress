@@ -9,7 +9,7 @@ import HeroFilmPlayer from '@/components/HeroFilmPlayer';
 
 export default function OriginSection() {
   return (
-    <section id="origin" className="px-8 py-28 max-md:px-5 max-md:py-20">
+    <section id="origin" className="px-8 py-28 max-md:px-7 max-md:py-20">
       <div className="mx-auto grid max-w-[1180px] grid-cols-[0.85fr_1.15fr] items-center gap-[70px] max-lg:grid-cols-1 max-lg:gap-11">
         <div
           className="relative min-h-[520px] overflow-hidden rounded-[36px] shadow-[0_22px_60px_rgba(42,59,47,0.08)] max-md:min-h-[430px]"

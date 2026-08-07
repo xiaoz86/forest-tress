@@ -37,7 +37,7 @@ export default async function CreatorsPage() {
       <Nav />
 
       {/* Hero */}
-      <section className="relative pt-36 pb-20 px-10 bg-gradient-to-b from-forest-deep via-[#223b22] to-forest-mid text-center overflow-hidden max-md:px-5 max-md:pt-28 max-md:pb-14">
+      <section className="relative pt-36 pb-20 px-10 bg-gradient-to-b from-forest-deep via-[#223b22] to-forest-mid text-center overflow-hidden max-md:px-7 max-md:pt-28 max-md:pb-14">
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(160deg,rgba(255,255,255,0.055),transparent_44%,rgba(232,201,160,0.045))]" />
         <div className="relative max-w-[760px] mx-auto">
           <div className="inline-block text-xs tracking-[3px] text-sage uppercase mb-4 font-medium">
@@ -56,7 +56,7 @@ export default async function CreatorsPage() {
       </section>
 
       {/* Forest Grid */}
-      <section className="relative py-20 px-10 bg-warm-cream max-md:py-14 max-md:px-5">
+      <section className="relative py-20 px-10 bg-warm-cream max-md:py-14 max-md:px-7">
         <div className="max-w-[1200px] mx-auto">
           {/* 作品书架入口 */}
           {creators.length > 0 && (
@@ -143,7 +143,7 @@ export default async function CreatorsPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-16 px-10 bg-forest-deep text-center max-md:py-12 max-md:px-5">
+      <section className="py-16 px-10 bg-forest-deep text-center max-md:py-12 max-md:px-7">
         <h2 className="font-serif text-[clamp(1.5rem,3vw,2rem)] font-bold text-white mb-4">
           也想把自己这棵树，放进森林？
         </h2>

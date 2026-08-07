@@ -15,7 +15,7 @@ export default function WorksCarousel({ works }: Props) {
     <div className="relative -mx-6 max-md:-mx-5">
       {/* 滚动条本体 */}
       <div className="overflow-x-auto overflow-y-visible scrollbar-thin pb-3">
-        <ul className="flex gap-5 px-6 max-md:gap-4 max-md:px-5 snap-x snap-mandatory">
+        <ul className="flex gap-5 px-6 max-md:gap-4 max-md:px-7 snap-x snap-mandatory">
           {works.map((w) => (
             <li
               key={w.id}

@@ -68,7 +68,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
     return (
       <>
         <Nav />
-        <main className="relative min-h-screen overflow-hidden bg-[#eef3ea] px-8 pb-28 pt-32 text-ink max-md:px-5 max-md:pt-28">
+        <main className="relative min-h-screen overflow-hidden bg-[#eef3ea] px-8 pb-28 pt-32 text-ink max-md:px-7 max-md:pt-28">
           <ForestLight />
           <div className="relative">
             <div className="mx-auto mb-12 flex max-w-[1080px] items-center justify-between gap-4">
@@ -110,7 +110,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
         其余（声音林、引导冥想、纯声音）走首页那套纸感底：干净、清爽、林中漫步。
       */}
       <main
-        className={`relative min-h-screen overflow-hidden px-8 pb-24 pt-32 max-md:px-5 max-md:pt-28 ${
+        className={`relative min-h-screen overflow-hidden px-8 pb-24 pt-32 max-md:px-7 max-md:pt-28 ${
           isProgram ? 'bg-[#0f1411] text-white' : 'bg-[#eef3ea] text-ink'
         }`}
       >

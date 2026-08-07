@@ -193,7 +193,7 @@ export default async function Home() {
       {/* 行动 — 种下你的种子 */}
       <section
         id="join"
-        className="relative overflow-hidden bg-gradient-to-b from-paper-soft via-paper to-[#efe9dc] px-8 py-28 max-md:px-5 max-md:py-20"
+        className="relative overflow-hidden bg-gradient-to-b from-paper-soft via-paper to-[#efe9dc] px-8 py-28 max-md:px-7 max-md:py-20"
       >
         <div className="pointer-events-none absolute left-1/2 top-0 h-px w-[min(760px,78vw)] -translate-x-1/2 bg-gradient-to-r from-transparent via-forest/15 to-transparent" />
         <div className="relative">
@@ -204,7 +204,7 @@ export default async function Home() {
       {/* ════════════════════════════════════════════════════════════════
           Footer
       ════════════════════════════════════════════════════════════════ */}
-      <footer className="bg-forest-deep px-8 py-14 text-white/55 max-md:px-5">
+      <footer className="bg-forest-deep px-8 py-14 text-white/55 max-md:px-7">
         <div className="mx-auto flex max-w-[860px] flex-col items-center gap-6 text-center">
           <div>
             <div className="mb-2 flex items-center justify-center gap-2.5 font-serif text-lg font-bold text-white">

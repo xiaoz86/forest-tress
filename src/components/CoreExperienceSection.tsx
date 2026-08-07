@@ -13,7 +13,7 @@ export default function CoreExperienceSection({ content, isAdmin = false }: Prop
   return (
     <section
       id="experience"
-      className="relative py-28 px-8 bg-[linear-gradient(180deg,#fff_0%,#faf8f2_100%)] max-md:py-16 max-md:px-5"
+      className="relative py-28 px-8 bg-[linear-gradient(180deg,#fff_0%,#faf8f2_100%)] max-md:py-16 max-md:px-7"
     >
       <div className="max-w-[1120px] mx-auto">
         <div className="mb-14 grid grid-cols-[0.9fr_1.1fr] items-end gap-12 max-lg:block">

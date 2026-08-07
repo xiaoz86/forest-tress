@@ -21,7 +21,7 @@ export default async function MeditationAdminPage() {
     return (
       <>
         <Nav />
-        <main className="min-h-screen bg-[#0f1411] px-8 pb-24 pt-32 text-white max-md:px-5">
+        <main className="min-h-screen bg-[#0f1411] px-8 pb-24 pt-32 text-white max-md:px-7">
           <div className="mx-auto max-w-[680px] rounded-lg border border-white/10 bg-white/[0.045] p-8">
             <div className="mb-4 text-[11px] font-medium tracking-[0.18em] text-coral-soft uppercase">
               Admin
@@ -45,7 +45,7 @@ export default async function MeditationAdminPage() {
   return (
     <>
       <Nav />
-      <main className="relative min-h-screen overflow-hidden bg-[#0f1411] px-8 pb-24 pt-32 text-white max-md:px-5">
+      <main className="relative min-h-screen overflow-hidden bg-[#0f1411] px-8 pb-24 pt-32 text-white max-md:px-7">
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(160deg,rgba(255,255,255,0.055),transparent_44%,rgba(232,201,160,0.05))]" />
         <div className="relative mx-auto max-w-[1040px]">
           <div className="mb-10 flex items-center justify-between gap-4">

@@ -24,7 +24,7 @@ export default async function SharesPage() {
   return (
     <>
       <Nav />
-      <main className="min-h-screen bg-[linear-gradient(180deg,#fff_0%,#faf8f2_100%)] px-8 pb-24 pt-32 max-md:px-5">
+      <main className="min-h-screen bg-[linear-gradient(180deg,#fff_0%,#faf8f2_100%)] px-8 pb-24 pt-32 max-md:px-7">
         <div className="mx-auto max-w-[1120px]">
           <div className="mb-14 flex items-start justify-between gap-6 max-md:block">
             <div className="max-w-[720px]">

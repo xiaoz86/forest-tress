@@ -153,7 +153,7 @@ export default async function CreatorDetail({ params }: Props) {
 
       {/* 主体 — 干净的白底 */}
       <main className="bg-white">
-        <div className="max-w-[680px] mx-auto px-6 py-16 max-md:py-10 max-md:px-5">
+        <div className="max-w-[680px] mx-auto px-6 py-16 max-md:py-10 max-md:px-7">
           {canEditProfile && (
             <div className="mb-10 max-md:mb-7">
               <ProfileEditor node={me} mode={isOwner ? 'owner' : 'admin'} />
@@ -181,7 +181,7 @@ export default async function CreatorDetail({ params }: Props) {
         </div>
 
         {canSeeRecommendations && (
-          <div className="max-w-[680px] mx-auto px-6 pb-12 max-md:px-5 max-md:pb-8">
+          <div className="max-w-[680px] mx-auto px-6 pb-12 max-md:px-7 max-md:pb-8">
             <div className="rounded-2xl bg-gradient-to-br from-love-pink/8 via-warmth/8 to-leaf/6 border border-coral-soft/25 p-6 max-md:p-5">
               <AIRecommendations
                 nodeId={me.id!}
@@ -194,7 +194,7 @@ export default async function CreatorDetail({ params }: Props) {
         )}
 
         {/* 联系方式 — 卡片化 */}
-        <div className="max-w-[680px] mx-auto px-6 pb-16 max-md:px-5 max-md:pb-10">
+        <div className="max-w-[680px] mx-auto px-6 pb-16 max-md:px-7 max-md:pb-10">
           <div className="rounded-2xl bg-[#fafaf7] border border-black/[0.06] p-7 max-md:p-5">
             <div className="text-[11px] font-semibold tracking-[0.18em] text-text-light uppercase mb-4">
               联系方式

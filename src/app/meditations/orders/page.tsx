@@ -19,7 +19,7 @@ export default async function OrdersPage() {
     return (
       <>
         <Nav />
-        <main className="min-h-screen bg-[#0f1411] px-8 pb-24 pt-32 text-white max-md:px-5">
+        <main className="min-h-screen bg-[#0f1411] px-8 pb-24 pt-32 text-white max-md:px-7">
           <div className="mx-auto max-w-[680px] rounded-lg border border-white/10 bg-white/[0.045] p-8">
             <div className="mb-4 text-[11px] font-medium uppercase tracking-[0.18em] text-coral-soft">
               Unlock Requests
@@ -51,7 +51,7 @@ export default async function OrdersPage() {
   return (
     <>
       <Nav />
-      <main className="relative min-h-screen bg-[#0f1411] px-8 pb-24 pt-32 text-white max-md:px-5 max-md:pt-28">
+      <main className="relative min-h-screen bg-[#0f1411] px-8 pb-24 pt-32 text-white max-md:px-7 max-md:pt-28">
         <div className="mx-auto max-w-[880px]">
           <div className="mb-10 flex items-center justify-between gap-4">
             <Link

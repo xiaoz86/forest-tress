@@ -110,7 +110,7 @@ export default function AboutPage() {
       </header>
 
       {/* === 缘起 === */}
-      <section id="origin" className="py-24 px-10 bg-white max-md:py-16 max-md:px-5">
+      <section id="origin" className="py-24 px-10 bg-white max-md:py-16 max-md:px-7">
         <div className="text-center max-w-[720px] mx-auto mb-14">
           <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{String(origin.frontmatter.label)}</div>
           <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35]">{String(origin.frontmatter.title)}</h2>
@@ -149,7 +149,7 @@ export default function AboutPage() {
       </section>
 
       {/* === 理念 === */}
-      <section id="philosophy" className="py-24 px-10 bg-warm-cream max-md:py-16 max-md:px-5">
+      <section id="philosophy" className="py-24 px-10 bg-warm-cream max-md:py-16 max-md:px-7">
         <div className="text-center max-w-[760px] mx-auto mb-10">
           <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">生态理念</div>
           <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-4">
@@ -188,7 +188,7 @@ export default function AboutPage() {
       </section>
 
       {/* === 连接故事 === */}
-      <section id="voices" className="py-24 px-10 bg-gradient-to-br from-forest-deep via-[#1f3a1f] to-forest-mid relative overflow-hidden max-md:py-16 max-md:px-5">
+      <section id="voices" className="py-24 px-10 bg-gradient-to-br from-forest-deep via-[#1f3a1f] to-forest-mid relative overflow-hidden max-md:py-16 max-md:px-7">
         <div className="absolute inset-0 bg-[linear-gradient(160deg,rgba(255,255,255,0.045),transparent_42%,rgba(232,201,160,0.045))] pointer-events-none" />
         <div className="text-center max-w-[720px] mx-auto mb-14 relative z-[2]">
           <div className="inline-block text-xs tracking-[3px] text-coral-soft uppercase mb-4 font-medium">{String(voices.frontmatter.label)}</div>
@@ -228,7 +228,7 @@ export default function AboutPage() {
       </section>
 
       {/* === 运作方式 === */}
-      <section id="how-it-works" className="py-24 px-10 bg-warm-cream max-md:py-16 max-md:px-5">
+      <section id="how-it-works" className="py-24 px-10 bg-warm-cream max-md:py-16 max-md:px-7">
         <div className="text-center max-w-[720px] mx-auto mb-14">
           <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{String(howItWorks.frontmatter.label)}</div>
           <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-4">
@@ -265,7 +265,7 @@ export default function AboutPage() {
       </section>
 
       {/* === 线下活动 === */}
-      <section className="py-24 px-10 bg-cream max-md:py-16 max-md:px-5">
+      <section className="py-24 px-10 bg-cream max-md:py-16 max-md:px-7">
         <div className="text-center max-w-[720px] mx-auto mb-14">
           <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{String(offline.frontmatter.label)}</div>
           <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-4">{String(offline.frontmatter.title)}</h2>
@@ -286,7 +286,7 @@ export default function AboutPage() {
       </section>
 
       {/* === 织一张网 === */}
-      <section className="pt-24 pb-10 px-10 bg-gradient-to-b from-warm-cream to-white text-center max-md:pt-16 max-md:pb-10 max-md:px-5">
+      <section className="pt-24 pb-10 px-10 bg-gradient-to-b from-warm-cream to-white text-center max-md:pt-16 max-md:pb-10 max-md:px-7">
         <div className="text-center max-w-[720px] mx-auto mb-14">
           <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">织一张网</div>
           <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35]">让光继续传递</h2>
@@ -308,7 +308,7 @@ export default function AboutPage() {
       </section>
 
       {/* === 社群联结 === */}
-      <section id="community" className="pt-12 pb-24 px-10 bg-white max-md:pt-10 max-md:pb-16 max-md:px-5">
+      <section id="community" className="pt-12 pb-24 px-10 bg-white max-md:pt-10 max-md:pb-16 max-md:px-7">
         <div className="text-center max-w-[780px] mx-auto mb-14">
           <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">社群联结</div>
           <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-8">
@@ -369,7 +369,7 @@ export default function AboutPage() {
       </section>
 
       {/* === 回到主页 CTA === */}
-      <section className="py-20 px-10 bg-forest-deep text-center max-md:py-14 max-md:px-5">
+      <section className="py-20 px-10 bg-forest-deep text-center max-md:py-14 max-md:px-7">
         <h2 className="font-serif text-[clamp(1.4rem,2.8vw,1.8rem)] font-bold text-white mb-6 leading-[1.4]">
           也想把自己这棵树，放进森林？
         </h2>
@@ -382,7 +382,7 @@ export default function AboutPage() {
       </section>
 
       {/* === Footer === */}
-      <footer className="bg-forest-deep py-10 px-8 text-white/45 text-center text-[11px] border-t border-white/5 max-md:px-5">
+      <footer className="bg-forest-deep py-10 px-8 text-white/45 text-center text-[11px] border-t border-white/5 max-md:px-7">
         <p>附近森林 · Nearby Forest</p>
         <p className="mt-1.5 text-white/30">让独立的个体彼此连接、流动、共创</p>
       </footer>
