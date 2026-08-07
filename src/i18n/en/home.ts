@@ -13,6 +13,10 @@ import type { home as zhHome } from '@/i18n/zh/home';
  * hero 那三句和「有温度」的处理留给主理人定稿——见 handTranslated。
  */
 export const home: typeof zhHome = {
+  metaTitle: 'Nearby Forest · a living community',
+  metaDescription:
+    'A place where people doing their own work find each other, talk, and keep growing. Connection, conversation, support, and things made together.',
+
   hero: {
     // 前后各带一个空格：中文那版靠 CSS 的 mx-1 留气口，英文要的是真空格
     titleLead: 'Thousands of creators who ',

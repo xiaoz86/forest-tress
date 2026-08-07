@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import HeroVideo from '@/components/HeroVideo';
@@ -17,6 +18,17 @@ import { buildRelationGraph } from '@/lib/network';
 import type { NodeCard } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * 标题和描述也跟着语言走。
+ *
+ * 根 layout 里那份是静态的 metadata，动不了——/launch 是 force-static，
+ * 让 layout 去读 cookie 会直接构建失败。所以在页面这一层覆盖。
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const t = dict(await getLocale()).home;
+  return { title: t.metaTitle, description: t.metaDescription };
+}
 
 async function fetchCreators(): Promise<NodeCard[]> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
