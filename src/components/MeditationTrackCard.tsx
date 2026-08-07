@@ -1,9 +1,12 @@
 import Link from 'next/link';
 import TrackAudioPanel from '@/components/TrackAudioPanel';
+import type { Dictionary } from '@/i18n';
 import type { MeditationTrack, TrackMood } from '@/lib/meditations';
 
 type Props = {
   track: MeditationTrack;
+  /** 卡片上那几个标签的文案。标题和简介来自库里，仍是中文。 */
+  t: Dictionary['meditations']['card'];
   href?: string;
   showAudio?: boolean;
   showDescription?: boolean;
@@ -63,6 +66,7 @@ const TRACK_VISUALS: Record<TrackMood, { cover: string; dot: string; shade: stri
 
 export default function MeditationTrackCard({
   track,
+  t,
   href,
   showAudio = false,
   showDescription = true,
@@ -91,10 +95,10 @@ export default function MeditationTrackCard({
         白字压在淡渐变上根本读不出来。
       */}
       <div className="absolute left-4 top-4 max-w-[58%] truncate text-[10px] font-semibold uppercase tracking-[0.2em] text-forest-deep/60">
-        {track.stage || '声音'}
+        {track.stage || t.stageFallback}
       </div>
       <div className="absolute right-3 top-3 rounded-full bg-white/75 px-2.5 py-1 text-[11px] font-medium text-forest-deep backdrop-blur-sm">
-        {track.hasAudio ? '可收听' : '开放中'}
+        {track.hasAudio ? t.ready : t.coming}
       </div>
       <div className="absolute inset-0 flex items-center justify-center text-forest-deep/45">
         <TrackGlyph mood={track.mood} />
@@ -103,7 +107,7 @@ export default function MeditationTrackCard({
   );
 
   const coverEl = href ? (
-    <Link href={href} className={coverClass} aria-label={`打开${track.title}`}>
+    <Link href={href} className={coverClass} aria-label={t.open(track.title)}>
       {cover}
     </Link>
   ) : (

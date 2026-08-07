@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import MeditationTrackCard from '@/components/MeditationTrackCard';
+// 这一屏还没接双语（目前也没有任何页面引用它），先直接用中文字典
+import { zh } from '@/i18n/zh';
 import type { MeditationCategory, MeditationContent, TrackMood } from '@/lib/meditations';
 
 type Props = {
@@ -128,6 +130,7 @@ export default function MeditationSection({ content, isAdmin = false }: Props) {
             <MeditationTrackCard
               key={track.id}
               track={track}
+              t={zh.meditations.card}
               href={`/meditations?category=${encodeURIComponent(track.categoryId)}#${track.id}`}
             />
           ))}

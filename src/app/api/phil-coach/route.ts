@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getAuthenticatedMemberId } from '@/lib/session';
+import { getLocale } from '@/lib/locale';
 import { createChatCompletion, getLLMConfig, type ChatMessage } from '@/lib/llm';
 import { getPhilPath } from '@/lib/philCoach';
 import { COACH_WISDOM } from '@/lib/philCoachWisdom';
@@ -69,6 +70,25 @@ const BASE_SYSTEM = `你是「附近森林」里的 phil-coach，一位能真实
 边界：
 你不是医疗、心理治疗或危机干预服务，不做诊断。若用户表达自伤、自杀或即时危险，先稳定陪伴，并建议立即联系当地急救、可信任的人或专业支持。`;
 
+/**
+ * 英文界面的用户来了怎么办。
+ *
+ * 上面那套人格是用中文写的，也只该用中文写——教练那套语言（「看见」「在场」
+ * 「守住关键的点」）是这个产品的内核，翻成英文再喂给模型，人格会先垮一层。
+ * 所以底层一个字不动，只在最后追加一条：换输出语言，别的照旧。
+ *
+ * 注意它必须放在整个 system prompt 的最末尾——前面第 7 条写着「中文回答」，
+ * 靠位置压过去，比回头去改那条规则安全。
+ */
+const ENGLISH_OUTPUT_RULE = `
+
+【输出语言】这位用户在用英文界面：请全程用英文回复。
+上面所有要求全部照旧——语气、长度、一条回复只问一个问题、情绪浓时先陪伴、
+收尾那三步、守住 ta 绕开的关键点——只有输出的语言换成英文。
+不要中英夹杂，也不要先写中文再翻一遍。
+教练语言里那些中文特有的说法，用英文里本来就有的对应说法
+（看见→notice、觉察→awareness、在场→presence、陪伴→stay with），不要逐字直译。`;
+
 const VOICE_OBSERVATION_RULE = `
 
 语音观察的使用边界：
@@ -122,11 +142,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'message-required' }, { status: 400 });
   }
 
+  const locale = await getLocale();
+
   const latestUserText = messages[messages.length - 1].content;
   if (CRISIS_RE.test(latestUserText)) {
+    // 这句不能走模型，也不能只有中文——正是这一句要保证对方读得懂
     return NextResponse.json({
       reply:
-        '我听见你现在真的很难受。先别一个人扛着，请立刻联系身边可信任的人，或拨打当地急救/危机援助电话。你可以先把手机拿起来，给一个能马上回应你的人发一句：“我现在很危险，需要你陪我。”',
+        locale === 'en'
+          ? 'I hear how much pain you are in right now. Please do not carry this alone — reach out to someone you trust, or call your local emergency or crisis line right now. You can start by picking up your phone and sending one line to someone who will answer: "I am in danger and I need you with me."'
+          : '我听见你现在真的很难受。先别一个人扛着，请立刻联系身边可信任的人，或拨打当地急救/危机援助电话。你可以先把手机拿起来，给一个能马上回应你的人发一句：“我现在很危险，需要你陪我。”',
     });
   }
 
@@ -204,7 +229,7 @@ export async function POST(request: Request) {
   const chatMessages: ChatMessage[] = [
     {
       role: 'system',
-      content: `${BASE_SYSTEM}${VOICE_OBSERVATION_RULE}\n\n${COACH_WISDOM}${knowledgeBlock}${memoryBlock}${buildPathContext(body.pathId)}`,
+      content: `${BASE_SYSTEM}${VOICE_OBSERVATION_RULE}\n\n${COACH_WISDOM}${knowledgeBlock}${memoryBlock}${buildPathContext(body.pathId)}${locale === 'en' ? ENGLISH_OUTPUT_RULE : ''}`,
     },
     ...recentMessages.map((m, index) => ({
       role: m.role,

@@ -1,10 +1,13 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import MeditationTrackCard from '@/components/MeditationTrackCard';
 import MeditationProgram from '@/components/MeditationProgram';
 import MeditationAmbient from '@/components/MeditationAmbient';
 import MeditationGrove from '@/components/MeditationGrove';
+import { dict, type Dictionary } from '@/i18n';
 import { isAdminId } from '@/lib/admin';
+import { getLocale } from '@/lib/locale';
 import { fetchNoteCounts } from '@/lib/meditationNotes';
 import { findLatestOrder } from '@/lib/programOrders';
 import { getAuthenticatedMemberId } from '@/lib/session';
@@ -17,21 +20,26 @@ import {
   type TrackMood,
 } from '@/lib/meditations';
 
-export const metadata = {
-  title: '林间呼吸 · 附近森林',
-  description: '附近森林的主题冥想与声音练习。',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = dict(await getLocale()).meditations;
+  return { title: t.metaTitle, description: t.metaDescription };
+}
 
 type Props = {
   searchParams: Promise<{ category?: string }>;
 };
 
+/** 这一屏的文案。分类名和音频标题不在这里——那些存在 Supabase，翻不了。 */
+type T = Dictionary['meditations'];
+
 export default async function MeditationsPage({ searchParams }: Props) {
-  const [{ category }, rawContent, memberId] = await Promise.all([
+  const [{ category }, rawContent, memberId, locale] = await Promise.all([
     searchParams,
     fetchMeditationContent(),
     getAuthenticatedMemberId(),
+    getLocale(),
   ]);
+  const t = dict(locale).meditations;
   const isAdmin = isAdminId(memberId);
 
   // 音频「在哪」在这里就全部摘掉，只留「有没有」——播放统一走 stream 路由
@@ -76,8 +84,9 @@ export default async function MeditationsPage({ searchParams }: Props) {
                 href="/"
                 className="text-sm text-ink-soft underline-offset-4 transition-colors hover:text-forest"
               >
-                ← 回到首页
+                {t.backHome}
               </Link>
+              {/* 管理入口只有主理人看得见，点进去是整页中文的后台，所以不翻 */}
               {isAdmin && (
                 <Link
                   href="/meditations/admin"
@@ -87,7 +96,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
                 </Link>
               )}
             </div>
-            <MeditationGrove content={content} counts={trackCounts} />
+            <MeditationGrove content={content} counts={trackCounts} t={t} />
           </div>
         </main>
       </>
@@ -128,7 +137,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
                 isProgram ? 'text-white/42 hover:text-white' : 'text-ink-soft hover:text-forest'
               }`}
             >
-              ← 所有声音
+              {t.backToAll}
             </Link>
             {isAdmin && (
               <div className="flex items-center gap-2.5">
@@ -157,7 +166,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
 
           {/* 陪伴营自带头部（封面 + 金句 + 导师），不再套这一层通用大标题 */}
           {!isProgram && (
-            <CategoryHero category={activeCategory} count={tracks.length} />
+            <CategoryHero category={activeCategory} count={tracks.length} t={t} />
           )}
 
           <section className="mt-14 grid grid-cols-[220px_1fr] gap-10 max-lg:grid-cols-1 max-lg:mt-8">
@@ -171,7 +180,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
                   isProgram ? 'text-white/28' : 'text-forest/45'
                 }`}
               >
-                Other Paths
+                {t.category.otherPaths}
               </p>
               <div className="flex flex-col gap-0.5 max-lg:flex-row max-lg:gap-2 max-lg:pb-2">
                 {content.categories.map(categoryItem => {
@@ -217,7 +226,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
               />
             ) : (
             <div>
-            <CategoryNotes category={activeCategory} />
+            <CategoryNotes category={activeCategory} t={t} />
 
             {/*
               这里原来还并排放一段 description。页首现在已经用大字介绍过这条小径，
@@ -225,13 +234,13 @@ export default async function MeditationsPage({ searchParams }: Props) {
             */}
             <div className="mb-8">
               <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.2em] text-forest/45">
-                Listen
+                {t.category.listenEyebrow}
               </p>
               <h2
                 className="text-[1.5rem] font-semibold tracking-[-0.02em] text-ink"
                 style={{ fontFamily: 'var(--font-serif)' }}
               >
-                具体的声音
+                {t.category.listenTitle}
               </h2>
             </div>
 
@@ -244,6 +253,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
               <div className="max-w-[760px]">
                 <MeditationTrackCard
                   track={tracks[0]}
+                  t={t.card}
                   layout="wide"
                   showAudio
                   loggedIn={Boolean(memberId)}
@@ -266,6 +276,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
                   <MeditationTrackCard
                     key={track.id}
                     track={track}
+                    t={t.card}
                     showAudio
                     loggedIn={Boolean(memberId)}
                     noteCount={noteCounts[track.id] || 0}
@@ -274,7 +285,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
               </div>
             ) : (
               <div className="rounded-2xl border border-forest/12 bg-white/60 px-6 py-10 text-ink-soft">
-                这一条小径还在生长。等新的声音出现，会安静地放进来。
+                {t.category.empty}
               </div>
             )}
             </div>
@@ -310,7 +321,7 @@ function ForestLight() {
   );
 }
 
-function CategoryNotes({ category }: { category: MeditationCategory }) {
+function CategoryNotes({ category, t }: { category: MeditationCategory; t: T }) {
   const benefits = (category.benefits || []).filter(Boolean);
   const hasNotes = Boolean(category.sourceNote || category.featureNote || benefits.length);
   if (!hasNotes) return null;
@@ -320,7 +331,7 @@ function CategoryNotes({ category }: { category: MeditationCategory }) {
       <div className="grid grid-cols-[1.1fr_0.9fr] gap-8 max-md:grid-cols-1 max-md:gap-6">
         <div>
           <div className="mb-4 text-[11px] font-bold uppercase tracking-[0.2em] text-clay">
-            来源与特色
+            {t.category.sourceEyebrow}
           </div>
           {category.sourceNote && (
             <p className="text-[14px] leading-[2] text-ink-soft">
@@ -337,7 +348,7 @@ function CategoryNotes({ category }: { category: MeditationCategory }) {
         {benefits.length > 0 && (
           <div>
             <div className="mb-4 text-[11px] font-bold uppercase tracking-[0.2em] text-forest/45">
-              可能带来的变化
+              {t.category.benefitsEyebrow}
             </div>
             <div className="flex flex-wrap gap-2.5">
               {benefits.map(benefit => (
@@ -381,7 +392,13 @@ const CATEGORY_GLYPH: Record<string, string> = {
   'self-care': '柔', 'inner-freedom': '松', 'sleep': '眠',
 };
 
-function CategoryHero({ category, count }: { category: MeditationCategory; count: number }) {
+function CategoryHero({
+  category, count, t,
+}: {
+  category: MeditationCategory;
+  count: number;
+  t: T;
+}) {
   const aura = MOOD_AURA[category.mood || 'forest'];
   return (
     <section className="relative">

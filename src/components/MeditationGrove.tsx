@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { Dictionary } from '@/i18n';
 import type { MeditationCategory, MeditationContent, MeditationKind, TrackMood } from '@/lib/meditations';
 
 /**
@@ -12,28 +13,18 @@ import type { MeditationCategory, MeditationContent, MeditationKind, TrackMood }
 type Props = {
   content: MeditationContent;
   counts: Record<string, number>;
+  /** 页面框架的文案。分类名和音频标题来自 content，那些存在库里，翻不了。 */
+  t: Dictionary['meditations'];
 };
 
-const KIND_GROUPS: { kind: MeditationKind; eyebrow: string; title: string; note: string }[] = [
-  {
-    kind: 'guided',
-    eyebrow: 'Guided',
-    title: '引导冥想',
-    note: '有人声带着走。随时挑一段，按自己的节奏听。',
-  },
-  {
-    kind: 'program',
-    eyebrow: 'Program',
-    title: '睡眠-系列',
-    note: '有次序的一整段旅程。一周一周走，不急着走完。',
-  },
-  {
-    kind: 'ambient',
-    eyebrow: 'Ambient',
-    title: '声音',
-    note: '没有引导。手碟、颂钵、雨声，放着就好。',
-  },
-];
+/** 三组的文字跟着字典走；kind 是代码里的分组键，不显示给人看。 */
+function kindGroups(t: Dictionary['meditations']) {
+  return [
+    { kind: 'guided' as MeditationKind, ...t.grove.guided },
+    { kind: 'program' as MeditationKind, ...t.grove.program },
+    { kind: 'ambient' as MeditationKind, ...t.grove.ambient },
+  ];
+}
 
 /**
  * 每条小径自己的光。
@@ -85,12 +76,12 @@ const GLYPH: Record<string, string> = {
   'self-care': '柔', 'inner-freedom': '松', 'sleep': '眠', 'ambient': '声',
 };
 
-export default function MeditationGrove({ content, counts }: Props) {
+export default function MeditationGrove({ content, counts, t }: Props) {
   return (
     <div className="mx-auto max-w-[1080px]">
       <header className="mb-16 max-w-[760px] max-md:mb-10">
         <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
-          Sounds of the Forest
+          {t.grove.eyebrow}
         </p>
         <h1
           className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.22] tracking-[-0.03em] text-ink"
@@ -104,7 +95,7 @@ export default function MeditationGrove({ content, counts }: Props) {
       </header>
 
       <div className="flex flex-col gap-16 max-md:gap-12">
-        {KIND_GROUPS.map(group => {
+        {kindGroups(t).map(group => {
           const items = content.categories.filter(c => (c.kind || 'guided') === group.kind);
           // 还没有内容的那一组先不出现，免得摆一排空位
           if (items.length === 0) return null;
@@ -135,6 +126,7 @@ export default function MeditationGrove({ content, counts }: Props) {
                     category={category}
                     count={counts[category.id] || 0}
                     wide={items.length === 1}
+                    t={t}
                   />
                 ))}
               </div>
@@ -186,11 +178,12 @@ function WideCover({ category }: { category: MeditationCategory }) {
 }
 
 function PathCard({
-  category, count, wide,
+  category, count, wide, t,
 }: {
   category: MeditationCategory;
   count: number;
   wide: boolean;
+  t: Dictionary['meditations'];
 }) {
   const ink = MOOD_INK[category.mood || 'forest'];
   const glyph = GLYPH[category.id] || '声';
@@ -254,7 +247,7 @@ function PathCard({
 
           <div className="mt-7 flex items-center gap-3">
             <span className="rounded-full border border-forest/15 bg-white/70 px-3.5 py-1.5 text-[12px] font-medium text-forest">
-              {count > 0 ? `${count} 段声音` : '声音开放中'}
+              {count > 0 ? t.soundCount(count) : t.soundsComing}
             </span>
             <span
               aria-hidden="true"
