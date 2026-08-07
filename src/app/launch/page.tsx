@@ -6,7 +6,8 @@ import remarkGfm from 'remark-gfm';
 import remarkHtml from 'remark-html';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import Nav from '@/components/Nav';
+import NavClient from '@/components/NavClient';
+import { zh } from '@/i18n/zh';
 
 export const dynamic = 'force-static';
 
@@ -48,7 +49,12 @@ export default async function LaunchPage() {
 
   return (
     <>
-      <Nav />
+      {/*
+        这页是 force-static 的发布公告，不能读 cookie（读了就静态不了）。
+        所以直接用客户端导航、写死中文：一篇写给中文读者的公告，
+        不值得为它把整页变成动态渲染。
+      */}
+      <NavClient locale="zh" t={zh.nav} />
       <main className="bg-white">
         {/* 文章头 */}
         <header className="pt-32 pb-10 px-6 text-center bg-gradient-to-b from-[#fafaf7] via-[#f5f5f0] to-white max-md:pt-24 max-md:pb-6">
