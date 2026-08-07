@@ -10,6 +10,12 @@ type Props = {
   /** 只在 showAudio 时用得上：决定能不能写感悟、已有几条 */
   loggedIn?: boolean;
   noteCount?: number;
+  /**
+   * grid = 网格里的竖版（封面在上、文字在下）。
+   * wide = 独占一行的横版（封面在左、文字在右）：一条小径下面只有一两段声音时，
+   *        竖版会孤零零站在一格里、右边整片空白，横版才把那行宽度用起来。
+   */
+  layout?: 'grid' | 'wide';
 };
 
 const TRACK_VISUALS: Record<TrackMood, { cover: string; dot: string; shade: string }> = {
@@ -62,10 +68,15 @@ export default function MeditationTrackCard({
   showDescription = true,
   loggedIn = false,
   noteCount = 0,
+  layout = 'grid',
 }: Props) {
+  const wide = layout === 'wide';
   const visual = TRACK_VISUALS[track.mood] || TRACK_VISUALS.forest;
   const coverClass = [
-    'relative block aspect-square overflow-hidden rounded-[20px] border border-forest-deep/[0.10] no-underline',
+    'relative block overflow-hidden rounded-[20px] border border-forest-deep/[0.10] no-underline',
+    // 横版在手机上是上下叠的：这时封面用 3:2 的横幅，正方形会占掉大半屏，
+    // 人要滑过一整块装饰才看得到标题。到 sm 以上它移到左边，才变回正方形。
+    wide ? 'aspect-[3/2] sm:aspect-square' : 'aspect-square',
     'transition-all duration-500 group-hover:-translate-y-1 group-hover:shadow-[0_16px_36px_rgba(42,59,47,0.10)]',
     visual.cover,
   ].join(' ');
@@ -91,18 +102,32 @@ export default function MeditationTrackCard({
     </>
   );
 
-  return (
-    <article id={track.id} className="group min-w-0 scroll-mt-28">
-      {href ? (
-        <Link href={href} className={coverClass} aria-label={`打开${track.title}`}>
-          {cover}
-        </Link>
-      ) : (
-        <div className={coverClass}>{cover}</div>
-      )}
+  const coverEl = href ? (
+    <Link href={href} className={coverClass} aria-label={`打开${track.title}`}>
+      {cover}
+    </Link>
+  ) : (
+    <div className={coverClass}>{cover}</div>
+  );
 
-      <div>
-        <div className="mt-5 flex items-center gap-2 text-[12px] font-medium tracking-[0.08em] text-ink-soft">
+  return (
+    <article
+      id={track.id}
+      className={
+        wide
+          ? 'group scroll-mt-28 sm:flex sm:items-start sm:gap-8'
+          : 'group min-w-0 scroll-mt-28'
+      }
+    >
+      {/* 横版里给封面一个定宽，它才不会跟着文字一起被拉成一整行那么大 */}
+      {wide ? <div className="sm:w-[240px] sm:shrink-0">{coverEl}</div> : coverEl}
+
+      <div className={wide ? 'min-w-0 flex-1' : ''}>
+        <div
+          className={`flex items-center gap-2 text-[12px] font-medium tracking-[0.08em] text-ink-soft ${
+            wide ? 'mt-5 sm:mt-1' : 'mt-5'
+          }`}
+        >
           <span className={`h-1.5 w-1.5 rounded-full ${visual.dot}`} />
           <span>{[track.duration, track.stage].filter(Boolean).join(' · ')}</span>
         </div>
@@ -117,16 +142,16 @@ export default function MeditationTrackCard({
             {track.intention}
           </p>
         )}
-      </div>
 
-      {showAudio && (
-        <TrackAudioPanel
-          trackId={track.id}
-          hasAudio={Boolean(track.hasAudio)}
-          loggedIn={loggedIn}
-          noteCount={noteCount}
-        />
-      )}
+        {showAudio && (
+          <TrackAudioPanel
+            trackId={track.id}
+            hasAudio={Boolean(track.hasAudio)}
+            loggedIn={loggedIn}
+            noteCount={noteCount}
+          />
+        )}
+      </div>
     </article>
   );
 }

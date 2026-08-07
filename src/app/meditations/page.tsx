@@ -235,8 +235,33 @@ export default async function MeditationsPage({ searchParams }: Props) {
               </h2>
             </div>
 
-            {tracks.length > 0 ? (
-              <div className="grid grid-cols-3 gap-8 max-xl:grid-cols-2 max-md:grid-cols-2 max-[420px]:gap-5 max-[360px]:grid-cols-1">
+            {tracks.length === 1 ? (
+              /*
+                只有一段的时候不要塞进网格：一张竖卡站在三分之一格里，
+                右边整片空白，看着像是加载失败。横版把这一行用满。
+                宽度收在 760px 以内，否则大屏上一行正文会长到读不下去。
+              */
+              <div className="max-w-[760px]">
+                <MeditationTrackCard
+                  track={tracks[0]}
+                  layout="wide"
+                  showAudio
+                  loggedIn={Boolean(memberId)}
+                  noteCount={noteCounts[tracks[0].id] || 0}
+                />
+              </div>
+            ) : tracks.length > 0 ? (
+              /*
+                列数跟着实际有几段走，别让最后一行留下空格子。
+                手机上一律单列——两列的话每行只剩十个字，中文根本读不成句。
+              */
+              <div
+                className={`grid gap-8 max-[420px]:gap-5 ${
+                  tracks.length === 2
+                    ? 'sm:grid-cols-2'
+                    : 'sm:grid-cols-2 xl:grid-cols-3'
+                }`}
+              >
                 {tracks.map(track => (
                   <MeditationTrackCard
                     key={track.id}
