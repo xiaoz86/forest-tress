@@ -146,6 +146,12 @@ export const home = {
         footer: '李明朗 × 赵一舟 等 5 人 · 每周三晚上的共读',
       },
     ],
+    /**
+     * 引号跟着语言走，不能写死在组件里：
+     * 中文用直角引号，英文用弯引号——「」套在英文句子外面很难看。
+     */
+    quoteOpen: '「',
+    quoteClose: '」',
     /** 关系网那块：中间夹着最新加入的人的名字和一个数字，所以拆成三截 */
     networkLabelTop: '连接 · 共振',
     networkLabelBottom: '关系网络',

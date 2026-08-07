@@ -1,31 +1,9 @@
-import PathSteps, { type Step } from './PathSteps';
+import type { Dictionary } from '@/i18n';
+import PathSteps from './PathSteps';
 // [4] 加入后会获得什么 —— 把「连接怎么长出来」拆成四步，
 // 让人知道种下节点之后会发生什么，而不是留在想象里。
 
-const STEPS: Step[] = [
-  {
-    n: '01',
-    title: '种下节点',
-    body: '写下你正在做的事、关心的议题、可以提供与正在寻找的内容。',
-  },
-  {
-    n: '02',
-    title: '被彼此看见',
-    body: '森林根据议题、方向与互补能力，推荐值得认真认识的人。',
-  },
-  {
-    n: '03',
-    title: '开始对话',
-    body: '从一个具体问题开始，不急着交换资源，也不需要表演自己。',
-  },
-  {
-    n: '04',
-    title: '长出事情',
-    body: '一次支持、一场活动、一件作品，或一个可以共同推进的项目。',
-  },
-];
-
-export default function PathSection() {
+export default function PathSection({ t }: { t: Dictionary['home']['paths'] }) {
   return (
     <section
       id="paths"
@@ -45,13 +23,13 @@ export default function PathSection() {
             className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.25] tracking-[-0.03em] text-white"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
-            连接不必用力，
+            {t.headingTop}
             <br />
-            让关系沿着适合自己的速度生长。
+            {t.headingBottom}
           </h2>
         </div>
 
-        <PathSteps steps={STEPS} />
+        <PathSteps steps={t.steps} unfold={t.unfold} fold={t.fold} />
       </div>
     </section>
   );

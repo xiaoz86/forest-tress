@@ -1,40 +1,15 @@
 import Link from 'next/link';
+import type { Dictionary } from '@/i18n';
 
 // [2] 我能做什么 —— 首页不再完整展开每个产品，只给每类需要一个清晰入口。
 // 名字沿用导航里的正式叫法，别在这里另发明一套。
+//
+// 链接不进字典：那是路由，不是文案。字典里四条的顺序就是下面这四条的顺序，
+// 加减一条要两边一起改。
 
-const ENTRANCES = [
-  {
-    icon: '息',
-    title: '林间探索',
-    body: '从正念声音、身心放松与自我关怀开始，把注意力重新带回此刻。',
-    href: '/meditations',
-    cta: '进入「林间探索」',
-  },
-  {
-    icon: '伴',
-    title: '回到自己',
-    body: '一个会记得你的虚拟陪伴教练 phil-coach，支持你整理感受、看见选择，并找到下一步。',
-    href: '/phil-coach',
-    cta: '开始一次对话',
-  },
-  {
-    icon: '见',
-    title: '遇见附近',
-    body: '浏览创造者节点，通过同频推荐、小桌子对话和主题活动认识彼此。',
-    href: '/creators',
-    cta: '看看创造者森林',
-  },
-  {
-    icon: '创',
-    title: '个体创造',
-    body: '让你的课程、内容、活动、作品或项目被看见，并找到可以支持它的人。',
-    href: '/shares',
-    cta: '看看正在生长的事',
-  },
-];
+const HREFS = ['/meditations', '/phil-coach', '/creators', '/shares'];
 
-export default function EntranceSection() {
+export default function EntranceSection({ t }: { t: Dictionary['home']['entrances'] }) {
   return (
     <section id="entrances" className="bg-paper-soft/60 px-8 py-24 max-md:px-7 max-md:py-16">
       <div className="mx-auto max-w-[1080px]">
@@ -46,15 +21,15 @@ export default function EntranceSection() {
             className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-ink"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
-            从适合你的那条小径进入。
+            {t.heading}
           </h2>
         </div>
 
         <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1 max-md:gap-4">
-          {ENTRANCES.map(e => (
+          {t.items.map((e, i) => (
             <Link
-              key={e.href}
-              href={e.href}
+              key={HREFS[i]}
+              href={HREFS[i]}
               className="group flex flex-col justify-between rounded-[26px] border border-forest-deep/[0.10] bg-paper-soft p-9 no-underline transition-all hover:-translate-y-1 hover:border-forest-deep/20 hover:shadow-[0_18px_44px_rgba(42,59,47,0.07)] max-md:p-7"
             >
               <div>

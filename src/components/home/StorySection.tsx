@@ -1,35 +1,18 @@
 import type { ReactNode } from 'react';
+import type { Dictionary } from '@/i18n';
 
 // [5] 真实发生过什么连接 —— 编辑式排布：一则占大块，另两则叠在右侧。
 // 文案沿用线上原有的三段连接故事，不另写。
+//
+// 引号来自字典：中文用「」，英文用弯引号——「」套在英文句子外面很难看。
 
-const STORIES: {
-  type: string;
-  quote: string;
-  footer: string;
-}[] = [
-  {
-    type: 'AI MATCH · 共创伙伴',
-    quote:
-      '我们因为都关注社区营造被 AI 推荐认识。第一次线上聊了两个小时，发现彼此在做的事情竟然可以互补。后来一起发起了一个城市空间改造项目。这种不是刻意社交、而是自然生长出来的合作，特别珍贵。',
-    footer: '林小溪 × 张远山 · 从共同关心社区营造开始',
-  },
-  {
-    type: 'SMALL TABLE · 彼此支持',
-    quote:
-      '在一次「此刻你在重新思考什么」的小桌子对话里，我说出了自己正在转型的迷茫。没想到对面的人也经历过类似的阶段。她没有给建议，只是认真地听完，然后说「我理解」。那三个字比任何方法论都温暖。',
-    footer: '陈思源 × 王晓晴 · 一次关于转型的小桌子对话',
-  },
-  {
-    type: 'READING GROUP · 共读共学',
-    quote:
-      '我们在共读小组里一起读了一个月的书。每周三晚上的讨论，从书里聊到生活，从观点聊到经历。读完那本书的时候，我发现自己不知不觉多了几个真正可以聊天的朋友。这就是附近吧。',
-    footer: '李明朗 × 赵一舟 等 5 人 · 每周三晚上的共读',
-  },
-];
+type Props = {
+  t: Dictionary['home']['stories'];
+  children?: ReactNode;
+};
 
-export default function StorySection({ children }: { children?: ReactNode }) {
-  const [lead, ...rest] = STORIES;
+export default function StorySection({ t, children }: Props) {
+  const [lead, ...rest] = t.items;
 
   return (
     <section id="stories" className="px-8 py-24 max-md:px-7 max-md:py-16">
@@ -43,12 +26,10 @@ export default function StorySection({ children }: { children?: ReactNode }) {
               className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-ink"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
-              有些连接，已经开始发生。
+              {t.heading}
             </h2>
           </div>
-          <p className="text-[14px] leading-[1.95] text-ink-soft">
-            不是每次相遇都要变成合作。被认真听见、找到可以交流的人，本身也是附近重新出现的方式。
-          </p>
+          <p className="text-[14px] leading-[1.95] text-ink-soft">{t.lede}</p>
         </div>
 
         <div className="grid grid-cols-[1.05fr_0.95fr] gap-5 max-lg:grid-cols-1">
@@ -61,7 +42,9 @@ export default function StorySection({ children }: { children?: ReactNode }) {
                 className="mt-6 text-[clamp(1.05rem,2.1vw,1.3rem)] font-normal leading-[1.85] text-forest-deep"
                 style={{ fontFamily: 'var(--font-serif)' }}
               >
-                「{lead.quote}」
+                {t.quoteOpen}
+                {lead.quote}
+                {t.quoteClose}
               </blockquote>
             </div>
             <footer className="mt-8 text-[12.5px] text-ink-soft">{lead.footer}</footer>
@@ -78,7 +61,9 @@ export default function StorySection({ children }: { children?: ReactNode }) {
                     {s.type}
                   </span>
                   <blockquote className="mt-5 text-[14px] leading-[1.9] text-ink-soft">
-                    「{s.quote}」
+                    {t.quoteOpen}
+                    {s.quote}
+                    {t.quoteClose}
                   </blockquote>
                 </div>
                 <footer className="mt-6 text-[12px] text-ink-soft">{s.footer}</footer>

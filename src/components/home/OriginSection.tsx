@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import HeroFilmPlayer from '@/components/HeroFilmPlayer';
+import type { Dictionary } from '@/i18n';
 
 // [6] 为什么要做附近森林 —— 放在最后：先看见能做什么、有什么人、
 // 会长出什么，再说来处，才不像开场白。
@@ -7,7 +8,7 @@ import HeroFilmPlayer from '@/components/HeroFilmPlayer';
 // 左边这张卡不用照片，用几层渐变画出「一棵树站在坡上」：
 // 照片会把注意力拉到具体某处风景，插画只留下意象。
 
-export default function OriginSection() {
+export default function OriginSection({ t }: { t: Dictionary['home']['origin'] }) {
   return (
     <section id="origin" className="px-8 py-28 max-md:px-7 max-md:py-20">
       <div className="mx-auto grid max-w-[1180px] grid-cols-[0.85fr_1.15fr] items-center gap-[70px] max-lg:grid-cols-1 max-lg:gap-11">
@@ -41,19 +42,17 @@ export default function OriginSection() {
             className="text-[clamp(2.1rem,4.4vw,3.6rem)] font-medium leading-[1.2] tracking-[-0.035em] text-ink"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
-            每个人都可以有自己的生长方式。
+            {t.heading}
           </h2>
-          <p className="mt-6 text-[16px] leading-[1.85] text-ink-soft">
-            附近森林不是一个只用来展示自己的橱窗，也不是另一个需要经营人设的社交广场。我们希望它是一片可以安顿自己、认识真实的人，也让正在做的事继续生长的空间。
-          </p>
+          <p className="mt-6 text-[16px] leading-[1.85] text-ink-soft">{t.body}</p>
 
           <blockquote
             className="mt-9 border-l border-forest pl-[22px] text-[clamp(1.15rem,2.2vw,1.375rem)] leading-[1.65] text-forest"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
-            每一棵树都是独立的，
+            {t.quoteTop}
             <br />
-            而根系在看不见的土地深处彼此连接。
+            {t.quoteBottom}
           </blockquote>
 
           <div className="mt-10">
@@ -61,7 +60,7 @@ export default function OriginSection() {
               href="/about"
               className="text-[14px] text-forest no-underline underline-offset-4 transition-colors hover:text-forest-dark hover:underline"
             >
-              阅读附近森林的来处 →
+              {t.link}
             </Link>
           </div>
         </div>

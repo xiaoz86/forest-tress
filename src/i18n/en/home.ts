@@ -14,13 +14,15 @@ import type { home as zhHome } from '@/i18n/zh/home';
  */
 export const home: typeof zhHome = {
   hero: {
-    titleLead: 'Thousands of creators who',
+    // 前后各带一个空格：中文那版靠 CSS 的 mx-1 留气口，英文要的是真空格
+    titleLead: 'Thousands of creators who ',
     titleAccent: 'still feel',
-    titleTail: 'like people',
+    titleTail: ' like people',
     taglineTop: 'We find what we are capable of, and we are seen.',
     taglineBottom: 'We meet, we make things, we grow.',
     lede: 'For people doing their own work, who would rather not do it alone.',
-    chips: ['Breathe', 'See', 'Resonate', 'Meet', 'Create', 'Grow'],
+    // 术语表定的是 看见 = notice，这里跟着定：六个词都是动词，读下来是一串动作
+    chips: ['Breathe', 'Notice', 'Resonate', 'Meet', 'Create', 'Grow'],
     cta: 'Walk into the forest',
   },
 
@@ -38,7 +40,7 @@ export const home: typeof zhHome = {
         index: '02 · MEET NEARBY',
         symbol: '遇',
         title: 'Find your people',
-        body: 'Start from what you both care about, and find people who understand you, or who fill in what you lack.',
+        body: 'Start from what you both care about, and find people who understand you, or who bring what you do not have.',
       },
       {
         index: '03 · GROW TOGETHER',
@@ -56,7 +58,7 @@ export const home: typeof zhHome = {
         icon: '息',
         title: 'Listen',
         body: 'Start with mindfulness sounds, rest, and care for yourself. Attention comes back to now.',
-        cta: 'Enter Listen',
+        cta: 'Start listening',
       },
       {
         icon: '伴',
@@ -91,7 +93,7 @@ export const home: typeof zhHome = {
       seeking: 'Looking for',
       matchTitle: 'A meeting that might be worth starting',
       matchBody: '{a} and {b} are both {focus}. The forest puts two people like this near each other.',
-      matchFocusTopic: 'drawn to "{topic}"',
+      matchFocusTopic: 'drawn to “{topic}”',
       matchFocusPlain: 'making something real',
       groupLabel: 'See creator group {n}',
     },
@@ -139,7 +141,7 @@ export const home: typeof zhHome = {
       {
         type: 'SMALL TABLE · MUTUAL SUPPORT',
         quote:
-          'At a small table on "what are you rethinking right now", I said out loud how lost I felt about changing direction. The person across from me had been through the same stretch. She gave no advice. She listened all the way through, then said, "I understand." Those two words were warmer than any method.',
+          'At a small table on ‘what are you rethinking right now’, I said out loud how lost I felt about changing direction. The person across from me had been through the same stretch. She gave no advice. She listened all the way through, then said, ‘I understand.’ Those two words were warmer than any method.',
         footer: 'Chen Siyuan × Wang Xiaoqing · A small table about changing direction',
       },
       {
@@ -149,11 +151,14 @@ export const home: typeof zhHome = {
         footer: 'Li Minglang × Zhao Yizhou and 3 others · Reading together on Wednesday nights',
       },
     ],
+    // 外层引号用弯的；上面那段里的内引号相应降一级用单弯引号
+    quoteOpen: '“',
+    quoteClose: '”',
     networkLabelTop: 'Connection · Resonance',
     networkLabelBottom: 'The relationship network',
     networkLead: 'When ',
-    networkMid: ' planted a tree, ',
-    networkTail: ' others appeared in the forest that might be worth meeting.',
+    networkMid: ' joined, the forest surfaced ',
+    networkTail: ' trees worth meeting.',
     networkLink: 'See the whole forest →',
   },
 
@@ -167,7 +172,7 @@ export const home: typeof zhHome = {
 
   join: {
     heading: 'Every tree starts as a seed',
-    lede: 'Gently put the part of you that is just sprouting into the forest',
+    lede: 'Let the part of you that is just sprouting settle into the forest',
     benefitsLead:
       'Plant it and you get your own node card, AI suggestions for people in tune with you, ',
     benefitsAccent: 'a phil-coach of your own',

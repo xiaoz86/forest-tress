@@ -1,28 +1,12 @@
+import type { Dictionary } from '@/i18n';
+
 // [1] 这是什么 —— 紧跟 Hero，先把「来这里会发生什么」讲清楚，
 // 再让访客自己去找入口。
+//
+// 上面那行 eyebrow（What Happens Here）两种语言都用英文，所以不进字典。
+// 每张卡的汉字符号（见 / 遇 / 生）也一样：aria-hidden 的图形，不跟着语言变。
 
-const VALUES = [
-  {
-    index: '01 · BE SEEN',
-    symbol: '见',
-    title: '被看见',
-    body: '让别人看见的不只是你的身份，而是你正在投入的事情、积累的能力与真实的需要。',
-  },
-  {
-    index: '02 · MEET NEARBY',
-    symbol: '遇',
-    title: '遇见同频',
-    body: '从共同关心的议题出发，找到能够理解你，也可能与你形成互补的人。',
-  },
-  {
-    index: '03 · GROW TOGETHER',
-    symbol: '生',
-    title: '共同生长',
-    body: '一次对话、一个小组或一场共创，都可以让一颗种子真正向前生长一步。',
-  },
-];
-
-export default function ValueSection() {
+export default function ValueSection({ t }: { t: Dictionary['home']['value'] }) {
   return (
     <section className="px-8 py-24 max-md:px-7 max-md:py-16">
       <div className="mx-auto max-w-[1080px]">
@@ -34,15 +18,15 @@ export default function ValueSection() {
             className="mx-auto max-w-[680px] text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-ink"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
-            不是再认识更多人，
+            {t.headingTop}
             <br />
-            而是遇见真正与你有关的人。
+            {t.headingBottom}
           </h2>
         </div>
 
         <div className="grid grid-cols-3 gap-5 max-md:grid-cols-1 max-md:gap-4">
-          {VALUES.map(v => (
-            <article key={v.title} className="px-2 py-4 max-md:px-0">
+          {t.items.map(v => (
+            <article key={v.index} className="px-2 py-4 max-md:px-0">
               <span className="text-[10.5px] font-medium tracking-[0.2em] text-moss/70">
                 {v.index}
               </span>

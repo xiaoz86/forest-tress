@@ -1,9 +1,16 @@
 import Link from 'next/link';
+import type { Dictionary } from '@/i18n';
 import CreatorShowcase, { type ShowcaseNode } from './CreatorShowcase';
 
 // [3] 森林里已经有什么人 —— 真实节点，不是示意卡片。
+// 节点上的名字、城市、正在做什么都来自库里，翻不了；这里只管框架文案。
 
-export default function CreatorSection({ nodes }: { nodes: ShowcaseNode[] }) {
+type Props = {
+  nodes: ShowcaseNode[];
+  t: Dictionary['home']['creators'];
+};
+
+export default function CreatorSection({ nodes, t }: Props) {
   if (nodes.length === 0) return null;
 
   return (
@@ -18,25 +25,23 @@ export default function CreatorSection({ nodes }: { nodes: ShowcaseNode[] }) {
               className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-ink"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
-              森林里，已经有人
+              {t.headingTop}
               <br />
-              在做这些事。
+              {t.headingBottom}
             </h2>
           </div>
           <div>
-            <p className="text-[14px] leading-[1.95] text-ink-soft">
-              每一个节点都来自一个真实的人。你可以看见他们正在创造什么、能够提供什么，以及此刻希望遇见怎样的伙伴。
-            </p>
+            <p className="text-[14px] leading-[1.95] text-ink-soft">{t.lede}</p>
             <Link
               href="/creators"
               className="mt-5 inline-block text-[13.5px] font-medium text-forest-mid underline-offset-4 transition-colors hover:text-forest-deep hover:underline"
             >
-              进入创造者森林 →
+              {t.link} →
             </Link>
           </div>
         </div>
 
-        <CreatorShowcase nodes={nodes} />
+        <CreatorShowcase nodes={nodes} t={t.showcase} />
       </div>
     </section>
   );

@@ -6,8 +6,18 @@ import { useState } from 'react';
 // 桌面四栏平铺。
 // 手机上做成一条被 S 形折起的纸带：四折交替朝前 / 朝后倾，
 // 折与折之间一道细线当折痕，点一下整条摊平、正文展开。
+//
+// 客户端组件不自己判断语言：四步和那两个按钮字都由 PathSection 传进来。
 
 export type Step = { n: string; title: string; body: string };
+
+type Props = {
+  steps: readonly Step[];
+  /** 收起时按钮上的字（摊开这四步） */
+  unfold: string;
+  /** 展开时按钮上的字（折回去） */
+  fold: string;
+};
 
 const FOLD_DEG = 48;   // 收起时每一折的倾角，太大字就压扁看不清了
 const STRIP = 58;      // 收起时每一折露出的高度（px）
@@ -18,7 +28,7 @@ const STRIP = 58;      // 收起时每一折露出的高度（px）
 // 同一个负 margin 就串不齐——相邻两折会叠到一起，末尾那折被挤没。
 const SQUASH = Math.round(STRIP * (1 - Math.cos((FOLD_DEG * Math.PI) / 180)));
 
-export default function PathSteps({ steps }: { steps: Step[] }) {
+export default function PathSteps({ steps, unfold, fold }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -84,7 +94,7 @@ export default function PathSteps({ steps }: { steps: Step[] }) {
           >
             ＋
           </span>
-          {open ? '折回去' : '摊开这四步'}
+          {open ? fold : unfold}
         </button>
       </div>
 

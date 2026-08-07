@@ -11,12 +11,12 @@ import OriginSection from '@/components/home/OriginSection';
 import PathSection from '@/components/home/PathSection';
 import StorySection from '@/components/home/StorySection';
 import ValueSection from '@/components/home/ValueSection';
+import { dict } from '@/i18n';
+import { getLocale } from '@/lib/locale';
 import { buildRelationGraph } from '@/lib/network';
 import type { NodeCard } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
-
-const CHIPS = ['呼吸', '看见', '同频', '相遇', '共创', '生长'];
 
 async function fetchCreators(): Promise<NodeCard[]> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -46,7 +46,11 @@ function toShowcase(node: NodeCard): ShowcaseNode | null {
 }
 
 export default async function Home() {
-  const creators = await fetchCreators();
+  const [creators, locale] = await Promise.all([fetchCreators(), getLocale()]);
+  // 每一屏取自己那块字典，往下传。客户端组件（JoinSection、CreatorShowcase、
+  // PathSteps）一律从这里拿文案，不自己读 cookie——那会先闪一遍中文。
+  const d = dict(locale);
+  const t = d.home;
   const visible = creators.filter(n => !n.name?.startsWith('___'));
 
   // 资料填得越完整，越适合当门面：先按「有没有说清正在做什么」排
@@ -95,25 +99,33 @@ export default async function Home() {
             className="mb-6 animate-fade-in font-serif text-[clamp(2.2rem,5.8vw,4.3rem)] font-bold leading-[1.3] tracking-wide text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.42)]"
             style={{ fontFamily: 'var(--font-display)' }}
           >
-            连接万千
-            <span className="mx-1 text-leaf">有温度</span>
-            的超级创造者
+            {/*
+              中文靠 mx-1 给这三个字留一点气口——汉字之间本来没有空格。
+              英文相反：词与词之间必须是真的空格（否则复制出来是 "whostill"，
+              读屏也会把两个词连读），空格已经写在字典的字串里，
+              再叠一层 mx-1 就把这一处的词距撑得比别处宽一倍。
+            */}
+            {t.hero.titleLead}
+            <span className={locale === 'zh' ? 'mx-1 text-leaf' : 'text-leaf'}>
+              {t.hero.titleAccent}
+            </span>
+            {t.hero.titleTail}
           </h1>
 
           <div className="mx-auto mb-7 h-px w-12 animate-fade-in-delay-2 bg-white/35" />
 
           <p className="mx-auto mb-6 max-w-[680px] animate-fade-in-delay-2 text-[clamp(1.18rem,2.2vw,1.55rem)] font-medium leading-[1.9] text-white/92 [text-shadow:0_1px_14px_rgba(0,0,0,0.4)]">
-            我们既发现自己的无限可能，也被看见
+            {t.hero.taglineTop}
             <br />
-            在相遇中共同创造与成长
+            {t.hero.taglineBottom}
           </p>
 
           <p className="mx-auto mb-16 max-w-[580px] animate-fade-in-delay-2 text-[16.5px] leading-[1.9] text-white/75 [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]">
-            让正在独立做事的人，找到真正同行的伙伴。
+            {t.hero.lede}
           </p>
 
           <div className="mb-14 flex animate-fade-in-delay-3 flex-wrap justify-center gap-x-8 gap-y-4">
-            {CHIPS.map((c, i) => (
+            {t.hero.chips.map((c, i) => (
               <span
                 key={c}
                 className="animate-drift text-[13.5px] font-light text-white/55"
@@ -133,7 +145,7 @@ export default async function Home() {
               href="#entrances"
               className="inline-flex min-h-[52px] min-w-[168px] items-center justify-center gap-2 rounded-full bg-[#efc39d] px-9 text-base font-medium text-[#243026] no-underline shadow-[0_14px_34px_rgba(0,0,0,0.18)] transition-all hover:-translate-y-0.5 hover:bg-[#f5ceb0]"
             >
-              走进这片森林
+              {t.hero.cta}
             </a>
           </div>
         </div>
@@ -145,26 +157,26 @@ export default async function Home() {
       </section>
 
       {/* [1b] 这是什么 — 来这里会发生什么 */}
-      <ValueSection />
+      <ValueSection t={t.value} />
 
       {/* [2] 我能做什么 — 四条小径，首页只给入口不展开产品 */}
-      <EntranceSection />
+      <EntranceSection t={t.entrances} />
 
       {/* [3] 森林里已经有什么人 — 真实节点，可轮播，点进个人页 */}
-      <CreatorSection nodes={showcaseNodes} />
+      <CreatorSection nodes={showcaseNodes} t={t.creators} />
 
       {/* [4] 加入后会获得什么 — 连接怎么长出来 */}
-      <PathSection />
+      <PathSection t={t.paths} />
 
       {/* [5] 真实发生过什么连接 — 故事 + 真实关系网 */}
-      <StorySection>
+      <StorySection t={t.stories}>
         {showcaseGraph && showcaseGraph.neighbors.length > 0 && showcaseCenter && (
           <div className="mx-auto mt-16 max-w-[860px]">
             <div className="mb-7 text-center">
               <div className="inline-block text-[12px] font-bold uppercase leading-[1.8] tracking-[0.2em] text-forest">
-                连接 · 共振
+                {t.stories.networkLabelTop}
                 <br />
-                关系网络
+                {t.stories.networkLabelBottom}
               </div>
             </div>
 
@@ -173,14 +185,17 @@ export default async function Home() {
             </div>
 
             <p className="mx-auto mt-6 max-w-[520px] text-center text-[13px] leading-[1.9] text-text-light">
-              这是 <span className="font-medium text-forest-deep">{showcaseCenter.name}</span>{' '}
-              加入后，森林里浮现出的 {showcaseGraph.neighbors.length} 棵可能相遇的树。
+              {t.stories.networkLead}
+              <span className="font-medium text-forest-deep">{showcaseCenter.name}</span>
+              {t.stories.networkMid}
+              {showcaseGraph.neighbors.length}
+              {t.stories.networkTail}
               <br />
               <Link
                 href="/creators"
                 className="mt-3 inline-block text-forest-mid underline-offset-4 hover:text-forest-deep hover:underline"
               >
-                看看整片森林 →
+                {t.stories.networkLink}
               </Link>
             </p>
           </div>
@@ -188,7 +203,7 @@ export default async function Home() {
       </StorySection>
 
       {/* [6] 为什么要做附近森林 */}
-      <OriginSection />
+      <OriginSection t={t.origin} />
 
       {/* 行动 — 种下你的种子 */}
       <section
@@ -197,7 +212,7 @@ export default async function Home() {
       >
         <div className="pointer-events-none absolute left-1/2 top-0 h-px w-[min(760px,78vw)] -translate-x-1/2 bg-gradient-to-r from-transparent via-forest/15 to-transparent" />
         <div className="relative">
-          <JoinSection />
+          <JoinSection t={t.join} />
         </div>
       </section>
 
@@ -216,25 +231,24 @@ export default async function Home() {
                   opacity="0.6"
                 />
               </svg>
-              附近森林
+              {/* 品牌名和「登录」跟导航共用一份，别在页脚另存一遍 */}
+              {d.nav.brand}
             </div>
-            <p className="max-w-[440px] text-[12.5px] leading-[1.7]">
-              让独立的个体彼此连接、流动、共创。
-            </p>
+            <p className="max-w-[440px] text-[12.5px] leading-[1.7]">{t.footer.tagline}</p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12px]">
             <Link href="/about" className="transition-colors hover:text-coral-soft">
-              附近森林的来处
+              {t.footer.about}
             </Link>
             <Link href="/creators" className="transition-colors hover:text-coral-soft">
-              创造者森林
+              {t.footer.creators}
             </Link>
             <Link href="/login" className="transition-colors hover:text-coral-soft">
-              登录
+              {d.nav.login}
             </Link>
           </div>
           <div className="mt-2 w-full border-t border-white/10 pt-6 text-[11px] text-white/35">
-            © 2026 附近森林生态社区
+            {t.footer.copyright}
           </div>
         </div>
       </footer>

@@ -3,11 +3,14 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Avatar from '@/components/Avatar';
+import type { Dictionary } from '@/i18n';
 
 // 森林里已经有什么人。
 // 从「后台产品卡片」改成编辑式：一位重点创造者占大图，右侧两位不同方向的人，
 // 每个人都先说清「正在做什么」和「正在寻找什么」。AI 推荐收进底部那条深绿提示里，
 // 不再做成功能组件——让真实的人当视觉中心。
+//
+// 这是客户端组件，不自己判断语言：文案由 CreatorSection 从服务端传进来。
 
 export type ShowcaseNode = {
   id: string;
@@ -19,7 +22,16 @@ export type ShowcaseNode = {
   avatarUrl?: string;
 };
 
+type T = Dictionary['home']['creators']['showcase'];
+
 const ROTATE_MS = 6500;
+
+/** 把 {a} {b} {topic} 这类占位符换成真值。中英文的语序不同，只能留成模板。 */
+function fill(template: string, values: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (whole, key: string) =>
+    key in values ? values[key] : whole,
+  );
+}
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined') return false;
@@ -35,7 +47,7 @@ function pick(nodes: ShowcaseNode[], index: number): ShowcaseNode {
   return nodes[((index % nodes.length) + nodes.length) % nodes.length];
 }
 
-export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
+export default function CreatorShowcase({ nodes, t }: { nodes: ShowcaseNode[]; t: T }) {
   const [cursor, setCursor] = useState(0);
   const [paused, setPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -96,8 +108,8 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
 
           <div className="relative z-[2] flex h-full flex-col">
             <div className="flex items-start justify-between gap-5 text-[11px] tracking-[0.10em] text-white/60">
-              <span>森林里正在生长</span>
-              <span className="text-right">{featured.city || '附近'}</span>
+              <span>{t.growing}</span>
+              <span className="text-right">{featured.city || t.cityFallback}</span>
             </div>
 
             <div className="absolute right-2 top-[150px] max-md:static max-md:mt-8">
@@ -111,7 +123,7 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
 
             <div className="mt-auto pt-16">
               <p className="text-[12.5px] tracking-[0.08em] text-white/62">
-                {featured.topics.slice(0, 2).join(' · ') || '创造者'}
+                {featured.topics.slice(0, 2).join(' · ') || t.topicFallback}
               </p>
               <h3
                 className="mt-2 text-[clamp(1.7rem,3.4vw,2.3rem)] font-medium leading-[1.3] text-white"
@@ -127,12 +139,12 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
 
               {featured.topics.length > 0 && (
                 <div className="mt-5 flex flex-wrap gap-2">
-                  {featured.topics.slice(0, 3).map(t => (
+                  {featured.topics.slice(0, 3).map(topic => (
                     <span
-                      key={t}
+                      key={topic}
                       className="rounded-full border border-white/18 bg-white/[0.08] px-3 py-1 text-[11.5px] text-white/80"
                     >
-                      {t}
+                      {topic}
                     </span>
                   ))}
                 </div>
@@ -140,7 +152,7 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
 
               {featured.seeking && (
                 <div className="mt-6 flex items-center justify-between gap-5 border-t border-white/15 pt-5 text-[12px] text-white/60 max-md:flex-col max-md:items-start max-md:gap-2">
-                  <span className="shrink-0">正在寻找</span>
+                  <span className="shrink-0">{t.seeking}</span>
                   <strong className="line-clamp-2 text-right text-[14px] font-medium text-white max-md:text-left">
                     {featured.seeking}
                   </strong>
@@ -176,7 +188,7 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
                 )}
                 {node.seeking && (
                   <p className="mt-2.5 line-clamp-1 text-[12.5px] text-moss">
-                    正在寻找 · {node.seeking}
+                    {t.seeking} · {node.seeking}
                   </p>
                 )}
               </div>
@@ -199,11 +211,15 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
                 ✦
               </span>
               <div className="min-w-0 overflow-hidden">
-                <b className="block text-[13px] font-semibold">一次可能值得开始的相遇</b>
+                <b className="block text-[13px] font-semibold">{t.matchTitle}</b>
                 <p className="mt-1 line-clamp-2 text-[11.5px] leading-[1.6] text-white/62">
-                  {featured.name} 与 {sideNodes[0].name} 都在
-                  {featured.topics[0] ? `关注「${featured.topics[0]}」` : '做真实的事'}
-                  ，森林会把这样的两个人放到彼此附近。
+                  {fill(t.matchBody, {
+                    a: featured.name,
+                    b: sideNodes[0].name,
+                    focus: featured.topics[0]
+                      ? fill(t.matchFocusTopic, { topic: featured.topics[0] })
+                      : t.matchFocusPlain,
+                  })}
                 </p>
               </div>
             </div>
@@ -219,7 +235,7 @@ export default function CreatorShowcase({ nodes }: { nodes: ShowcaseNode[] }) {
               key={i}
               onClick={() => setCursor(i)}
               type="button"
-              aria-label={`看第 ${i + 1} 组创造者`}
+              aria-label={fill(t.groupLabel, { n: String(i + 1) })}
               aria-current={i === cursor}
               className={`h-1.5 rounded-full transition-all ${
                 i === cursor ? 'w-7 bg-forest-mid' : 'w-1.5 bg-forest-deep/20 hover:bg-forest-deep/40'
