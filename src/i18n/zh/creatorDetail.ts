@@ -94,6 +94,19 @@ export const creatorDetail = {
     hostHint: '打开微信 → 添加朋友 → 粘贴微信号',
     copy: '复制',
     copied: '已复制 ✓',
+
+    /**
+     * 规则匹配拼出来的理由（大模型没配、返回空或出错时就走这条路）。
+     * 中间那串词是成员自己填的议题/擅长，不翻；这里只翻框架。
+     */
+    reason: {
+      sharedTopics: (topics: string) => `共同关注：${topics}`,
+      sameCity: (city: string) => `同在 ${city}`,
+      theyHelpYou: (words: string) => `TA 可以支持你：${words}`,
+      youHelpThem: (words: string) => `你也许能帮到 TA：${words}`,
+      /** 列举多个词时的分隔符，中英标点不同 */
+      separator: '、',
+    },
   },
 
   ai: {

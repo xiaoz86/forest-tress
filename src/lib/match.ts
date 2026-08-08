@@ -1,5 +1,6 @@
 import type { NodeCard } from './supabase';
 import type { Locale } from './locale';
+import { dict } from '@/i18n';
 import { createChatCompletion, getLLMConfig } from './llm';
 
 export type MatchedNode = NodeCard & {
@@ -41,7 +42,15 @@ function wordsOverlap(a: string[], b: string[]): string[] {
 export function scoreMatch(
   me: NodeCard,
   other: NodeCard,
+  /**
+   * 理由是拼给人看的，要跟着看的人的语言走。
+   *
+   * 注意这条路不只是「大模型的备胎」：没配大模型、模型返回空、
+   * 模型抛错，都会落到这里，英文用户很容易撞上。
+   */
+  locale: Locale = 'zh',
 ): { score: number; reasons: string[]; matchType: MatchedNode['matchType'] } {
+  const t = dict(locale).creatorDetail.match.reason;
   let score = 0;
   const reasons: string[] = [];
 
@@ -51,14 +60,15 @@ export function scoreMatch(
   const sharedTopics = myTopics.filter(t => otherTopics.includes(t));
   if (sharedTopics.length > 0) {
     score += sharedTopics.length * 3;
-    reasons.push(`共同关注：${sharedTopics.join('、')}`);
+    // 议题本身是成员自己填的，不翻；只有框架和分隔符跟着语言走
+    reasons.push(t.sharedTopics(sharedTopics.join(t.separator)));
   }
 
   // 2. 同城
   const sameCity = me.city && other.city && me.city.trim() === other.city.trim();
   if (sameCity) {
     score += 2;
-    reasons.push(`同在 ${me.city}`);
+    reasons.push(t.sameCity(me.city!));
   }
 
   // 3. 互补 A：TA 的擅长 / 经验 ↔ 我在寻找 / 在做
@@ -73,7 +83,7 @@ export function scoreMatch(
   const aToB = wordsOverlap(otherOfferWords, mySeekingWords);
   if (aToB.length > 0) {
     score += aToB.length;
-    reasons.push(`TA 可以支持你：${aToB.slice(0, 3).join('、')}`);
+    reasons.push(t.theyHelpYou(aToB.slice(0, 3).join(t.separator)));
   }
 
   // 4. 互补 B：我的擅长 / 经验 ↔ TA 在寻找 / 在做
@@ -88,7 +98,7 @@ export function scoreMatch(
   const bToA = wordsOverlap(myOfferWords, otherSeekingWords);
   if (bToA.length > 0) {
     score += bToA.length;
-    reasons.push(`你也许能帮到 TA：${bToA.slice(0, 3).join('、')}`);
+    reasons.push(t.youHelpThem(bToA.slice(0, 3).join(t.separator)));
   }
 
   // 判定主要 matchType
@@ -104,11 +114,12 @@ export function matchNodes(
   me: NodeCard,
   others: NodeCard[],
   topN = 3,
+  locale: Locale = 'zh',
 ): MatchedNode[] {
   return others
     .filter(n => n.id !== me.id)
     .map(n => {
-      const { score, reasons, matchType } = scoreMatch(me, n);
+      const { score, reasons, matchType } = scoreMatch(me, n, locale);
       return { ...n, score, reasons, matchType };
     })
     .filter(n => n.score > 0)
@@ -147,7 +158,7 @@ export async function matchNodesAI(
   /** 英文界面的人拿到的理由和共创方向要是英文的 */
   locale: Locale = 'zh',
 ): Promise<MatchedNode[]> {
-  if (!getLLMConfig()) return matchNodes(me, others, topN);
+  if (!getLLMConfig()) return matchNodes(me, others, topN, locale);
 
   // 先用规则筛出 ≤8 个候选给 AI，避免上下文过长 + 帮 AI 聚焦
   const ruleRanked = others
@@ -175,7 +186,7 @@ export async function matchNodesAI(
   try {
     const ai = await callLLMMatch(me, candidates, topN, locale);
     if (!ai || ai.length === 0) {
-      return matchNodes(me, others, topN);
+      return matchNodes(me, others, topN, locale);
     }
 
     // 把 AI 结果合并回 NodeCard：按 id 找回原始节点信息 + reasons
@@ -195,10 +206,10 @@ export async function matchNodesAI(
         score: base.score + 100, // 标记 AI 选中（仅排序用）
       });
     }
-    return merged.length ? merged.slice(0, topN) : matchNodes(me, others, topN);
+    return merged.length ? merged.slice(0, topN) : matchNodes(me, others, topN, locale);
   } catch (err) {
     console.error('[match] AI match failed, falling back to rules', err);
-    return matchNodes(me, others, topN);
+    return matchNodes(me, others, topN, locale);
   }
 }
 

@@ -80,6 +80,14 @@ export const creatorDetail: typeof zhCreatorDetail = {
     hostHint: 'Open WeChat → Add contact → Paste the ID',
     copy: 'Copy',
     copied: 'Copied ✓',
+
+    reason: {
+      sharedTopics: (topics: string) => `Both care about: ${topics}`,
+      sameCity: (city: string) => `Both in ${city}`,
+      theyHelpYou: (words: string) => `They can support you with: ${words}`,
+      youHelpThem: (words: string) => `You might help them with: ${words}`,
+      separator: ', ',
+    },
   },
 
   ai: {
