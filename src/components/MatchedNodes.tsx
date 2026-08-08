@@ -1,10 +1,16 @@
 'use client';
 
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { MatchedNode } from '@/lib/match';
 
-type Props = { matches: MatchedNode[] };
+type Props = {
+  matches: MatchedNode[];
+  /** 字典里有函数，跨不过 server → client 序列化边界，所以只收 locale */
+  locale: Locale;
+};
 
 // 社区主理人微信号 — 如需修改请直接改这里
 const HOST_WECHAT = 'XiaoZ_lifeCoach';
@@ -24,13 +30,15 @@ function hashPick(key: string): string {
   return gradients[h % gradients.length];
 }
 
+// 键是数据里的固定值（match.ts 里的联合类型），不随语言变；
+// 徽标显示的文字走字典 creatorDetail.matchType。
 const matchTypeStyle: Record<MatchedNode['matchType'], string> = {
   同频: 'bg-leaf/15 text-forest-mid border-leaf/30',
   互补: 'bg-warmth/20 text-coral border-coral-soft/40',
   同城: 'bg-sky/15 text-[#4a7c9a] border-sky/30',
 };
 
-function HostContactCard() {
+function HostContactCard({ t }: { t: ReturnType<typeof dict>['creatorDetail'] }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -57,10 +65,10 @@ function HostContactCard() {
     <div className="mt-8 p-7 bg-gradient-to-br from-leaf/8 via-sage/8 to-warmth/8 rounded-2xl border border-moss/20 text-center">
       <div className="text-3xl mb-2">🤝</div>
       <h4 className="font-serif text-lg font-bold text-forest-deep mb-1.5">
-        添加主理人{HOST_NAME}，进入社区群
+        {t.match.hostTitle(HOST_NAME)}
       </h4>
       <p className="text-sm text-text-secondary leading-relaxed mb-5 max-w-md mx-auto">
-        主理人会把你拉进社区群，让你更快和同频的人连接起来。
+        {t.match.hostNote}
       </p>
       <div className="flex justify-center">
         <div className="inline-flex items-center gap-2 px-4 py-3 bg-white rounded-2xl border border-moss/25 shadow-[0_2px_10px_rgba(26,46,26,0.06)]">
@@ -76,39 +84,40 @@ function HostContactCard() {
                 : 'bg-coral-soft/20 text-coral border-coral-soft/40 hover:bg-coral-soft/30'
             }`}
           >
-            {copied ? '已复制 ✓' : '复制'}
+            {copied ? t.match.copied : t.match.copy}
           </button>
         </div>
       </div>
       <p className="text-[11px] text-text-light mt-3">
-        打开微信 → 添加朋友 → 粘贴微信号
+        {t.match.hostHint}
       </p>
     </div>
   );
 }
 
-export default function MatchedNodes({ matches }: Props) {
+export default function MatchedNodes({ matches, locale }: Props) {
+  const t = useMemo(() => dict(locale).creatorDetail, [locale]);
   if (matches.length === 0) {
     return (
       <>
         <div className="mt-8 text-center py-10 px-6 bg-gradient-to-br from-love-pink/8 to-warmth/8 rounded-2xl border border-coral-soft/20">
           <div className="text-4xl mb-3">🌱</div>
           <h3 className="font-serif text-xl font-bold text-forest-deep mb-2">
-            你是这片森林的第一棵树
+            {t.match.firstTitle}
           </h3>
           <p className="text-sm text-text-secondary leading-relaxed max-w-md mx-auto">
-            森林的每一次起始都是如此安静。
+            {t.match.firstLine1}
             <br />
-            期待与后来的创造者在这里相遇。
+            {t.match.firstLine2}
           </p>
           <Link
             href="/creators"
             className="inline-block mt-5 px-6 py-2.5 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep text-sm font-semibold rounded-full no-underline hover:-translate-y-0.5 transition-transform"
           >
-            去看看这片森林
+            {t.match.firstCta}
           </Link>
         </div>
-        <HostContactCard />
+        <HostContactCard t={t} />
       </>
     );
   }
@@ -117,10 +126,10 @@ export default function MatchedNodes({ matches }: Props) {
     <div className="mt-10">
       <div className="text-center mb-6">
         <h3 className="font-serif text-2xl font-bold text-forest-deep mb-2">
-          为你找到 {matches.length} 位可能同频的人
+          {t.match.found(matches.length)}
         </h3>
         <p className="text-sm text-text-light">
-          基于你的节点信息，从现有森林里找到了这些可能链接的树
+          {t.match.foundNote}
         </p>
       </div>
 
@@ -145,7 +154,7 @@ export default function MatchedNodes({ matches }: Props) {
                   <span
                     className={`ml-auto inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${matchTypeStyle[m.matchType]}`}
                   >
-                    {m.matchType}
+                    {t.matchType[m.matchType]}
                   </span>
                 </div>
                 {m.doing && (
@@ -156,7 +165,7 @@ export default function MatchedNodes({ matches }: Props) {
                 {m.aiSummary && (
                   <div className="mb-2 p-3 rounded-xl bg-leaf/8 border border-leaf/20">
                     <div className="text-[10px] font-semibold tracking-widest text-forest-mid uppercase mb-1">
-                      为何匹配
+                      {t.match.why}
                     </div>
                     <p className="text-[13px] text-text-secondary leading-relaxed">
                       {m.aiSummary}
@@ -166,7 +175,7 @@ export default function MatchedNodes({ matches }: Props) {
                 {m.aiCoCreate && (
                   <div className="mb-2 p-3 rounded-xl bg-warmth/15 border border-coral-soft/30">
                     <div className="text-[10px] font-semibold tracking-widest text-coral uppercase mb-1">
-                      可能共创
+                      {t.match.coCreate}
                     </div>
                     <p className="text-[13px] text-text-secondary leading-relaxed">
                       {m.aiCoCreate}
@@ -190,14 +199,14 @@ export default function MatchedNodes({ matches }: Props) {
       </div>
 
       {/* 添加主理人 CTA */}
-      <HostContactCard />
+      <HostContactCard t={t} />
 
       <div className="text-center mt-8">
         <Link
           href="/creators"
           className="inline-flex items-center gap-2 px-7 py-3 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-semibold rounded-full no-underline shadow-[0_4px_20px_rgba(212,160,160,0.25)] hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(212,160,160,0.35)] transition-all"
         >
-          去看看整片森林
+          {t.match.seeForest}
         </Link>
       </div>
     </div>

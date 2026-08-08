@@ -1,5 +1,7 @@
 'use client';
 
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Avatar from './Avatar';
@@ -13,6 +15,8 @@ type Props = {
   darkBg?: boolean;
   /** 滚到眼前时让节点依次点亮、连线随后长出 */
   animate?: boolean;
+  /** 字典里有函数，跨不过序列化边界，所以只收 locale */
+  locale: Locale;
 };
 
 const W = 720;
@@ -52,7 +56,9 @@ export default function RelationNetwork({
   isMember = false,
   darkBg = false,
   animate = false,
+  locale,
 }: Props) {
+  const t = useMemo(() => dict(locale).creatorDetail, [locale]);
   const containerRef = useRef<HTMLDivElement>(null);
   // 全程在「容器的真实像素」里算。之前布局用 viewBox 单位、内边距用像素，
   // 两套坐标来回换算，既容易算错，也没法在窄屏改容器比例。
@@ -190,7 +196,7 @@ export default function RelationNetwork({
         preserveAspectRatio="none"
         className="absolute inset-0 block h-full w-full"
         role="img"
-        aria-label="关系网"
+        aria-label={t.network.aria}
       >
         <g fill="none" stroke={edgeStroke} strokeLinecap="round">
           {[...graph.edges]
@@ -279,7 +285,7 @@ export default function RelationNetwork({
             key={n.id}
             href={`/creators/${n.id}`}
             className="no-underline"
-            aria-label={`查看 ${n.name} 的详情`}
+            aria-label={t.network.nodeAria(n.name)}
           >
             {inner}
           </Link>

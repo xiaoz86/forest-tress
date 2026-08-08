@@ -172,6 +172,16 @@ export const home = {
     quoteTop: '每一棵树都是独立的，',
     quoteBottom: '而根系在看不见的土地深处彼此连接。',
     link: '阅读附近森林的来处 →',
+    /** 首页那颗理念片按钮和播放浮层 */
+    film: {
+      cta: '观看理念片',
+      ariaOpen: '观看附近森林理念片',
+      ariaClose: '关闭理念片',
+      close: '关闭',
+      /** 浮层顶部两行：品牌名 + 副题 */
+      brand: '附近森林',
+      subtitle: '理念片',
+    },
   },
 
   join: {

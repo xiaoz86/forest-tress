@@ -1,6 +1,8 @@
 'use client';
 
-import { useRef } from 'react';
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
+import { useMemo, useRef } from 'react';
 
 const HERO_FILM_SRC = '/hero-film.mp4?v=20260627-1';
 
@@ -11,7 +13,19 @@ const HERO_FILM_SRC = '/hero-film.mp4?v=20260627-1';
  */
 type Variant = 'hero' | 'paper' | 'glass';
 
-export default function HeroFilmPlayer({ variant = 'hero' }: { variant?: Variant } = {}) {
+/**
+ * 文案在客户端自己取。字典里有函数（英文单复数用的），函数跨不过
+ * server → client 那道序列化边界，整片切片当 props 传会让页面直接崩。
+ * 只传 locale——它仍是服务端算好的，这边不读 cookie。
+ */
+export default function HeroFilmPlayer({
+  variant = 'hero',
+  locale,
+}: {
+  variant?: Variant;
+  locale: Locale;
+}) {
+  const t = useMemo(() => dict(locale).home.origin.film, [locale]);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -50,7 +64,7 @@ export default function HeroFilmPlayer({ variant = 'hero' }: { variant?: Variant
           type="button"
           onClick={openFilm}
           className="inline-flex items-center gap-3.5 rounded-full border border-white/45 bg-white/[0.14] py-2.5 pl-2.5 pr-6 text-[14.5px] font-medium text-white backdrop-blur-[12px] transition-all hover:-translate-y-0.5 hover:bg-white/25"
-          aria-label="观看附近森林理念片"
+          aria-label={t.ariaOpen}
         >
           <span
             aria-hidden="true"
@@ -58,7 +72,7 @@ export default function HeroFilmPlayer({ variant = 'hero' }: { variant?: Variant
           >
             <span className="ml-[3px] block h-0 w-0 border-y-[7px] border-y-transparent border-l-[11px] border-l-white" />
           </span>
-          观看理念片
+          {t.cta}
         </button>
       ) : (
         <button
@@ -70,7 +84,7 @@ export default function HeroFilmPlayer({ variant = 'hero' }: { variant?: Variant
               ? 'inline-flex min-h-[48px] items-center gap-3 rounded-full border border-forest/15 bg-paper-soft/70 px-6 text-[14.5px] font-medium text-forest transition-all hover:-translate-y-0.5 hover:bg-paper-soft'
               : 'inline-flex items-center gap-3 rounded-full border border-white/30 bg-black/10 px-6 py-3.5 text-[15px] font-medium text-white/86 backdrop-blur-sm transition-colors hover:border-white/55 hover:bg-white/10 hover:text-white'
           }
-          aria-label="观看附近森林理念片"
+          aria-label={t.ariaOpen}
         >
           <span
             className={`flex h-8 w-8 items-center justify-center rounded-full border ${
@@ -80,7 +94,7 @@ export default function HeroFilmPlayer({ variant = 'hero' }: { variant?: Variant
           >
             <span className="ml-0.5 block h-0 w-0 border-y-[5px] border-y-transparent border-l-[8px] border-l-current" />
           </span>
-          观看理念片
+          {t.cta}
         </button>
       )}
 
@@ -100,10 +114,10 @@ export default function HeroFilmPlayer({ variant = 'hero' }: { variant?: Variant
             <div className="mb-5 flex items-end justify-between gap-6 px-1 max-md:absolute max-md:left-5 max-md:right-5 max-md:top-5 max-md:mb-0">
               <div>
                 <div className="text-[10px] font-medium uppercase tracking-[0.32em] text-coral-soft">
-                  附近森林
+                  {t.brand}
                 </div>
                 <h2 id="hero-film-title" className="mt-2 text-xl font-semibold text-white">
-                  理念片
+                  {t.subtitle}
                 </h2>
               </div>
               <button
@@ -111,8 +125,8 @@ export default function HeroFilmPlayer({ variant = 'hero' }: { variant?: Variant
                 type="button"
                 onClick={closeFilm}
                 className="flex h-11 w-11 items-center justify-center rounded-full border border-white/18 bg-white/[0.06] text-2xl font-light text-white/72 transition-colors hover:bg-white/12 hover:text-white"
-                aria-label="关闭理念片"
-                title="关闭"
+                aria-label={t.ariaClose}
+                title={t.close}
               >
                 ×
               </button>

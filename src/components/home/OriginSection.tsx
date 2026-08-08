@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import HeroFilmPlayer from '@/components/HeroFilmPlayer';
 import type { Dictionary } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 
 // [6] 为什么要做附近森林 —— 放在最后：先看见能做什么、有什么人、
 // 会长出什么，再说来处，才不像开场白。
@@ -8,7 +9,14 @@ import type { Dictionary } from '@/i18n';
 // 左边这张卡不用照片，用几层渐变画出「一棵树站在坡上」：
 // 照片会把注意力拉到具体某处风景，插画只留下意象。
 
-export default function OriginSection({ t }: { t: Dictionary['home']['origin'] }) {
+export default function OriginSection({
+  t,
+  locale,
+}: {
+  t: Dictionary['home']['origin'];
+  /** 理念片播放器是客户端组件，按约定只收 locale，自己查字典 */
+  locale: Locale;
+}) {
   return (
     <section id="origin" className="px-8 py-28 max-md:px-7 max-md:py-20">
       <div className="mx-auto grid max-w-[1180px] grid-cols-[0.85fr_1.15fr] items-center gap-[70px] max-lg:grid-cols-1 max-lg:gap-11">
@@ -30,7 +38,7 @@ export default function OriginSection({ t }: { t: Dictionary['home']['origin'] }
             className="pointer-events-none absolute bottom-[210px] left-[calc(50%-88px)] h-[150px] w-[180px] rotate-[8deg] rounded-[70%_30%_55%_45%] bg-[rgba(30,53,40,0.84)]"
           />
           <div className="absolute bottom-8 left-8">
-            <HeroFilmPlayer variant="glass" />
+            <HeroFilmPlayer variant="glass" locale={locale} />
           </div>
         </div>
 

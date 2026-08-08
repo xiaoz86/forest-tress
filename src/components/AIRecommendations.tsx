@@ -1,7 +1,9 @@
 'use client';
 
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AIRecommendation } from '@/lib/supabase';
 
@@ -11,8 +13,11 @@ type Props = {
   generatedAt?: string | null;
   /** 当前可见者是节点本人还是管理员 — 文案会做区分 */
   mode: 'owner' | 'admin';
+  /** 字典里有函数，跨不过序列化边界，所以只收 locale */
+  locale: Locale;
 };
 
+// 键是数据里的固定值，不随语言变；显示文字走字典。
 const matchTypeStyle: Record<AIRecommendation['matchType'], string> = {
   同频: 'bg-leaf/15 text-forest-mid border-leaf/30',
   互补: 'bg-warmth/20 text-coral border-coral-soft/40',
@@ -45,7 +50,8 @@ function formatTime(iso: string | null | undefined): string {
   }
 }
 
-export default function AIRecommendations({ nodeId, initial, generatedAt, mode }: Props) {
+export default function AIRecommendations({ nodeId, initial, generatedAt, mode, locale }: Props) {
+  const t = useMemo(() => dict(locale).creatorDetail, [locale]);
   const router = useRouter();
   const [items, setItems] = useState<AIRecommendation[]>(initial);
   const [stamp, setStamp] = useState<string | null | undefined>(generatedAt);
@@ -65,10 +71,10 @@ export default function AIRecommendations({ nodeId, initial, generatedAt, mode }
       if (!res.ok) {
         setError(
           json?.error === 'forbidden'
-            ? '没有权限重新生成'
+            ? t.ai.error.forbidden
             : json?.error === 'column-missing'
-              ? '数据库尚未升级，请联系管理员'
-              : '生成失败，请稍后再试',
+              ? t.ai.error.columnMissing
+              : t.ai.error.failed,
         );
       } else {
         setItems(Array.isArray(json.recommendations) ? json.recommendations : []);
@@ -77,7 +83,7 @@ export default function AIRecommendations({ nodeId, initial, generatedAt, mode }
         router.refresh();
       }
     } catch {
-      setError('生成失败，请稍后再试');
+      setError(t.ai.error.failed);
     } finally {
       setBusy(false);
     }
@@ -88,11 +94,11 @@ export default function AIRecommendations({ nodeId, initial, generatedAt, mode }
       <div className="flex items-center justify-between gap-3 mb-3">
         <div>
           <div className="text-[11px] font-semibold tracking-[0.18em] uppercase text-coral mb-1">
-            AI 为你推荐 · 仅你{mode === 'admin' ? '（管理员）' : ''}可见
+            {t.ai.title}{mode === 'admin' ? t.ai.titleAdmin : ''}{t.ai.titleTail}
           </div>
           {stamp && (
             <div className="text-[11px] text-text-light">
-              生成于 {formatTime(stamp)}
+              {t.ai.generatedAt(formatTime(stamp))}
             </div>
           )}
         </div>
@@ -102,7 +108,7 @@ export default function AIRecommendations({ nodeId, initial, generatedAt, mode }
           disabled={busy}
           className="text-[12.5px] font-medium px-3.5 py-1.5 rounded-full border border-black/[0.08] bg-white hover:bg-[#fafaf7] disabled:opacity-50 transition-colors"
         >
-          {busy ? '生成中…' : items.length > 0 ? '重新生成' : '让 AI 现在生成'}
+          {busy ? t.ai.generating : items.length > 0 ? t.ai.regenerate : t.ai.generate}
         </button>
       </div>
 
@@ -112,9 +118,9 @@ export default function AIRecommendations({ nodeId, initial, generatedAt, mode }
 
       {items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-mist bg-warm-cream/50 p-5 text-[13px] leading-relaxed text-text-secondary">
-          还没有 AI 推荐。点上方「让 AI 现在生成」按钮，根据你最新的节点信息生成 1-3 位最值得连接的成员。
+          {t.ai.emptyHint}
           <br />
-          每次更新完个人资料后都可以重新生成一次。
+          {t.ai.emptyNote}
         </div>
       ) : (
         <ul className="space-y-3">
@@ -148,7 +154,7 @@ export default function AIRecommendations({ nodeId, initial, generatedAt, mode }
                     <span
                       className={`ml-auto inline-block px-2 py-0.5 rounded-full text-[10.5px] font-semibold border ${matchTypeStyle[m.matchType]}`}
                     >
-                      {m.matchType}
+                      {t.matchType[m.matchType]}
                     </span>
                   </div>
                   {m.doing && (
@@ -159,7 +165,7 @@ export default function AIRecommendations({ nodeId, initial, generatedAt, mode }
                   {m.aiSummary && (
                     <div className="mb-1.5 p-2.5 rounded-lg bg-leaf/8 border border-leaf/20">
                       <div className="text-[10px] font-semibold tracking-widest text-forest-mid uppercase mb-0.5">
-                        为何匹配
+                        {t.match.why}
                       </div>
                       <p className="text-[12.5px] text-text-secondary leading-relaxed">
                         {m.aiSummary}
@@ -169,7 +175,7 @@ export default function AIRecommendations({ nodeId, initial, generatedAt, mode }
                   {m.aiCoCreate && (
                     <div className="mb-1.5 p-2.5 rounded-lg bg-warmth/15 border border-coral-soft/30">
                       <div className="text-[10px] font-semibold tracking-widest text-coral uppercase mb-0.5">
-                        可能共创
+                        {t.match.coCreate}
                       </div>
                       <p className="text-[12.5px] text-text-secondary leading-relaxed">
                         {m.aiCoCreate}

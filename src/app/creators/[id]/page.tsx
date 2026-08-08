@@ -13,8 +13,12 @@ import PhilMemoriesManager from '@/components/PhilMemoriesManager';
 import { buildRelationGraph } from '@/lib/network';
 import { isAdminId } from '@/lib/admin';
 import { getAuthenticatedMemberId } from '@/lib/session';
-import { getLocale } from '@/lib/locale';
+import { dict } from '@/i18n';
+import { getLocale, type Locale } from '@/lib/locale';
 import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
+
+/** 主理人本名，不随语言变 */
+const ADMIN_NAME = '小 Z';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,10 +40,12 @@ export async function generateMetadata({ params }: Props) {
   const { id } = await params;
   const all = await fetchAll();
   const me = all.find(n => n.id === id);
-  if (!me) return { title: '创造者 · 附近森林' };
+  const t = dict(await getLocale()).creatorDetail;
+  if (!me) return { title: t.metaTitleFallback };
   return {
-    title: `${me.name} · 创造者森林`,
-    description: me.doing || '附近森林的一棵创造者之树',
+    // 名字和「正在做」都是本人填的，不翻
+    title: t.metaTitle(me.name),
+    description: me.doing || t.metaDescriptionFallback,
   };
 }
 
@@ -51,8 +57,8 @@ export default async function CreatorDetail({ params }: Props) {
 
   const graph = buildRelationGraph(me, all, 8);
 
-  // 这一页其余部分还没接双语（见 i18n 待办），先把已经接好的记忆区喂上语言
   const [memberId, locale] = await Promise.all([getAuthenticatedMemberId(), getLocale()]);
+  const t = dict(locale).creatorDetail;
   const isMember = Boolean(memberId);
   const isOwner = memberId === me.id;
   const isAdmin = isAdminId(memberId);
@@ -82,7 +88,7 @@ export default async function CreatorDetail({ params }: Props) {
             className="inline-flex items-center gap-1.5 text-[13px] text-text-light hover:text-forest-mid transition-colors"
           >
             <span>←</span>
-            <span>创造者森林</span>
+            <span>{t.backToForest}</span>
           </Link>
         </div>
         {/* 已登录提示（自己的页面） / 游客可登录入口 */}
@@ -92,16 +98,16 @@ export default async function CreatorDetail({ params }: Props) {
               href={`/api/logout?back=/creators/${me.id}`}
               className="text-text-light hover:text-forest-mid transition-colors"
             >
-              退出登录
+              {t.logout}
             </a>
           ) : isAdmin ? (
-            <span className="text-moss font-medium">管理员视角 · 小 Z</span>
+            <span className="text-moss font-medium">{t.adminView(ADMIN_NAME)}</span>
           ) : isMember ? null : (
             <Link
               href="/login"
               className="text-text-light hover:text-forest-mid transition-colors"
             >
-              登录
+              {t.login}
             </Link>
           )}
         </div>
@@ -110,7 +116,7 @@ export default async function CreatorDetail({ params }: Props) {
           {/* 头像（本人或管理员可上传，其他人只看） */}
           <div className="flex justify-center">
             {canEditAvatar ? (
-              <AvatarUploader
+              <AvatarUploader locale={locale}
                 id={me.id!}
                 currentUrl={me.avatar_url}
                 name={me.name}
@@ -158,7 +164,7 @@ export default async function CreatorDetail({ params }: Props) {
         <div className="max-w-[680px] mx-auto px-6 py-16 max-md:py-10 max-md:px-7">
           {canEditProfile && (
             <div className="mb-10 max-md:mb-7">
-              <ProfileEditor node={me} mode={isOwner ? 'owner' : 'admin'} />
+              <ProfileEditor locale={locale} node={me} mode={isOwner ? 'owner' : 'admin'} />
             </div>
           )}
           {isOwner && (
@@ -167,25 +173,27 @@ export default async function CreatorDetail({ params }: Props) {
             </div>
           )}
           <div className="space-y-12 max-md:space-y-9">
-            <Section label="正在做" body={me.doing} />
+            <Section label={t.section.doing} body={me.doing} />
             <WorksSection
+              t={t}
+              locale={locale}
               nodeId={me.id!}
               works={works}
               legacyText={me.product}
               canEdit={canEditWorks}
               isOwner={isOwner}
             />
-            <Section label="经验与独特性" body={me.experience} />
-            <Section label="可以提供" body={me.offer} />
-            <Section label="正在寻找" body={me.seeking} tone="coral" />
-            <Section label="兴趣爱好" body={me.interests} />
+            <Section label={t.section.experience} body={me.experience} />
+            <Section label={t.section.offer} body={me.offer} />
+            <Section label={t.section.seeking} body={me.seeking} tone="coral" />
+            <Section label={t.section.interests} body={me.interests} />
           </div>
         </div>
 
         {canSeeRecommendations && (
           <div className="max-w-[680px] mx-auto px-6 pb-12 max-md:px-7 max-md:pb-8">
             <div className="rounded-2xl bg-gradient-to-br from-love-pink/8 via-warmth/8 to-leaf/6 border border-coral-soft/25 p-6 max-md:p-5">
-              <AIRecommendations
+              <AIRecommendations locale={locale}
                 nodeId={me.id!}
                 initial={recommendations}
                 generatedAt={me.ai_recommendations_at}
@@ -199,12 +207,12 @@ export default async function CreatorDetail({ params }: Props) {
         <div className="max-w-[680px] mx-auto px-6 pb-16 max-md:px-7 max-md:pb-10">
           <div className="rounded-2xl bg-[#fafaf7] border border-black/[0.06] p-7 max-md:p-5">
             <div className="text-[11px] font-semibold tracking-[0.18em] text-text-light uppercase mb-4">
-              联系方式
+              {t.contact.title}
             </div>
             {isMember ? (
-              <ContactBlock node={me} />
+              <ContactBlock node={me} t={t} />
             ) : (
-              <GatedContact />
+              <GatedContact t={t} />
             )}
           </div>
         </div>
@@ -221,22 +229,22 @@ export default async function CreatorDetail({ params }: Props) {
               className="text-[24px] font-semibold tracking-[-0.01em] text-forest-deep max-md:text-[20px]"
               style={{ fontFamily: 'var(--font-display)' }}
             >
-              {me.name} 周围的连接
+              {t.network.title(me.name)}
             </h2>
             <p className="mt-2 text-[13px] text-text-light leading-relaxed max-w-md mx-auto">
-              森林始终只动态展示 9 个节点以内的关系，由近到远，从紧密到弱连接。
+              {t.network.note}
             </p>
           </div>
 
           {graph.neighbors.length === 0 ? (
             <p className="text-center py-12 text-text-light text-[13px]">
-              这棵树还没有相邻的连接。
+              {t.network.empty1}
               <br />
-              当更多创造者加入时，关系网会自动生长。
+              {t.network.empty2}
             </p>
           ) : (
             <div className="bg-white rounded-2xl border border-black/[0.06] p-6 shadow-[0_2px_20px_rgba(0,0,0,0.04)] max-md:p-3">
-              <RelationNetwork graph={graph} isMember={isMember} />
+              <RelationNetwork locale={locale} graph={graph} isMember={isMember} />
             </div>
           )}
         </div>
@@ -249,20 +257,20 @@ export default async function CreatorDetail({ params }: Props) {
             className="text-[22px] font-semibold tracking-[-0.01em] text-forest-deep mb-3"
             style={{ fontFamily: 'var(--font-display)' }}
           >
-            也想被收进这片森林？
+            {t.joinCta.title}
           </h2>
           <Link
             href="/#join"
             className="inline-block mt-2 px-7 py-3 bg-forest-deep text-white text-[14px] font-medium rounded-full no-underline hover:bg-forest-mid transition-colors"
           >
-            成为森林的一棵树
+            {t.joinCta.button}
           </Link>
         </section>
       )}
 
       <footer className="bg-white text-text-light py-10 px-6 text-center text-[11px] border-t border-black/[0.04]">
-        <p>附近森林 · Nearby Forest</p>
-        <p className="mt-1.5 text-text-light/70">让独立的个体彼此连接、流动、共创</p>
+        <p>{t.footer.brand}</p>
+        <p className="mt-1.5 text-text-light/70">{t.footer.tagline}</p>
       </footer>
     </>
   );
@@ -301,12 +309,17 @@ function WorksSection({
   legacyText,
   canEdit,
   isOwner,
+  t,
+  locale,
 }: {
   nodeId: string;
   works: Work[];
   legacyText?: string | null;
   canEdit: boolean;
   isOwner: boolean;
+  t: ReturnType<typeof dict>['creatorDetail'];
+  /** 里面的 WorksEditor 是客户端组件，按约定只收 locale */
+  locale: Locale;
 }) {
   const hasWorks = works.length > 0;
   const hasLegacy = !!(legacyText && legacyText.trim());
@@ -316,7 +329,7 @@ function WorksSection({
   return (
     <section>
       <div className="text-[11px] font-semibold tracking-[0.18em] uppercase mb-3 text-moss">
-        作品 / 项目
+        {t.works.title}
       </div>
 
       {hasWorks ? (
@@ -327,12 +340,12 @@ function WorksSection({
         </p>
       ) : canEdit ? (
         <p className="text-[13px] text-text-light">
-          还没有作品。点下方 <span className="font-medium text-forest-deep">+ 添加作品</span>，让访客一眼看到你的公众号、播客、产品或服务。
+          {t.works.emptyBefore}<span className="font-medium text-forest-deep">{t.works.emptyAccent}</span>{t.works.emptyAfter}
         </p>
       ) : null}
 
       {canEdit && (
-        <WorksEditor
+        <WorksEditor locale={locale}
           nodeId={nodeId}
           works={works}
           mode={isOwner ? 'owner' : 'admin'}
@@ -342,11 +355,11 @@ function WorksSection({
   );
 }
 
-function ContactBlock({ node }: { node: NodeCard }) {
+function ContactBlock({ node, t }: { node: NodeCard; t: ReturnType<typeof dict>['creatorDetail'] }) {
   if (!node.wechat && !node.email) {
     return (
       <p className="text-[13px] text-text-light">
-        TA 还没有留下联系方式。
+        {t.contact.none}
       </p>
     );
   }
@@ -354,13 +367,13 @@ function ContactBlock({ node }: { node: NodeCard }) {
     <dl className="space-y-3 text-[14px]">
       {node.wechat && (
         <div className="flex items-baseline gap-4">
-          <dt className="text-text-light w-12 shrink-0 text-[12px] tracking-wide">微信</dt>
+          <dt className="text-text-light w-12 shrink-0 text-[12px] tracking-wide">{t.contact.wechat}</dt>
           <dd className="font-mono text-forest-deep font-medium break-all">{node.wechat}</dd>
         </div>
       )}
       {node.email && (
         <div className="flex items-baseline gap-4">
-          <dt className="text-text-light w-12 shrink-0 text-[12px] tracking-wide">邮箱</dt>
+          <dt className="text-text-light w-12 shrink-0 text-[12px] tracking-wide">{t.contact.email}</dt>
           <dd>
             <a
               href={`mailto:${node.email}`}
@@ -375,19 +388,19 @@ function ContactBlock({ node }: { node: NodeCard }) {
   );
 }
 
-function GatedContact() {
+function GatedContact({ t }: { t: ReturnType<typeof dict>['creatorDetail'] }) {
   return (
     <div className="text-center py-3">
       <p className="text-[13.5px] text-text-secondary leading-relaxed mb-5">
-        联系方式只对社区成员可见。
+        {t.contact.membersOnly}
         <br />
-        填写一张你自己的节点卡，就能看到。
+        {t.contact.membersOnlyHint}
       </p>
       <Link
         href="/#join"
         className="inline-block px-6 py-2.5 bg-forest-deep text-white text-[13px] font-medium rounded-full no-underline hover:bg-forest-mid transition-colors"
       >
-        成为森林的一棵树
+        {t.contact.cta}
       </Link>
     </div>
   );

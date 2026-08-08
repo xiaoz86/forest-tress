@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
       );
 
       const [aiMatches, aiKeywords] = await Promise.all([
-        matchNodesAI(newNode, others, 3),
+        matchNodesAI(newNode, others, 3, await getLocale()),
         generateKeywordsAI(newNode, 6),
       ]);
       matches = aiMatches;

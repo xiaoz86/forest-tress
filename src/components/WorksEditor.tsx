@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Work } from '@/lib/supabase';
 
@@ -8,24 +10,32 @@ type Props = {
   nodeId: string;
   works: Work[];
   mode: 'owner' | 'admin';
+  /** 字典里有函数，跨不过 server → client 序列化边界，所以只收 locale */
+  locale: Locale;
 };
 
-const ERROR_MESSAGES: Record<string, string> = {
-  forbidden: '只有本人或管理员可以编辑作品',
-  'missing-title': '请填写作品标题',
-  'bad-url': '链接需以 http:// 或 https:// 开头',
-  'bad-file-type': '请上传 JPG / PNG / WebP / HEIC 图片',
-  'file-too-large': '图片过大，请压缩到 5MB 以内',
-  'too-many-works': '作品数量已达上限',
-  'column-missing': '数据库尚未升级，请联系管理员',
-  'upload-failed': '上传失败，请稍后再试',
-  'db-update-failed': '保存失败，请稍后再试',
-  'node-not-found': '找不到这棵树',
-  'work-not-found': '这条作品不存在或已被删除',
-  'nothing-to-update': '没有可更新的内容',
-};
+function errorText(code: string, t: WorksCopy): string {
+  const map: Record<string, string> = {
+    forbidden: t.error.forbidden,
+    'missing-title': t.error.missingTitle,
+    'bad-url': t.error.badUrl,
+    'bad-file-type': t.error.badFileType,
+    'file-too-large': t.error.fileTooLarge,
+    'too-many-works': t.error.tooManyWorks,
+    'column-missing': t.error.columnMissing,
+    'upload-failed': t.error.uploadFailed,
+    'db-update-failed': t.error.saveFailed,
+    'node-not-found': t.error.nodeNotFound,
+    'work-not-found': t.error.workNotFound,
+    'nothing-to-update': t.error.nothingToUpdate,
+  };
+  return map[code] || t.error.saveFailed;
+}
 
-export default function WorksEditor({ nodeId, works, mode }: Props) {
+type WorksCopy = ReturnType<typeof dict>['creatorDetail']['worksEditor'];
+
+export default function WorksEditor({ nodeId, works, mode, locale }: Props) {
+  const t = useMemo(() => dict(locale).creatorDetail.worksEditor, [locale]);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -75,7 +85,7 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
 
   const submit = async () => {
     if (!title.trim()) {
-      setError(ERROR_MESSAGES['missing-title']);
+      setError(t.error.missingTitle);
       return;
     }
     setSubmitting(true);
@@ -103,21 +113,21 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
       }
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(ERROR_MESSAGES[json.error] || '保存失败，请稍后再试');
+        setError(errorText(json.error, t));
       } else {
         reset();
         setOpen(false);
         router.refresh();
       }
     } catch {
-      setError('保存失败，请稍后再试');
+      setError(t.error.saveFailed);
     } finally {
       setSubmitting(false);
     }
   };
 
   const remove = async (workId: string) => {
-    if (!confirm('删除这条作品？此操作不可撤销。')) return;
+    if (!confirm(t.confirmDelete)) return;
     setBusyId(workId);
     try {
       const res = await fetch(
@@ -126,12 +136,12 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
       );
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        alert(ERROR_MESSAGES[json.error] || '删除失败');
+        alert(errorText(json.error, t));
       } else {
         router.refresh();
       }
     } catch {
-      alert('删除失败');
+      alert(t.error.deleteFailed);
     } finally {
       setBusyId(null);
     }
@@ -148,12 +158,12 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
       );
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(ERROR_MESSAGES[json.error] || '更换封面失败');
+        alert(errorText(json.error, t));
       } else {
         router.refresh();
       }
     } catch {
-      alert('更换封面失败');
+      alert(t.error.coverFailed);
     } finally {
       setBusyId(null);
     }
@@ -164,7 +174,7 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
       {/* 操作栏 */}
       <div className="flex items-center justify-between gap-3 px-1">
         <p className="text-[12px] text-text-light">
-          {mode === 'admin' ? '管理员模式 · 你正在编辑 TA 的作品' : '只有你能看到这些编辑按钮'}
+          {mode === 'admin' ? t.adminMode : t.ownerOnly}
         </p>
         {!open && (
           <button
@@ -172,7 +182,7 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
             onClick={openCreate}
             className="text-[13px] font-medium px-4 py-2 rounded-full bg-forest-deep text-white hover:bg-forest-mid transition-colors"
           >
-            + 添加作品
+            {t.add}
           </button>
         )}
       </div>
@@ -181,31 +191,31 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
       {open && (
         <div className="mt-4 rounded-2xl border border-black/[0.08] bg-white p-5 max-md:p-4 shadow-[0_2px_18px_rgba(0,0,0,0.04)]">
           <div className="text-[12px] text-text-light mb-3">
-            {editingId ? '编辑作品' : '新建作品'}
+            {editingId ? t.editTitle : t.newTitle}
           </div>
           <div className="grid gap-3">
-            <Field label="标题">
+            <Field label={t.field.title}>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="例：1on1 教练服务 / 播客《随机漫步的进化》"
+                placeholder={t.field.titlePlaceholder}
                 maxLength={80}
                 className="w-full rounded-md border border-black/[0.1] bg-[#fafaf7] px-3 py-2 text-[14px] focus:outline-none focus:border-forest-mid"
               />
             </Field>
 
-            <Field label="描述（可选，1-2 句话）">
+            <Field label={t.field.desc}>
               <textarea
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
-                placeholder="一句话告诉访客这是什么"
+                placeholder={t.field.descPlaceholder}
                 maxLength={240}
                 rows={2}
                 className="w-full rounded-md border border-black/[0.1] bg-[#fafaf7] px-3 py-2 text-[14px] resize-y focus:outline-none focus:border-forest-mid"
               />
             </Field>
 
-            <Field label="跳转链接（可选）">
+            <Field label={t.field.url}>
               <input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
@@ -214,20 +224,20 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
               />
             </Field>
 
-            <Field label={editingId ? '封面图（可选，留空则保留原图）' : '封面图（可选，5MB 内）'}>
+            <Field label={editingId ? t.field.coverEdit : t.field.coverNew}>
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
                   className="text-[13px] px-3 py-2 rounded-md border border-black/[0.1] bg-white hover:bg-[#fafaf7]"
                 >
-                  {file ? '更换图片' : '选择图片'}
+                  {file ? t.field.replace : t.field.pick}
                 </button>
                 {filePreview && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={filePreview}
-                    alt="预览"
+                    alt={t.field.previewAlt}
                     className="w-12 h-12 rounded object-cover ring-1 ring-black/[0.08]"
                   />
                 )}
@@ -264,7 +274,7 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
                 disabled={submitting}
                 className="text-[13px] px-4 py-2 rounded-full text-text-light hover:text-forest-deep"
               >
-                取消
+                {t.cancel}
               </button>
               <button
                 type="button"
@@ -272,7 +282,7 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
                 disabled={submitting}
                 className="text-[13px] font-medium px-5 py-2 rounded-full bg-forest-deep text-white hover:bg-forest-mid disabled:opacity-50 transition-colors"
               >
-                {submitting ? '保存中…' : editingId ? '保存更改' : '保存作品'}
+                {submitting ? t.saving : editingId ? t.saveChanges : t.save}
               </button>
             </div>
           </div>
@@ -283,7 +293,7 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
       {works.length > 0 && (
         <div className="mt-5 px-1">
           <div className="text-[11px] text-text-light mb-2.5 tracking-wide">
-            已发布 {works.length} 条
+            {t.published(works.length)}
           </div>
           <ul className="divide-y divide-black/[0.05] border-y border-black/[0.05]">
             {works.map((w) => {
@@ -301,7 +311,7 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-[10px] text-text-light/70">
-                        无图
+                        {t.noImage}
                       </div>
                     )}
                   </div>
@@ -312,7 +322,7 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
                       {w.title}
                     </div>
                     <div className="text-[11.5px] text-text-light truncate">
-                      {w.url || (w.desc ? w.desc : '无链接 · 无描述')}
+                      {w.url || (w.desc ? w.desc : t.noLinkNoDesc)}
                     </div>
                   </div>
 
@@ -324,21 +334,21 @@ export default function WorksEditor({ nodeId, works, mode }: Props) {
                         rowFileRef.current?.click();
                       }}
                       disabled={busy}
-                      label="更换封面"
+                      label={t.action.cover}
                     >
                       📷
                     </RowAction>
                     <RowAction
                       onClick={() => openEdit(w)}
                       disabled={busy}
-                      label="编辑文字"
+                      label={t.action.text}
                     >
                       ✎
                     </RowAction>
                     <RowAction
                       onClick={() => remove(w.id)}
                       disabled={busy}
-                      label="删除"
+                      label={t.action.remove}
                       danger
                     >
                       {busy ? '…' : '×'}

@@ -204,7 +204,7 @@ export default async function Home() {
             </div>
 
             <div className="px-2 max-md:px-0">
-              <RelationNetwork graph={showcaseGraph} isMember={false} animate />
+              <RelationNetwork graph={showcaseGraph} isMember={false} animate locale={locale} />
             </div>
 
             <p className="mx-auto mt-6 max-w-[520px] text-center text-[13px] leading-[1.9] text-text-light">
@@ -226,7 +226,7 @@ export default async function Home() {
       </StorySection>
 
       {/* [6] 为什么要做附近森林 */}
-      <OriginSection t={t.origin} />
+      <OriginSection t={t.origin} locale={locale} />
 
       {/* 行动 — 种下你的种子 */}
       <section

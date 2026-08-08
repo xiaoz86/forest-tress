@@ -328,7 +328,7 @@ export default function JoinForm({ locale }: { locale: Locale }) {
               )}
             </p>
           </div>
-          <MatchedNodes matches={matches} />
+          <MatchedNodes matches={matches} locale={locale} />
         </div>
       </div>
     );

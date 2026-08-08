@@ -1,6 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
+import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type Props = {
@@ -10,6 +12,12 @@ type Props = {
   size?: number;
   /** 'owner'（本人上传）| 'admin'（管理员替别人上传） */
   mode?: 'owner' | 'admin';
+  /**
+   * 文案在客户端自己取。字典里有函数（adminUploadAria 这些），
+   * 函数跨不过 server → client 那道序列化边界，整片切片当 props
+   * 传会让页面直接崩。只传 locale。
+   */
+  locale: Locale;
 };
 
 const gradients = [
@@ -30,16 +38,19 @@ function firstChar(name: string): string {
   return (name || '').trim().charAt(0) || '·';
 }
 
-const ERROR_MESSAGES: Record<string, string> = {
-  forbidden: '只能上传你自己的形象照',
-  'bad-file-type': '请上传 JPG / PNG / WebP / HEIC 图片',
-  'file-too-large': '图片过大，请压缩到 5MB 以内',
-  'column-missing': '数据库尚未升级，请联系管理员',
-  'missing-id': '缺少身份信息',
-  'missing-file': '没有选中文件',
-  'upload-failed': '上传失败，请稍后再试',
-  'db-update-failed': '保存失败，请稍后再试',
-};
+function errorText(code: string, t: ReturnType<typeof dict>['creatorDetail']['avatar']): string {
+  const map: Record<string, string> = {
+    forbidden: t.error.forbidden,
+    'bad-file-type': t.error.badFileType,
+    'file-too-large': t.error.fileTooLarge,
+    'column-missing': t.error.columnMissing,
+    'missing-id': t.error.missingId,
+    'missing-file': t.error.missingFile,
+    'upload-failed': t.error.uploadFailed,
+    'db-update-failed': t.error.saveFailed,
+  };
+  return map[code] || t.error.uploadFailed;
+}
 
 export default function AvatarUploader({
   id,
@@ -47,7 +58,9 @@ export default function AvatarUploader({
   name,
   size = 128,
   mode = 'owner',
+  locale,
 }: Props) {
+  const t = useMemo(() => dict(locale).creatorDetail.avatar, [locale]);
   const isAdmin = mode === 'admin';
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -74,7 +87,7 @@ export default function AvatarUploader({
       const res = await fetch('/api/avatar', { method: 'POST', body: fd });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(ERROR_MESSAGES[json.error] || '上传失败，请稍后再试');
+        setError(errorText(json.error, t));
         // 失败时回到原始头像
         setPreviewUrl(currentUrl || null);
       } else {
@@ -82,7 +95,7 @@ export default function AvatarUploader({
         router.refresh();
       }
     } catch {
-      setError('上传失败，请稍后再试');
+      setError(t.error.uploadFailed);
       setPreviewUrl(currentUrl || null);
     } finally {
       setUploading(false);
@@ -100,8 +113,8 @@ export default function AvatarUploader({
         style={{ width: `${size}px`, height: `${size}px` }}
         aria-label={
           isAdmin
-            ? previewUrl ? `管理员替 ${name} 更换形象照` : `管理员替 ${name} 上传形象照`
-            : previewUrl ? '更换形象照' : '上传形象照'
+            ? previewUrl ? t.adminChangeAria(name) : t.adminUploadAria(name)
+            : previewUrl ? t.changeAria : t.uploadAria
         }
       >
         {previewUrl ? (
@@ -122,10 +135,10 @@ export default function AvatarUploader({
         {/* Hover/upload overlay */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/45 transition-colors flex items-center justify-center text-white text-[12px] font-medium tracking-wide opacity-0 group-hover:opacity-100">
           {uploading
-            ? '上传中…'
+            ? t.uploading
             : isAdmin
-              ? previewUrl ? '管理员更换' : '管理员上传'
-              : previewUrl ? '更换照片' : '上传照片'}
+              ? previewUrl ? t.adminChange : t.adminUpload
+              : previewUrl ? t.change : t.upload}
         </div>
       </button>
 
@@ -143,11 +156,11 @@ export default function AvatarUploader({
 
       {!previewUrl && !uploading && (
         <p className="mt-3 text-[12px] text-text-light">
-          {isAdmin ? '点击为 TA 上传形象照（管理员）' : '点击上传你的形象照（可选）'}
+          {isAdmin ? t.adminHint : t.hint}
         </p>
       )}
       {previewUrl && !uploading && isAdmin && (
-        <p className="mt-3 text-[11px] text-text-light/80">管理员模式 · 点击头像更换</p>
+        <p className="mt-3 text-[11px] text-text-light/80">{t.adminNote}</p>
       )}
       {error && <p className="mt-3 text-[12px] text-coral">{error}</p>}
     </div>

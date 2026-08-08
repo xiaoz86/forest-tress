@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getLocale } from '@/lib/locale';
 import { NextRequest, NextResponse } from 'next/server';
 import { matchNodesAI } from '@/lib/match';
 import { isAdminId } from '@/lib/admin';
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
   const { data: allRows } = await sb.from('node_cards').select('*');
   const others = ((allRows || []) as NodeCard[]).filter(n => n.id !== nodeId);
 
-  const matches = await matchNodesAI(me, others, 3);
+  const matches = await matchNodesAI(me, others, 3, await getLocale());
   const snapshot = matches.map(toRecommendationSnapshot);
   const generatedAt = new Date().toISOString();
 

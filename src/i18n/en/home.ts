@@ -179,6 +179,14 @@ export const home: typeof zhHome = {
     quoteTop: 'Every tree stands on its own,',
     quoteBottom: 'and the roots meet deep in the ground, where no one can see.',
     link: 'Read where Nearby Forest comes from →',
+    film: {
+      cta: 'Watch the film',
+      ariaOpen: 'Watch the Nearby Forest film',
+      ariaClose: 'Close the film',
+      close: 'Close',
+      brand: 'Nearby Forest',
+      subtitle: 'The film',
+    },
   },
 
   join: {

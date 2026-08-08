@@ -1,4 +1,5 @@
 import type { NodeCard } from './supabase';
+import type { Locale } from './locale';
 import { createChatCompletion, getLLMConfig } from './llm';
 
 export type MatchedNode = NodeCard & {
@@ -121,10 +122,30 @@ export function matchNodes(
  *
  * 没配置大模型 API 时静默退化为规则匹配。
  */
+/**
+ * 英文界面的人来了怎么办。
+ *
+ * 上面那套撮合要求是用中文写的，也只该用中文写——照抄成英文再喂给模型，
+ * 那些拿捏分寸的话（「不夸张、不奉承」）会先垮一层。所以底层一个字不动，
+ * 只在 system 最末尾追加一条：换输出语言，别的照旧。
+ * 必须放在最后——前面写着「中文输出」，靠位置压过去比回头改那句安全。
+ *
+ * matchType 不在此列：那三个值（同频/互补/同城）是数据里的固定取值，
+ * 前端按语言查表显示，模型仍然只能回这三个中文词。
+ */
+const ENGLISH_OUTPUT_RULE = `
+【输出语言】这位用户在用英文界面：reasons、summary、coCreate 三个字段
+请全部用英文写，其余要求照旧。matchType 仍然只能是「同频」「互补」「同城」
+三者之一（那是系统的固定取值，不要翻译，也不要换写法）。
+字数改按英文计：reasons 每条 4-10 个词，summary 一句 15-30 个词，
+coCreate 一句 15-40 个词。不要中英夹杂。`;
+
 export async function matchNodesAI(
   me: NodeCard,
   others: NodeCard[],
   topN = 3,
+  /** 英文界面的人拿到的理由和共创方向要是英文的 */
+  locale: Locale = 'zh',
 ): Promise<MatchedNode[]> {
   if (!getLLMConfig()) return matchNodes(me, others, topN);
 
@@ -152,7 +173,7 @@ export async function matchNodesAI(
   if (candidates.length === 0) return [];
 
   try {
-    const ai = await callLLMMatch(me, candidates, topN);
+    const ai = await callLLMMatch(me, candidates, topN, locale);
     if (!ai || ai.length === 0) {
       return matchNodes(me, others, topN);
     }
@@ -193,6 +214,7 @@ async function callLLMMatch(
   me: NodeCard,
   candidates: (NodeCard & { reasons: string[] })[],
   topN: number,
+  locale: Locale,
 ): Promise<AIMatchItem[] | null> {
   const candidateLines = candidates.map((c, i) => {
     return [
@@ -225,7 +247,9 @@ async function callLLMMatch(
 你要从候选成员中，为新加入者挑出最值得连接的 1～${topN} 位，并明确告诉双方：
 1) 为何匹配（结合具体细节，不要套话）
 2) 可能共创什么（具体到一两个方向、产品形态、活动形式等）
-风格：温暖、具体、克制；不夸张、不奉承；不要解释你是 AI；中文输出。`;
+风格：温暖、具体、克制；不夸张、不奉承；不要解释你是 AI；中文输出。${
+    locale === 'en' ? ENGLISH_OUTPUT_RULE : ''
+  }`;
 
   const user = `【新加入者】
 ${meBlock}
