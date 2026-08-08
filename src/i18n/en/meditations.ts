@@ -1,57 +1,205 @@
 import type { meditations as zhMeditations } from '@/i18n/zh/meditations';
 
-/**
- * 声音林的英文。几处不是直译，记一下为什么：
- *
- * - 「引导冥想」这一组的 eyebrow 本来就是 Guided，标题再翻成 Guided meditations
- *   就成了同一个词说两遍。改成 With a voice——和它下面那句「有人声带着走」是一路的。
- * - 「声音」这一组同理：eyebrow 是 Ambient，标题用 Just sound。
- * - 「具体的声音」不是 Specific sounds（那是目录口气）。这一栏在页面上的意思是
- *   「铺垫说完了，下面是声音本身」，所以 The sounds themselves。
- * - 段数分单复数：1 sound / 3 sounds，不能一律 sounds。
- */
 export const meditations: typeof zhMeditations = {
-  metaTitle: 'Breathing in the forest · Nearby Forest',
-  metaDescription: 'Guided meditations and sound practices from Nearby Forest.',
+  metaTitle: 'Forest Breath · Nearby Forest',
+  metaDescription: 'Themed meditations and sound practices from Nearby Forest.',
 
-  backHome: '← Back home',
+  backHome: '← Home',
   backToAll: '← All sounds',
 
-  soundCount: (count: number) => (count === 1 ? '1 sound' : `${count} sounds`),
-  soundsComing: 'Sounds on the way',
+  /** 一条小径下面有几段声音。英文要分单复数，所以写成函数而不是拼接。 */
+  soundCount: (count: number) => `${count} sound${count !== 1 ? 's' : ''}`,
+  /** 一段都还没有时，胶囊里换成这句 */
+  soundsComing: 'More sounds on the way',
 
+  // 声音林（/meditations 不带参数时的列表页）
   grove: {
     eyebrow: 'Sounds of the Forest',
     guided: {
       eyebrow: 'Guided',
-      title: 'With a voice',
-      note: 'A voice leads the way. Pick a sound anytime, listen at your own pace.',
+      title: 'Guided meditations',
+      note: 'A voice to walk with. Pick one, go at your own pace.',
     },
     program: {
       eyebrow: 'Program',
       title: 'Sleep series',
-      note: 'A whole journey, in order. One week at a time, with no rush to finish.',
+      note: 'A journey with a sequence. Week by week, no rush.',
     },
     ambient: {
       eyebrow: 'Ambient',
-      title: 'Just sound',
-      note: 'No guidance. Handpan, singing bowls, rain — just let it play.',
+      title: 'Sounds',
+      note: 'No guidance. Handpan, singing bowls, rain. Just let it play.',
     },
   },
 
+  // 走进某一条小径之后的通用文字
   category: {
-    otherPaths: 'Other Paths',
+    otherPaths: 'Other paths',
     listenEyebrow: 'Listen',
-    listenTitle: 'The sounds themselves',
-    empty: 'This path is still growing. As new sounds appear, they will be placed here quietly.',
-    sourceEyebrow: 'Origins and character',
-    benefitsEyebrow: 'What may shift',
+    listenTitle: 'Sounds in this path',
+    empty: 'This path is still growing. New sounds will appear here quietly.',
+    sourceEyebrow: 'Source & style',
+    benefitsEyebrow: 'What you might notice',
   },
 
+  // 单段声音的卡片
   card: {
+    /** 后台没填阶段时封面左上角那个标签 */
     stageFallback: 'Sound',
     ready: 'Ready',
-    coming: 'Soon',
+    coming: 'Opening soon',
+    /** 只给读屏用，标题本身还是后台存的中文 */
     open: (title: string) => `Open ${title}`,
+  },
+
+  // 陪伴营（kind === 'program'）的界面
+  program: {
+    /** 封面右边那行小字。分类名来自后台，所以整句写成函数 */
+    series: (label: string, total: number) => `${label} · ${total} sessions`,
+    /** 顶部总进度 */
+    progress: (done: number, total: number) => `${done} / ${total} sounds`,
+    /** 周块右上角。已解锁的周只显示数字，不带量词 */
+    phaseProgress: (done: number, total: number) => `${done} / ${total}`,
+    /** 还没解锁的周：说清楚要听完几段才开 */
+    phaseLocked: (count: number, need: number) =>
+      `${count} sounds · Unlocks after ${need} from the previous week`,
+    free: 'Free',
+    /** 这一段还没上传音频 */
+    coming: 'Opening soon',
+    notes: 'Reflections',
+    /** 只给读屏用 */
+    play: (title: string) => `Play ${title}`,
+    audioFailed: 'Couldn’t load this sound. Refresh the page and try again.',
+    // 吸底那条
+    dock: {
+      claimPending: 'Access is open. The host will confirm after checking the payment record, usually same day.',
+      paid: 'Pick a sound to begin. Listening to 80% counts as done.',
+      unlockTitle: (total: number) => `Unlock all ${total} sounds`,
+      unlockSub: 'One-time payment. Come back anytime.',
+      unlockCta: 'Unlock now',
+    },
+  },
+
+  // 纯声音（kind === 'ambient'）
+  ambient: {
+    empty: 'These sounds are still being gathered. New ones will appear here quietly.',
+    note: 'No voice. Let it play in the background, do something else.',
+    /** 列表行末尾那个 ∞ 的 title */
+    loopable: 'Loopable',
+    looping: 'Looping',
+    once: 'Play once',
+    loopToggle: '∞ Loop',
+  },
+
+  // 引导冥想卡片底下的播放器
+  audio: {
+    failed: 'Couldn’t load this sound. Refresh the page and try again.',
+    coming: 'This sound is opening soon',
+    writeNote: 'Write a reflection',
+    noteCount: (count: number) => `${count} reflection${count !== 1 ? 's' : ''}`,
+  },
+
+  // 听后感悟
+  notes: {
+    placeholder: 'What remains after listening?',
+    anonymousToggle: 'Post anonymously',
+    /**
+     * 勾没勾匿名各显示一句完整的话。
+     * 不要拆成「会带上你的名字」+「，所有人可见」两段拼——
+     * 英文的语序和中文不一样，拼出来会散架。
+     */
+    asAnonymous: 'Shown as “someone in the forest,” visible to everyone',
+    asNamed: 'Shown with your name, visible to everyone',
+    publishing: 'Posting…',
+    publish: 'Write a reflection',
+    loading: 'Loading…',
+    empty: 'No reflections yet.',
+    withdraw: 'Withdraw',
+    /** 匿名者的显示名 */
+    anonName: 'someone in the forest',
+    /** 「登录」是个链接，所以句子拆成前后两截 */
+    signInPrompt: { link: 'Log in', after: ' to write a reflection.' },
+    time: {
+      justNow: 'just now',
+      minutes: (n: number) => `${n} minute${n !== 1 ? 's' : ''} ago`,
+      hours: (n: number) => `${n} hour${n !== 1 ? 's' : ''} ago`,
+      days: (n: number) => `${n} day${n !== 1 ? 's' : ''} ago`,
+      date: (y: number, m: number, d: number) => `${y}.${m}.${d}`,
+    },
+    error: {
+      tooMany: 'You’ve written 5 reflections on this sound. Take a break.',
+      tooLong: (max: number) => `${max} characters max.`,
+      notLoggedIn: 'Log in first.',
+      locked: 'This sound hasn’t been unlocked yet.',
+      failed: 'Couldn’t post. Try again in a moment.',
+    },
+  },
+
+  // 解锁与付款。钱走支付宝收款码，付完回来传一张截图。
+  unlock: {
+    loading: 'Loading…',
+    /** 还锁着几段 */
+    lockedCount: (n: number) => `${n} sound${n !== 1 ? 's' : ''} left`,
+    headline: 'Sign up for Nearby Forest to unlock the full journey',
+    signUpCta: 'Sign up & unlock',
+    haveAccount: 'Already signed up? Log in',
+    requestCta: 'I want to unlock',
+    busy: 'Processing…',
+
+    // 申请之后、主理人确认之前的那一段
+    badge: {
+      waiting: 'Awaiting confirmation',
+      proofReceived: 'Screenshot received',
+      /** 传了截图、权限已经先开出去了 */
+      openedNow: 'Open · pending check',
+    },
+    title: {
+      openedNow: 'Three weeks of sounds are now open',
+      proofReceived: 'Screenshot received, waiting for host confirmation',
+      toPay: (yuan: string) => `Scan the Alipay QR code to pay ¥${yuan}, then upload a screenshot`,
+    },
+    body: {
+      openedNow: 'The screenshot has been sent to the host. They’ll check it against the payment record, usually same day. If something doesn’t match, the request may be rejected—the reason will appear here.',
+      judgedBefore: 'A previous request was rejected, so this one will open after the host checks the record, usually same day.',
+    },
+
+    qrAlt: 'Alipay QR code',
+    qrCaption: 'Scan with Alipay',
+    /** 三步说明。第二步不再重复「当场就能听」——按钮旁边已经有一句了 */
+    steps: {
+      pay: (yuan: string) => `1. Scan the Alipay QR code to pay ¥${yuan}`,
+      upload: '2. Come back and upload a payment screenshot',
+      confirm: '3. The host checks the record and confirms',
+    },
+    /** 收款码没配好时的兜底，中间夹着一个指向 /about#community 的链接 */
+    noQr: {
+      before: 'The QR code hasn’t been set up yet. Go to the',
+      link: 'About',
+      after: 'page to add the host on WeChat and send the screenshot there.',
+    },
+
+    uploadCta: 'Paid — upload a screenshot',
+    uploadAgain: 'Replace screenshot',
+    uploading: 'Received, opening…',
+    uploadHint: 'You can listen right after uploading',
+    proofPrivacy: 'Only the host can see the screenshot, used to check the payment record.',
+
+    // 被驳回
+    rejected: {
+      badge: 'Not approved',
+      title: 'This request was not approved',
+      retry: 'Apply again',
+    },
+
+    error: {
+      notLoggedIn: 'Log in first.',
+      createFailed: 'Couldn’t create the request. Try again in a moment.',
+      badFileType: 'Images only (jpg / png / webp). Take a screenshot on your phone and try again.',
+      fileTooLarge: 'File is too large (max 8 MB). Compress it and try again.',
+      tooSoon: 'You just uploaded one. Wait a minute before replacing it.',
+      /** 钱已经付出去了，这里不能只说「再试」就没了下文 */
+      uploadFailed: 'Couldn’t upload. Try again. If it still fails, go to the About page to add the host on WeChat and send the screenshot directly.',
+      uploadNetwork: 'Couldn’t upload. Try again in a moment.',
+    },
   },
 };

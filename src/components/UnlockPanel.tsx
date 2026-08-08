@@ -1,9 +1,23 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 import type { ProgramOrder } from '@/lib/programOrders';
 
 type Props = {
+  /**
+   * 文案在客户端自己取。
+   *
+   * 不能像服务端组件那样把字典切片当 props 传进来——字典里为了英文单复数
+   * 用了函数（progress、phaseLocked 这些），而函数跨不过 server → client
+   * 那道序列化边界，页面会直接崩在「Functions cannot be passed directly
+   * to Client Components」。所以只传 locale 这个字符串，字典在这边查。
+   *
+   * 这也不违反「客户端不要自己判断语言」那条：locale 仍然是服务端算好的，
+   * 这里不读 cookie，不会先渲染一遍中文再闪成英文。
+   */
+  locale: Locale;
   programId: string;
   priceCents: number;
   lockedCount: number;
@@ -20,9 +34,9 @@ type Props = {
  * 自动就带上了，主理人只需要核金额和时间。少一步手抄，
  * 就少一批抄错、抄漏、配不上账的人。
  */
-export default function UnlockPanel({
-  programId, priceCents, lockedCount, loggedIn,
-}: Props) {
+export default function UnlockPanel({programId, priceCents, lockedCount, loggedIn, locale}: Props) {
+  const _d = dict(locale).meditations;
+  const t = _d.unlock;
   const [order, setOrder] = useState<ProgramOrder | null>(null);
   const [loading, setLoading] = useState(loggedIn);
   const [busy, setBusy] = useState(false);
@@ -56,16 +70,16 @@ export default function UnlockPanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error === 'not-logged-in' ? '需要先登录。' : '没能创建申请，过一会再试。');
+        setError(data.error === 'not-logged-in' ? t.error.notLoggedIn : t.error.createFailed);
         return;
       }
       setOrder(data.order);
     } catch {
-      setError('没能创建申请，过一会再试。');
+      setError(t.error.createFailed);
     } finally {
       setBusy(false);
     }
-  }, [programId, busy]);
+  }, [programId, busy, t]);
 
   /**
    * 传付款截图 = 说一句「我付好了」。
@@ -85,11 +99,11 @@ export default function UnlockPanel({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(
-          data.error === 'bad-file-type' ? '只收图片（jpg / png / webp）。用手机截图再试一次。'
-            : data.error === 'file-too-large' ? '图太大了（8MB 以内），压一下再传。'
-              : data.error === 'too-soon' ? '刚传过一张，等一分钟再换。'
+          data.error === 'bad-file-type' ? t.error.badFileType
+            : data.error === 'file-too-large' ? t.error.fileTooLarge
+              : data.error === 'too-soon' ? t.error.tooSoon
                 // 钱已经付出去了，这里不能只说「再试」就没了下文
-                : '没能传上去。再试一次；还是不行就到「生态社区」页加主理人微信，把截图直接发过去。',
+                : t.error.uploadFailed,
         );
         if (fileRef.current) fileRef.current.value = '';
         setUploading(false);
@@ -100,25 +114,25 @@ export default function UnlockPanel({
       setOrder(data.order);
       window.location.reload();
     } catch {
-      setError('没能传上去，过一会再试。');
+      setError(t.error.uploadNetwork);
       if (fileRef.current) fileRef.current.value = '';
       setUploading(false);
     }
-  }, [programId, uploading]);
+  }, [programId, uploading, t]);
 
   const shell = 'scroll-mt-24 border-t border-coral-soft/25 bg-[linear-gradient(160deg,rgba(232,168,142,0.13),rgba(30,42,68,0.22))] px-5 py-6';
 
   if (!loggedIn) {
     return (
       <div id="unlock" className={shell}>
-        <Head lockedCount={lockedCount} />
+        <Head lockedCount={lockedCount} t={t} />
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <a href="/login" className="rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] no-underline">
-            注册并解锁
+            {t.signUpCta}
           </a>
           <span className="text-[13px] font-bold tabular-nums text-white">¥{price}</span>
           <a href="/login" className="text-[12px] text-white/45 no-underline hover:text-white/70">
-            已注册？登录
+            {t.haveAccount}
           </a>
         </div>
       </div>
@@ -128,7 +142,7 @@ export default function UnlockPanel({
   if (loading) {
     return (
       <div id="unlock" className={shell}>
-        <p className="text-[12.5px] text-white/40">正在读…</p>
+        <p className="text-[12.5px] text-white/40">{t.loading}</p>
       </div>
     );
   }
@@ -146,14 +160,14 @@ export default function UnlockPanel({
             openedNow ? 'text-leaf' : 'text-coral-soft'
           }`}
         >
-          {openedNow ? '已开通 · 等核对' : claimed ? '已收到截图' : '等待确认'}
+          {openedNow ? t.badge.openedNow : claimed ? t.badge.proofReceived : t.badge.waiting}
         </div>
         <h3 className="text-[15px] font-semibold text-white">
           {openedNow
-            ? '三周的声音已经开好了'
+            ? t.title.openedNow
             : claimed
-              ? '截图收到了，等主理人确认'
-              : `支付宝扫码付 ¥${(order.amountCents / 100).toFixed(0)}，然后传张截图`}
+              ? t.title.proofReceived
+              : t.title.toPay((order.amountCents / 100).toFixed(0))}
         </h3>
 
         {/*
@@ -167,32 +181,30 @@ export default function UnlockPanel({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/api/meditations/pay-qr?program=${encodeURIComponent(programId)}`}
-              alt="支付宝收款码"
+              alt={t.qrAlt}
               onError={() => setQrFailed(true)}
               className="h-[144px] w-[144px] rounded-xl border border-white/12 bg-white p-2"
             />
             {/* 码是支付宝的，不写清楚会有人拿微信扫然后扫不出来 */}
-            <p className="mt-2 text-center text-[11.5px] text-white/45">支付宝扫码</p>
+            <p className="mt-2 text-center text-[11.5px] text-white/45">{t.qrCaption}</p>
           </div>
         )}
 
         {claimed ? (
           <p className="mt-5 text-[12.5px] leading-[1.8] text-white/52">
-            {openedNow
-              ? '截图已经发给主理人了。对着收款记录核一眼就转正，通常当天；万一对不上会驳回，原因会写在这里。'
-              : '上一次的申请被驳回过，所以这次要等主理人对完账再开，通常当天。'}
+            {openedNow ? t.body.openedNow : t.body.judgedBefore}
           </p>
         ) : !qrFailed ? (
           <ol className="mt-5 flex list-none flex-col gap-1.5 p-0 text-[12.5px] leading-[1.7] text-white/52">
-            <li>1. 支付宝扫码付 ¥{(order.amountCents / 100).toFixed(0)}</li>
-            <li>2. 回来传一张付款截图，<b className="text-white">当场就能听</b></li>
-            <li>3. 主理人对完收款记录，这一单就转正</li>
+            <li>{t.steps.pay((order.amountCents / 100).toFixed(0))}</li>
+            <li>{t.steps.upload}</li>
+            <li>{t.steps.confirm}</li>
           </ol>
         ) : (
           <p className="mt-4 text-[12.5px] leading-[1.8] text-white/48">
-            收款码还没配好。可以先到{' '}
-            <a href="/about#community" className="text-coral-soft no-underline hover:underline">生态社区</a>
-            {' '}页加主理人微信，把付款截图发过去。
+            {t.noQr.before}{' '}
+            <a href="/about#community" className="text-coral-soft no-underline hover:underline">{t.noQr.link}</a>
+            {' '}{t.noQr.after}
           </p>
         )}
 
@@ -219,12 +231,12 @@ export default function UnlockPanel({
                 : 'rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] disabled:opacity-40'
             }
           >
-            {uploading ? '收到了，正在打开…' : claimed ? '换一张截图' : '付好了，传张截图'}
+            {uploading ? t.uploading : claimed ? t.uploadAgain : t.uploadCta}
           </button>
-          {!claimed && <span className="text-[11.5px] text-white/38">传完当场就能听</span>}
+          {!claimed && <span className="text-[11.5px] text-white/38">{t.uploadHint}</span>}
         </div>
         <p className="mt-2.5 text-[11.5px] leading-[1.7] text-white/38">
-          截图只有主理人看得到，用来和收款记录核对。
+          {t.proofPrivacy}
         </p>
 
         {error && <p className="mt-2 text-[12px] text-coral-soft">{error}</p>}
@@ -237,9 +249,9 @@ export default function UnlockPanel({
     return (
       <div id="unlock" className={shell}>
         <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-coral-soft">
-          未通过
+          {t.rejected.badge}
         </div>
-        <h3 className="text-[15px] font-semibold text-white">这次申请没有通过</h3>
+        <h3 className="text-[15px] font-semibold text-white">{t.rejected.title}</h3>
         {order.note && <p className="mt-1.5 text-[12.5px] text-white/52">{order.note}</p>}
         <button
           type="button"
@@ -247,7 +259,7 @@ export default function UnlockPanel({
           disabled={busy}
           className="mt-4 rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] disabled:opacity-40"
         >
-          {busy ? '处理中' : '重新申请'}
+          {busy ? t.busy : t.rejected.retry}
         </button>
       </div>
     );
@@ -256,7 +268,7 @@ export default function UnlockPanel({
   // 还没申请过
   return (
     <div id="unlock" className={shell}>
-      <Head lockedCount={lockedCount} />
+      <Head lockedCount={lockedCount} t={t} />
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -264,7 +276,7 @@ export default function UnlockPanel({
           disabled={busy}
           className="rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] disabled:opacity-40"
         >
-          {busy ? '处理中' : '我要解锁'}
+          {busy ? t.busy : t.requestCta}
         </button>
         <span className="text-[13px] font-bold tabular-nums text-white">¥{price}</span>
       </div>
@@ -273,13 +285,13 @@ export default function UnlockPanel({
   );
 }
 
-function Head({ lockedCount }: { lockedCount: number }) {
+function Head({ lockedCount, t }: { lockedCount: number; t: ReturnType<typeof dict>['meditations']['unlock'] }) {
   return (
     <>
       <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-coral-soft">
-        还有 {lockedCount} 段
+        {t.lockedCount(lockedCount)}
       </div>
-      <h3 className="text-[15px] font-semibold text-white">注册附近森林，解锁完整旅程</h3>
+      <h3 className="text-[15px] font-semibold text-white">{t.headline}</h3>
     </>
   );
 }

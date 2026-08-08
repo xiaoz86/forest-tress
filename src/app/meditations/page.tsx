@@ -166,7 +166,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
 
           {/* 陪伴营自带头部（封面 + 金句 + 导师），不再套这一层通用大标题 */}
           {!isProgram && (
-            <CategoryHero category={activeCategory} count={tracks.length} t={t} />
+            <CategoryHero category={activeCategory} count={tracks.length} />
           )}
 
           <section className="mt-14 grid grid-cols-[220px_1fr] gap-10 max-lg:grid-cols-1 max-lg:mt-8">
@@ -210,6 +210,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
 
             {isProgram ? (
               <MeditationProgram
+                locale={locale}
                 content={content}
                 category={activeCategory}
                 paid={paidPrograms.has(activeCategory.id)}
@@ -219,6 +220,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
               />
             ) : isAmbient ? (
               <MeditationAmbient
+                locale={locale}
                 content={content}
                 category={activeCategory}
                 noteCounts={noteCounts}
@@ -254,6 +256,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
                 <MeditationTrackCard
                   track={tracks[0]}
                   t={t.card}
+                  locale={locale}
                   layout="wide"
                   showAudio
                   loggedIn={Boolean(memberId)}
@@ -277,6 +280,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
                     key={track.id}
                     track={track}
                     t={t.card}
+                    locale={locale}
                     showAudio
                     loggedIn={Boolean(memberId)}
                     noteCount={noteCounts[track.id] || 0}
@@ -393,11 +397,10 @@ const CATEGORY_GLYPH: Record<string, string> = {
 };
 
 function CategoryHero({
-  category, count, t,
+  category, count,
 }: {
   category: MeditationCategory;
   count: number;
-  t: T;
 }) {
   const aura = MOOD_AURA[category.mood || 'forest'];
   return (

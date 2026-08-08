@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TrackNotes from '@/components/TrackNotes';
 import UnlockPanel from '@/components/UnlockPanel';
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 import {
   buildProgramView,
   isPlayable,
@@ -13,6 +15,18 @@ import {
 } from '@/lib/meditations';
 
 type Props = {
+  /**
+   * 文案在客户端自己取。
+   *
+   * 不能像服务端组件那样把字典切片当 props 传进来——字典里为了英文单复数
+   * 用了函数（progress、phaseLocked 这些），而函数跨不过 server → client
+   * 那道序列化边界，页面会直接崩在「Functions cannot be passed directly
+   * to Client Components」。所以只传 locale 这个字符串，字典在这边查。
+   *
+   * 这也不违反「客户端不要自己判断语言」那条：locale 仍然是服务端算好的，
+   * 这里不读 cookie，不会先渲染一遍中文再闪成英文。
+   */
+  locale: Locale;
   content: MeditationContent;
   category: MeditationCategory;
   /** 有没有买。由服务端按开通记录算好传进来，前端不自己判断。 */
@@ -43,9 +57,9 @@ function readListened(categoryId: string): string[] {
   }
 }
 
-export default function MeditationProgram({
-  content, category, paid, claimPending = false, noteCounts, loggedIn,
-}: Props) {
+export default function MeditationProgram({content, category, paid, claimPending = false, noteCounts, loggedIn, locale}: Props) {
+  const _d = dict(locale).meditations;
+  const t = _d.program;
   const [listened, setListened] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
   const [openPhase, setOpenPhase] = useState<string | null>(null);
@@ -110,7 +124,7 @@ export default function MeditationProgram({
         <Cover category={category} />
         <div className="min-w-0">
           <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
-            {category.label} · 系列 {view.total} 节
+            {t.series(category.label, view.total)}
           </div>
           {category.highlight && (
             <h1
@@ -152,7 +166,7 @@ export default function MeditationProgram({
         <div className="mb-2 flex items-baseline justify-between gap-4 text-[12px] text-white/42">
           <span>{view.phases.find(p => p.phase.id === view.activePhaseId)?.phase.label || ''}</span>
           <span className="tabular-nums">
-            <b className="text-[13px] font-semibold text-white">{view.doneCount}</b> / {view.total} 段
+            {t.progress(view.doneCount, view.total)}
           </span>
         </div>
         <div className="h-[3px] overflow-hidden rounded-full bg-white/10">
@@ -171,6 +185,7 @@ export default function MeditationProgram({
       {claimPending && (
         <div className="mt-7 overflow-hidden rounded-2xl border border-white/10">
           <UnlockPanel
+            locale={locale}
             programId={category.id}
             priceCents={category.priceCents ?? 0}
             lockedCount={0}
@@ -208,15 +223,15 @@ export default function MeditationProgram({
                 </span>
                 <span className="shrink-0 text-[11px] tabular-nums tracking-[0.06em] text-white/40">
                   {pv.unlocked
-                    ? `${pv.doneCount} / ${pv.tracks.length}`
-                    : `${pv.tracks.length} 段 · 上一周听完 ${pv.phase.unlockAfter} 段后开放`}
+                    ? t.phaseProgress(pv.doneCount, pv.tracks.length)
+                    : t.phaseLocked(pv.tracks.length, pv.phase.unlockAfter)}
                 </span>
               </button>
 
               {expanded && (
                 <div>
                   {pv.tracks.map((row, i) => {
-                    // 付费墙就插在免费段和收费段的接缝处——撞到墙的地方才出现
+                    // 付费墙就插在{t.free}段和收费段的接缝处——撞到墙的地方才出现
                     const seam =
                       !view.paid &&
                       row.state === 'locked-paywall' &&
@@ -225,6 +240,7 @@ export default function MeditationProgram({
                       <div key={row.track.id}>
                         {seam && (
                           <UnlockPanel
+                            locale={locale}
                             programId={category.id}
                             priceCents={category.priceCents ?? 0}
                             lockedCount={locked}
@@ -232,6 +248,7 @@ export default function MeditationProgram({
                           />
                         )}
                         <TrackRow
+                          t={t}
                           track={row.track}
                           state={row.state}
                           done={row.done}
@@ -245,6 +262,7 @@ export default function MeditationProgram({
                         />
                         {openNotes === row.track.id && (
                           <TrackNotes
+                            locale={locale}
                             trackId={row.track.id}
                             loggedIn={loggedIn}
                             dark
@@ -272,7 +290,7 @@ export default function MeditationProgram({
                   <div className="text-[11px] text-white/44">
                     {/* 取不到音频时原生播放器一声不吭地卡住，得替它把话说出来 */}
                     {failed ? (
-                      <span className="text-coral-soft">这段声音暂时没能打开，刷新页面再试一次</span>
+                      <span className="text-coral-soft">{t.audioFailed}</span>
                     ) : (
                       playing.stage
                     )}
@@ -299,21 +317,21 @@ export default function MeditationProgram({
             ) : view.paid ? (
               <div className="flex-1 text-[13px] text-white/50">
                 {claimPending
-                  ? '已经开好了。主理人对完收款记录就转正，一般当天。'
-                  : '选一段开始听。听到八成就算走完。'}
+                  ? t.dock.claimPending
+                  : t.dock.paid}
               </div>
             ) : (
               <>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-semibold text-white">解锁完整 {view.total} 段</div>
-                  <div className="text-[11px] text-white/44">一次付清，之后随时回来听</div>
+                  <div className="text-[13px] font-semibold text-white">{t.dock.unlockTitle(view.total)}</div>
+                  <div className="text-[11px] text-white/44">{t.dock.unlockSub}</div>
                 </div>
                 <span className="shrink-0 text-[13px] font-bold tabular-nums text-white">¥{price}</span>
                 <a
                   href="#unlock"
                   className="shrink-0 rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] no-underline"
                 >
-                  立即解锁
+                  {t.dock.unlockCta}
                 </a>
               </>
             )}
@@ -345,8 +363,9 @@ function Cover({ category }: { category: MeditationCategory }) {
 }
 
 function TrackRow({
-  track, state, done, playing, onPlay, noteCount, notesOpen, onToggleNotes,
+  track, state, done, playing, onPlay, noteCount, notesOpen, onToggleNotes, t,
 }: {
+  t: ReturnType<typeof dict>['meditations']['program'];
   track: MeditationTrack;
   state: ProgramTrackState;
   done: boolean;
@@ -366,7 +385,7 @@ function TrackRow({
         type="button"
         onClick={playable ? onPlay : undefined}
         disabled={!playable}
-        aria-label={playable ? `播放${track.title}` : track.title}
+        aria-label={playable ? t.play(track.title) : track.title}
         className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border transition-colors ${
           done
             ? 'border-leaf/45 bg-leaf/15 text-leaf'
@@ -382,14 +401,14 @@ function TrackRow({
       </span>
       {state === 'free' && (
         <span className="shrink-0 rounded border border-leaf/35 px-1.5 py-px text-[10px] tracking-[0.08em] text-leaf">
-          免费
+          {t.free}
         </span>
       )}
       {track.duration && (
         <span className="shrink-0 text-[11px] tabular-nums text-white/36">{track.duration}</span>
       )}
       {isPlayable(state) && !track.hasAudio && (
-        <span className="shrink-0 text-[11px] text-white/32">开放中</span>
+        <span className="shrink-0 text-[11px] text-white/32">{t.coming}</span>
       )}
       {isPlayable(state) && (
         <button
@@ -403,7 +422,7 @@ function TrackRow({
           <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-3 w-3" aria-hidden="true">
             <path d="M1.8 2.4h8.4v5.4H5.4L2.8 9.9V7.8H1.8z" strokeLinejoin="round" />
           </svg>
-          {noteCount > 0 ? noteCount : '感悟'}
+          {noteCount > 0 ? noteCount : t.notes}
         </button>
       )}
     </div>

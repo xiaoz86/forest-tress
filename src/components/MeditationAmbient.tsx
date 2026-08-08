@@ -2,6 +2,8 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import TrackNotes from '@/components/TrackNotes';
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 import type { MeditationCategory, MeditationTrack } from '@/lib/meditations';
 
 /**
@@ -15,13 +17,31 @@ import type { MeditationCategory, MeditationTrack } from '@/lib/meditations';
  */
 
 type Props = {
+  /**
+   * 文案在客户端自己取。
+   *
+   * 不能像服务端组件那样把字典切片当 props 传进来——字典里为了英文单复数
+   * 用了函数（progress、phaseLocked 这些），而函数跨不过 server → client
+   * 那道序列化边界，页面会直接崩在「Functions cannot be passed directly
+   * to Client Components」。所以只传 locale 这个字符串，字典在这边查。
+   *
+   * 这也不违反「客户端不要自己判断语言」那条：locale 仍然是服务端算好的，
+   * 这里不读 cookie，不会先渲染一遍中文再闪成英文。
+   */
+  locale: Locale;
   content: { tracks: MeditationTrack[] };
   category: MeditationCategory;
   noteCounts: Record<string, number>;
   loggedIn: boolean;
 };
 
-export default function MeditationAmbient({ content, category, noteCounts, loggedIn }: Props) {
+export default function MeditationAmbient({content, category, noteCounts, loggedIn, locale}: Props) {
+  // 用 useMemo 包一层：dict() 是个函数调用，直接放在组件体里
+  // React Compiler 分析不了，会连带放弃保留下面 useCallback 的记忆化。
+  const { t, programT } = useMemo(() => {
+    const d = dict(locale).meditations;
+    return { t: d.ambient, programT: d.program };
+  }, [locale]);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [loop, setLoop] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -30,11 +50,11 @@ export default function MeditationAmbient({ content, category, noteCounts, logge
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const tracks = useMemo(
-    () => content.tracks.filter(t => t.categoryId === category.id),
+    () => content.tracks.filter(track => track.categoryId === category.id),
     [content.tracks, category.id],
   );
   const playing = useMemo(
-    () => tracks.find(t => t.id === playingId) || null,
+    () => tracks.find(track => track.id === playingId) || null,
     [tracks, playingId],
   );
 
@@ -55,7 +75,7 @@ export default function MeditationAmbient({ content, category, noteCounts, logge
   if (tracks.length === 0) {
     return (
       <div className="rounded-2xl border border-forest/12 bg-white/60 px-6 py-10 text-ink-soft">
-        这一片声音还在收集。等新的进来，会安静地放进去。
+        {t.empty}
       </div>
     );
   }
@@ -65,7 +85,7 @@ export default function MeditationAmbient({ content, category, noteCounts, logge
       {/* 页首的 CategoryHero 已经介绍过这条小径了，这里只留一行说明听法 */}
       <div className="mb-5 flex items-baseline gap-4">
         <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-forest/45">Ambient</p>
-        <p className="text-[12.5px] text-ink-soft">没有人说话。放着就好，做别的事也可以。</p>
+        <p className="text-[12.5px] text-ink-soft">{t.note}</p>
       </div>
 
       <ul className="list-none border-t border-forest/12 p-0">
@@ -79,7 +99,7 @@ export default function MeditationAmbient({ content, category, noteCounts, logge
                   type="button"
                   onClick={() => track.hasAudio && toggle(track)}
                   disabled={!track.hasAudio}
-                  aria-label={track.hasAudio ? `播放${track.title}` : track.title}
+                  aria-label={track.hasAudio ? programT.play(track.title) : track.title}
                   className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border transition-colors ${
                     active
                       ? 'border-forest bg-forest text-white'
@@ -103,7 +123,7 @@ export default function MeditationAmbient({ content, category, noteCounts, logge
                 )}
                 {track.loopable !== false && (
                   <span
-                    title="可循环"
+                    title={t.loopable}
                     aria-hidden="true"
                     className={`shrink-0 text-[14px] ${active && loop ? 'text-clay' : 'text-ink-soft/45'}`}
                   >
@@ -123,13 +143,13 @@ export default function MeditationAmbient({ content, category, noteCounts, logge
                   }`}
                 >
                   <IconNote />
-                  {(counts[track.id] || 0) > 0 ? counts[track.id] : '感悟'}
+                  {(counts[track.id] || 0) > 0 ? counts[track.id] : programT.notes}
                 </button>
               </div>
 
               {open && (
                 <div className="mb-4 overflow-hidden rounded-xl border border-forest/12">
-                  <TrackNotes trackId={track.id} loggedIn={loggedIn} onCountChange={bumpCount} />
+                  <TrackNotes locale={locale} trackId={track.id} loggedIn={loggedIn} onCountChange={bumpCount} />
                 </div>
               )}
             </li>
@@ -144,9 +164,9 @@ export default function MeditationAmbient({ content, category, noteCounts, logge
               <div className="truncate text-[13px] font-semibold text-white">{playing.title}</div>
               <div className="text-[11px] text-white/44">
                 {failed ? (
-                  <span className="text-coral-soft">这段声音暂时没能打开，刷新页面再试一次</span>
+                  <span className="text-coral-soft">{programT.audioFailed}</span>
                 ) : (
-                  loop ? '循环播放中' : '播完即停'
+                  loop ? t.looping : t.once
                 )}
               </div>
             </div>
@@ -161,7 +181,7 @@ export default function MeditationAmbient({ content, category, noteCounts, logge
                   : 'border-white/16 text-white/50 hover:text-white'
               }`}
             >
-              ∞ 循环
+              {t.loopToggle}
             </button>
 
             <audio

@@ -1,9 +1,23 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 import { NOTE_MAX_CHARS, type TrackNote } from '@/lib/meditationNotesShared';
 
 type Props = {
+  /**
+   * 文案在客户端自己取。
+   *
+   * 不能像服务端组件那样把字典切片当 props 传进来——字典里为了英文单复数
+   * 用了函数（progress、phaseLocked 这些），而函数跨不过 server → client
+   * 那道序列化边界，页面会直接崩在「Functions cannot be passed directly
+   * to Client Components」。所以只传 locale 这个字符串，字典在这边查。
+   *
+   * 这也不违反「客户端不要自己判断语言」那条：locale 仍然是服务端算好的，
+   * 这里不读 cookie，不会先渲染一遍中文再闪成英文。
+   */
+  locale: Locale;
   trackId: string;
   /** 没登录只能看，不能写 */
   loggedIn: boolean;
@@ -51,18 +65,20 @@ const TONE = {
   },
 } as const;
 
-function when(iso: string): string {
+function when(iso: string, t: ReturnType<typeof dict>['meditations']['notes']): string {
   const d = new Date(iso);
   const mins = Math.floor((Date.now() - d.getTime()) / 60000);
-  if (mins < 1) return '刚刚';
-  if (mins < 60) return `${mins} 分钟前`;
-  if (mins < 60 * 24) return `${Math.floor(mins / 60)} 小时前`;
-  if (mins < 60 * 24 * 30) return `${Math.floor(mins / 1440)} 天前`;
-  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+  if (mins < 1) return t.time.justNow;
+  if (mins < 60) return t.time.minutes(mins);
+  if (mins < 60 * 24) return t.time.hours(Math.floor(mins / 60));
+  if (mins < 60 * 24 * 30) return t.time.days(Math.floor(mins / 1440));
+  return t.time.date(d.getFullYear(), d.getMonth() + 1, d.getDate());
 }
 
-export default function TrackNotes({ trackId, loggedIn, dark = false, onCountChange }: Props) {
-  const t = dark ? TONE.dark : TONE.light;
+export default function TrackNotes({trackId, loggedIn, dark = false, onCountChange, locale}: Props) {
+  const _d = dict(locale).meditations;
+  const t = _d.notes;
+  const tone = dark ? TONE.dark : TONE.light;
   const [notes, setNotes] = useState<TrackNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [body, setBody] = useState('');
@@ -95,11 +111,11 @@ export default function TrackNotes({ trackId, loggedIn, dark = false, onCountCha
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(
-          data.error === 'too-many' ? '这一段你已经写了 5 条，先歇一歇。'
-            : data.error === 'too-long' ? `最多 ${NOTE_MAX_CHARS} 字。`
-            : data.error === 'not-logged-in' ? '需要先登录。'
-            : data.error === 'locked' ? '这一段还没解锁。'
-            : '没发出去，过一会再试。',
+          data.error === 'too-many' ? t.error.tooMany
+            : data.error === 'too-long' ? t.error.tooLong(NOTE_MAX_CHARS)
+            : data.error === 'not-logged-in' ? t.error.notLoggedIn
+            : data.error === 'locked' ? t.error.locked
+            : t.error.failed,
         );
         return;
       }
@@ -107,11 +123,11 @@ export default function TrackNotes({ trackId, loggedIn, dark = false, onCountCha
       setBody('');
       onCountChange?.(trackId, 1);
     } catch {
-      setError('没发出去，过一会再试。');
+      setError(t.error.failed);
     } finally {
       setBusy(false);
     }
-  }, [body, busy, trackId, anonymous, onCountChange]);
+  }, [body, busy, trackId, anonymous, onCountChange, t]);
 
   const remove = useCallback(async (id: string) => {
     const res = await fetch(`/api/meditations/notes?id=${encodeURIComponent(id)}`, {
@@ -124,62 +140,61 @@ export default function TrackNotes({ trackId, loggedIn, dark = false, onCountCha
   }, [trackId, onCountChange]);
 
   return (
-    <div className={`${t.wrap} px-4 py-4`}>
+    <div className={`${tone.wrap} px-4 py-4`}>
       {loggedIn ? (
         <div className="mb-4">
           <textarea
             value={body}
             onChange={e => setBody(e.target.value.slice(0, NOTE_MAX_CHARS))}
-            placeholder="听完之后，心里剩下什么？"
+            placeholder={t.placeholder}
             rows={2}
-            className={`w-full resize-y rounded-xl border ${t.field} px-3 py-2.5 text-[13.5px] leading-[1.75] focus:outline-none`}
+            className={`w-full resize-y rounded-xl border ${tone.field} px-3 py-2.5 text-[13.5px] leading-[1.75] focus:outline-none`}
           />
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <label className={`flex cursor-pointer items-center gap-2 text-[12px] ${t.hint}`}>
+            <label className={`flex cursor-pointer items-center gap-2 text-[12px] ${tone.hint}`}>
               <input
                 type="checkbox"
                 checked={anonymous}
                 onChange={e => setAnonymous(e.target.checked)}
                 className={`h-3.5 w-3.5 ${dark ? "accent-[#e8a88e]" : "accent-[#2f513d]"}`}
               />
-              匿名发布
+              {t.anonymousToggle}
             </label>
-            <span className={`text-[11px] ${t.faint}`}>
-              {anonymous ? '会显示为「森林里的一个人」' : '会带上你的名字'}
-              ，所有人可见
+            <span className={`text-[11px] ${tone.faint}`}>
+              {anonymous ? t.asAnonymous : t.asNamed}
             </span>
-            <span className={`ml-auto text-[11px] tabular-nums ${t.count}`}>
+            <span className={`ml-auto text-[11px] tabular-nums ${tone.count}`}>
               {body.length} / {NOTE_MAX_CHARS}
             </span>
             <button
               type="button"
               onClick={submit}
               disabled={busy || !body.trim()}
-              className={`rounded-full ${t.submit} px-4 py-1.5 text-[12.5px] font-semibold transition-opacity disabled:opacity-35`}
+              className={`rounded-full ${tone.submit} px-4 py-1.5 text-[12.5px] font-semibold transition-opacity disabled:opacity-35`}
             >
-              {busy ? '发布中' : '写下感悟'}
+              {busy ? t.publishing : t.publish}
             </button>
           </div>
-          {error && <p className={`mt-2 text-[12px] ${t.err}`}>{error}</p>}
+          {error && <p className={`mt-2 text-[12px] ${tone.err}`}>{error}</p>}
         </div>
       ) : (
-        <p className={`mb-4 text-[12.5px] ${t.prompt}`}>
-          <a href="/login" className={`${t.link} underline-offset-2 hover:underline`}>登录</a>
-          {' '}之后可以写下自己的感悟。
+        <p className={`mb-4 text-[12.5px] ${tone.prompt}`}>
+          <a href="/login" className={`${tone.link} underline-offset-2 hover:underline`}>{t.signInPrompt.link}</a>
+          {t.signInPrompt.after}
         </p>
       )}
 
       {loading ? (
-        <p className={`text-[12.5px] ${t.empty}`}>正在读…</p>
+        <p className={`text-[12.5px] ${tone.empty}`}>正在读…</p>
       ) : notes.length === 0 ? (
-        <p className={`text-[12.5px] ${t.empty}`}>还没有人写下感悟。</p>
+        <p className={`text-[12.5px] ${tone.empty}`}>{tone.empty}</p>
       ) : (
         <ul className="flex list-none flex-col gap-3.5 p-0">
           {notes.map(note => (
             <li key={note.id} className="flex gap-2.5">
               <span
                 aria-hidden="true"
-                className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full ${t.avatar} text-[11px] font-semibold`}
+                className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full ${tone.avatar} text-[11px] font-semibold`}
               >
                 {note.avatarUrl
                   // eslint-disable-next-line @next/next/no-img-element
@@ -188,19 +203,19 @@ export default function TrackNotes({ trackId, loggedIn, dark = false, onCountCha
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
-                  <span className={`text-[12.5px] font-semibold ${t.author}`}>{note.author}</span>
-                  <span className={`text-[11px] ${t.time}`}>{when(note.createdAt)}</span>
+                  <span className={`text-[12.5px] font-semibold ${tone.author}`}>{note.author}</span>
+                  <span className={`text-[11px] ${tone.time}`}>{when(note.createdAt, t)}</span>
                   {note.mine && (
                     <button
                       type="button"
                       onClick={() => remove(note.id)}
-                      className={`ml-auto text-[11px] transition-colors ${t.del}`}
+                      className={`ml-auto text-[11px] transition-colors ${tone.del}`}
                     >
-                      撤回
+                      {t.withdraw}
                     </button>
                   )}
                 </div>
-                <p className={`mt-1 whitespace-pre-wrap break-words text-[13px] leading-[1.8] ${t.body}`}>
+                <p className={`mt-1 whitespace-pre-wrap break-words text-[13px] leading-[1.8] ${tone.body}`}>
                   {note.body}
                 </p>
               </div>

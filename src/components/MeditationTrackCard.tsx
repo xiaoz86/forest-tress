@@ -1,12 +1,15 @@
 import Link from 'next/link';
 import TrackAudioPanel from '@/components/TrackAudioPanel';
 import type { Dictionary } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 import type { MeditationTrack, TrackMood } from '@/lib/meditations';
 
 type Props = {
   track: MeditationTrack;
   /** 卡片上那几个标签的文案。标题和简介来自库里，仍是中文。 */
   t: Dictionary['meditations']['card'];
+  /** TrackAudioPanel 是客户端组件，只能收 locale（字典里有函数，跨不过序列化） */
+  locale: Locale;
   href?: string;
   showAudio?: boolean;
   showDescription?: boolean;
@@ -72,7 +75,7 @@ export default function MeditationTrackCard({
   showDescription = true,
   loggedIn = false,
   noteCount = 0,
-  layout = 'grid',
+  layout = 'grid',  locale,
 }: Props) {
   const wide = layout === 'wide';
   const visual = TRACK_VISUALS[track.mood] || TRACK_VISUALS.forest;
@@ -149,6 +152,7 @@ export default function MeditationTrackCard({
 
         {showAudio && (
           <TrackAudioPanel
+          locale={locale}
             trackId={track.id}
             hasAudio={Boolean(track.hasAudio)}
             loggedIn={loggedIn}
