@@ -132,7 +132,9 @@ async function fromSupabase() {
   collect(sp.title, '分享·标题');
   collect(sp.description, '分享·描述');
   for (const s of sp.shares || []) {
-    for (const f of ['title', 'kicker', 'question', 'summary', 'note', 'authorLabel', 'badgeLabel']) {
+    // author 也要收：卡片下面那行「联合创始人团队 · 首次分享」是它和 authorLabel 拼的。
+    // 漏掉它，英文版那行就只翻出后半截。
+    for (const f of ['title', 'kicker', 'question', 'summary', 'note', 'author', 'authorLabel', 'badgeLabel']) {
       collect(s[f], `分享 ${s.id}·${f}`);
     }
     for (const tag of s.tags || []) collect(tag, `分享 ${s.id}·标签`);

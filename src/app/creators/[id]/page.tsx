@@ -13,6 +13,7 @@ import PhilMemoriesManager from '@/components/PhilMemoriesManager';
 import { buildRelationGraph } from '@/lib/network';
 import { isAdminId } from '@/lib/admin';
 import { getAuthenticatedMemberId } from '@/lib/session';
+import { getLocale } from '@/lib/locale';
 import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -50,7 +51,8 @@ export default async function CreatorDetail({ params }: Props) {
 
   const graph = buildRelationGraph(me, all, 8);
 
-  const memberId = await getAuthenticatedMemberId();
+  // 这一页其余部分还没接双语（见 i18n 待办），先把已经接好的记忆区喂上语言
+  const [memberId, locale] = await Promise.all([getAuthenticatedMemberId(), getLocale()]);
   const isMember = Boolean(memberId);
   const isOwner = memberId === me.id;
   const isAdmin = isAdminId(memberId);
@@ -161,7 +163,7 @@ export default async function CreatorDetail({ params }: Props) {
           )}
           {isOwner && (
             <div className="mb-10 max-md:mb-7">
-              <PhilMemoriesManager />
+              <PhilMemoriesManager locale={locale} />
             </div>
           )}
           <div className="space-y-12 max-md:space-y-9">

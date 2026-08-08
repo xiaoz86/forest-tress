@@ -1,13 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 
 type Props = {
   isLoggedIn: boolean;
+  /**
+   * 文案在客户端自己取。字典里为了英文单复数用了函数，而函数跨不过
+   * server → client 那道序列化边界，整片字典切片当 props 传会让页面直接崩。
+   * 所以只传 locale——它仍然是服务端算好的，这边不读 cookie，不会闪一下中文。
+   */
+  locale: Locale;
 };
 
-export default function ShareSubmitForm({ isLoggedIn }: Props) {
+export default function ShareSubmitForm({ isLoggedIn, locale }: Props) {
+  const t = useMemo(() => dict(locale).shares.submit, [locale]);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -15,17 +24,17 @@ export default function ShareSubmitForm({ isLoggedIn }: Props) {
     return (
       <div className="rounded-lg border border-forest-deep/10 bg-white/72 p-7">
         <div className="mb-3 text-[11px] font-medium tracking-[0.18em] text-coral uppercase">
-          带来分享
+          {t.eyebrow}
         </div>
-        <h2 className="text-2xl font-semibold text-forest-deep">先登录你的节点</h2>
+        <h2 className="text-2xl font-semibold text-forest-deep">{t.signInTitle}</h2>
         <p className="mt-4 text-sm leading-relaxed text-text-secondary">
-          登录后，你可以把自己的作品、产品、活动或体验放进林间分享，等待创始人团队审核。
+          {t.signInBody}
         </p>
         <a
           href="/login"
           className="mt-6 inline-flex rounded-full bg-forest-deep px-5 py-2.5 text-sm font-semibold text-white no-underline"
         >
-          去登录
+          {t.signInCta}
         </a>
       </div>
     );
@@ -42,12 +51,13 @@ export default function ShareSubmitForm({ isLoggedIn }: Props) {
         method: 'POST',
         body: formData,
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'submit-failed');
-      setMessage('已收到。创始人团队审核后，会出现在林间分享里。');
+      if (!res.ok) throw new Error('submit-failed');
+      setMessage(t.done);
       form.reset();
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : '提交失败');
+    } catch {
+      // 原来这里把接口回的错误码原样显示出来（submit-failed 之类）。
+      // 投稿人看不懂那种字符串，统一换成一句人话。
+      setMessage(t.failed);
     } finally {
       setSubmitting(false);
     }
@@ -59,36 +69,36 @@ export default function ShareSubmitForm({ isLoggedIn }: Props) {
       className="rounded-lg border border-forest-deep/10 bg-white/72 p-7"
     >
       <div className="mb-3 text-[11px] font-medium tracking-[0.18em] text-coral uppercase">
-        带来分享
+        {t.eyebrow}
       </div>
-      <h2 className="text-2xl font-semibold text-forest-deep">把你的片段放进来</h2>
+      <h2 className="text-2xl font-semibold text-forest-deep">{t.title}</h2>
       <p className="mt-4 text-sm leading-relaxed text-text-secondary">
-        可以是作品、产品、活动，也可以是一段体验。它会先进入审核，不会立刻公开。
+        {t.lede}
       </p>
 
       <div className="mt-7 grid grid-cols-2 gap-4 max-md:grid-cols-1">
-        <Field label="标题">
+        <Field label={t.field.title}>
           <input name="title" required maxLength={64} className={inputCls} />
         </Field>
-        <Field label="标签（逗号分隔）">
-          <input name="tags" maxLength={120} placeholder="作品，体验" className={inputCls} />
+        <Field label={t.field.tags}>
+          <input name="tags" maxLength={120} placeholder={t.field.tagsPlaceholder} className={inputCls} />
         </Field>
-        <Field label="从哪个问题开始" className="col-span-2 max-md:col-span-1">
+        <Field label={t.field.question} className="col-span-2 max-md:col-span-1">
           <input name="question" maxLength={120} className={inputCls} />
         </Field>
-        <Field label="简短描述" className="col-span-2 max-md:col-span-1">
+        <Field label={t.field.summary} className="col-span-2 max-md:col-span-1">
           <textarea name="summary" required maxLength={260} className={`${inputCls} min-h-28 resize-y leading-relaxed`} />
         </Field>
-        <Field label="补充一句" className="col-span-2 max-md:col-span-1">
+        <Field label={t.field.note} className="col-span-2 max-md:col-span-1">
           <textarea name="note" maxLength={220} className={`${inputCls} min-h-20 resize-y leading-relaxed`} />
         </Field>
-        <Field label="外部链接（可选）" className="col-span-2 max-md:col-span-1">
+        <Field label={t.field.href} className="col-span-2 max-md:col-span-1">
           <input name="href" type="url" maxLength={900} className={inputCls} />
         </Field>
-        <Field label="主媒体">
+        <Field label={t.field.media}>
           <input name="media" type="file" accept="video/mp4,video/quicktime,video/webm,image/*" className={fileInputCls} />
         </Field>
-        <Field label="视频海报（可选）">
+        <Field label={t.field.poster}>
           <input name="poster" type="file" accept="image/*" className={fileInputCls} />
         </Field>
       </div>
@@ -99,7 +109,7 @@ export default function ShareSubmitForm({ isLoggedIn }: Props) {
           disabled={submitting}
           className="rounded-full bg-forest-deep px-6 py-3 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
         >
-          {submitting ? '提交中' : '提交审核'}
+          {submitting ? t.submitting : t.submitCta}
         </button>
         {message && (
           <span className="text-sm leading-relaxed text-coral">{message}</span>

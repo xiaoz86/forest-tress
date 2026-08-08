@@ -10,4 +10,33 @@ export const shares: typeof zhShares = {
   submitCta: 'Share something',
   backHome: 'Home',
   manage: 'Manage shares',
+
+  submit: {
+    eyebrow: 'Bring a piece',
+
+    signInTitle: 'Log in to your node first',
+    signInBody:
+      'Once you’re logged in, you can add your own work, product, event, or experience here, and the founding team will take a look.',
+    signInCta: 'Log in',
+
+    title: 'Add your piece',
+    lede: 'It can be work, a product, an event, or just an experience. It goes to review first—nothing is published straight away.',
+
+    field: {
+      title: 'Title',
+      tags: 'Tags (comma separated)',
+      tagsPlaceholder: 'work, experience',
+      question: 'The question it started from',
+      summary: 'Short description',
+      note: 'One more thing',
+      href: 'External link (optional)',
+      media: 'Main media',
+      poster: 'Video poster (optional)',
+    },
+
+    submitting: 'Sending',
+    submitCta: 'Submit for review',
+    done: 'Got it. Once the founding team has reviewed it, it’ll show up here.',
+    failed: 'That didn’t go through. Try again in a moment.',
+  },
 };

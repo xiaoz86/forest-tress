@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { isWebKitBrowser, useClientFlag, useSpeechInput } from '@/lib/voice';
 import {
   PHIL_COACH_VOICES,
@@ -9,6 +9,11 @@ import {
   useServerSpeechInput,
 } from '@/lib/voiceServer';
 import type { VoiceAnalysis } from '@/lib/philCoachVoice';
+import { dict } from '@/i18n';
+
+/** 以字典里的键为准：lib 里加了小径却没配文案，这里会当场编译报错 */
+type PathId = keyof ReturnType<typeof dict>['philCoach']['experience']['paths'];
+import type { Locale } from '@/lib/locale';
 import {
   PHIL_PATHS,
   PROFILE_PATH,
@@ -44,7 +49,7 @@ const MIC_ALIVE_LEVEL = 0.02;       // 电平低于这个就是没收到声音
 
 function saveSession(s: Session | null) {
   try {
-    if (s && s.thread.some(t => t.kind === 'me')) {
+    if (s && s.thread.some(item => item.kind === 'me')) {
       sessionStorage.setItem(DRAFT_SESSION_KEY, JSON.stringify(s));
     } else {
       sessionStorage.removeItem(DRAFT_SESSION_KEY);
@@ -191,7 +196,19 @@ function SpeakerIcon({ waves = true, className = 'h-4 w-4' }: { waves?: boolean;
 
 
 
-export default function PhilCoachExperience() {
+/**
+ * 文案在客户端自己取。
+ *
+ * 不能像服务端组件那样把字典切片当 props 传进来——字典里为了英文单复数
+ * 用了函数（draftCount、listening 这些），而函数跨不过 server → client
+ * 那道序列化边界，页面会直接崩在「Functions cannot be passed directly
+ * to Client Components」。所以只传 locale，字典在这边查。
+ *
+ * 这也不违反「客户端不要自己判断语言」：locale 仍是服务端算好的，
+ * 这里不读 cookie，不会先渲染中文再闪成英文。
+ */
+export default function PhilCoachExperience({ locale }: { locale: Locale }) {
+  const t = useMemo(() => dict(locale).philCoach.experience, [locale]);
   const [session, setSession] = useState<Session | null>(null);
   const [draft, setDraft] = useState('');
   const draftRef = useRef('');
@@ -257,8 +274,8 @@ export default function PhilCoachExperience() {
       merged.complete
         ? ''
         : currentDraft.length >= 1200
-          ? '输入框已到 1200 字，这段录音没有加入。'
-          : '输入框已到 1200 字，这段话只有前面一部分被加入。',
+          ? t.voice.overflowAll
+          : t.voice.overflowPart,
     );
   });
   /**
@@ -466,7 +483,7 @@ export default function PhilCoachExperience() {
   useEffect(() => {
     if (!voiceOut.enabled || !session) return;
     if (voiceIn.recording || voiceIn.requesting) return;
-    const last = [...session.thread].reverse().find(t => t.kind === 'coach');
+    const last = [...session.thread].reverse().find(item => item.kind === 'coach');
     if (!last || last.text === spokenRef.current) return;
     spokenRef.current = last.text;
     voiceOut.speak(last.text);
@@ -570,7 +587,7 @@ export default function PhilCoachExperience() {
   }
 
   function openingForNextConversation(): string {
-    return getPhilOpening(profileKnown ? profileName : '', nextOpeningIndex());
+    return getPhilOpening(t.opening, profileKnown ? profileName : '', nextOpeningIndex());
   }
 
   function begin(p: PhilPath) {
@@ -596,7 +613,7 @@ export default function PhilCoachExperience() {
   function reset() {
     liveVoice.cancel();
     voiceIn.cancel();
-    if (session?.thread.some(t => t.kind === 'me')) markPathDone();
+    if (session?.thread.some(item => item.kind === 'me')) markPathDone();
     setSession(null);
     setDraft('');
     setVoiceInputNotice('');
@@ -698,7 +715,7 @@ export default function PhilCoachExperience() {
       }
     } catch {
       retryVoiceContextRef.current = null;
-      setError('刚才这段没有送出去。可以稍后再试，或先把它留给自己。');
+      setError(t.error.send);
     } finally {
       setLoading(false);
     }
@@ -783,7 +800,7 @@ export default function PhilCoachExperience() {
         if (r === 'ok') retryVoiceContextRef.current = null;
         else setPendingRetry(true);
       } catch {
-        setError('刚才这段没有送出去。可以稍后再试。');
+        setError(t.error.resend);
       } finally {
         setLoading(false);
       }
@@ -816,7 +833,7 @@ export default function PhilCoachExperience() {
   async function copyThread() {
     if (!session) return;
     const text = session.thread
-      .map(item => (item.kind === 'coach' ? `phil-coach：${item.text}` : `我：${item.text}`))
+      .map(item => (item.kind === 'coach' ? `${t.copyPrefix.coach}${item.text}` : `${t.copyPrefix.me}${item.text}`))
       .join('\n\n');
     try {
       await navigator.clipboard.writeText(text);
@@ -835,7 +852,7 @@ export default function PhilCoachExperience() {
         <button
           onClick={() => setShowGate(false)}
           type="button"
-          aria-label="先关闭，回去看对话"
+          aria-label={t.gate.close}
           className="absolute right-4 top-3 text-2xl leading-none text-white/35 transition-colors hover:text-white"
         >
           ×
@@ -843,11 +860,11 @@ export default function PhilCoachExperience() {
         {guestKnown && guestExpired && !guestApproved ? (
           <>
             <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
-              一段旅程走完了
+              {t.gate.expired.eyebrow}
             </div>
-            <h3 className="text-xl font-semibold">免费 3 个月已满</h3>
+            <h3 className="text-xl font-semibold">{t.gate.expired.title}</h3>
             <p className="mt-3 text-[14px] leading-[1.95] text-white/55">
-              你的免费使用期到了。想继续的话，点下面申请续期——我们确认后，会为你<span className="text-white/80">再开 3 个月的免费使用与答疑</span>（通常很快）。你的对话记录都还在下面，随时可以回看。
+              {t.gate.expired.bodyBefore}<span className="text-white/80">{t.gate.expired.bodyAccent}</span>{t.gate.expired.bodyAfter}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-4">
               {renewState !== 'sent' ? (
@@ -857,7 +874,7 @@ export default function PhilCoachExperience() {
                   type="button"
                   className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-50"
                 >
-                  {renewState === 'sending' ? '正在申请…' : '申请续期'}
+                  {renewState === 'sending' ? t.gate.expired.sending : t.gate.expired.cta}
                 </button>
               ) : (
                 <button
@@ -866,39 +883,39 @@ export default function PhilCoachExperience() {
                   type="button"
                   className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-50"
                 >
-                  {checkState === 'checking' ? '看看去…' : '看看续上了吗'}
+                  {checkState === 'checking' ? t.gate.checking : t.gate.expired.check}
                 </button>
               )}
               {renewState === 'sent' && checkState !== 'still-pending' && (
-                <span className="text-[13px] text-white/40">申请已发出，我们确认后就能继续。</span>
+                <span className="text-[13px] text-white/40">{t.gate.expired.sent}</span>
               )}
               {checkState === 'still-pending' && (
-                <span className="text-[13px] text-white/40">还在路上，稍等一会儿再试试。</span>
+                <span className="text-[13px] text-white/40">{t.gate.stillPending}</span>
               )}
               {renewState === 'error' && (
-                <span className="text-[13px] text-coral-soft">没发出去，稍后再试一次。</span>
+                <span className="text-[13px] text-coral-soft">{t.gate.failed}</span>
               )}
             </div>
             <p className="mt-5 text-[12px] leading-relaxed text-white/32">
-              已经是森林里的树？
+              {t.gate.loginPrompt}
               <Link
                 href="/login"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="ml-1 text-white/50 underline underline-offset-2 hover:text-white"
               >
-                直接登录（新窗口，不影响这段对话）
+                {t.gate.loginLink}
               </Link>
             </p>
           </>
         ) : guestKnown && !guestApproved ? (
           <>
             <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
-              就快好了
+              {t.gate.waiting.eyebrow}
             </div>
-            <h3 className="text-xl font-semibold">已收到，正在为你开通</h3>
+            <h3 className="text-xl font-semibold">{t.gate.waiting.title}</h3>
             <p className="mt-3 text-[14px] leading-[1.95] text-white/55">
-              我们已经收到你的登记，正在为你开通<span className="text-white/80">免费 3 个月的 phil-coach 使用与答疑</span>（通常很快）。通过后，我们也会按你留下的微信号来加你、邀你进附近森林社群。你的对话记录都还在下面，开通后接着聊就行。
+              {t.gate.waiting.bodyBefore}<span className="text-white/80">{t.gate.waiting.bodyAccent}</span>{t.gate.waiting.bodyAfter}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-4">
               <button
@@ -907,46 +924,46 @@ export default function PhilCoachExperience() {
                 type="button"
                 className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-50"
               >
-                {checkState === 'checking' ? '看看去…' : '看看开通了吗'}
+                {checkState === 'checking' ? t.gate.checking : t.gate.waiting.check}
               </button>
               {checkState === 'still-pending' && (
-                <span className="text-[13px] text-white/40">还在路上，稍等一会儿再试试。</span>
+                <span className="text-[13px] text-white/40">{t.gate.stillPending}</span>
               )}
             </div>
             <p className="mt-5 text-[12px] leading-relaxed text-white/32">
-              已经是森林里的树？
+              {t.gate.loginPrompt}
               <Link
                 href="/login"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="ml-1 text-white/50 underline underline-offset-2 hover:text-white"
               >
-                直接登录（新窗口，不影响这段对话）
+                {t.gate.loginLink}
               </Link>
             </p>
           </>
         ) : (
           <>
             <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
-              继续之前
+              {t.gate.register.eyebrow}
             </div>
-            <h3 className="text-xl font-semibold">留个称呼，继续免费用</h3>
+            <h3 className="text-xl font-semibold">{t.gate.register.title}</h3>
             <p className="mt-3 text-[14px] leading-[1.95] text-white/55">
-              第一段路你已经走完了。留下称呼和微信号，我们确认后，附近森林为你<span className="text-white/80">继续开放免费 3 个月的 phil-coach 使用与答疑</span>（通常很快），并按微信号加你、邀你进社群——群里可以交流反馈，也有<span className="text-white/80">真人教练答疑陪伴</span>。你下面的对话记录一直都在，随时可以回看。
+              {t.gate.register.bodyBefore}<span className="text-white/80">{t.gate.register.bodyAccent}</span>{t.gate.register.bodyMiddle}<span className="text-white/80">{t.gate.register.bodyAccent2}</span>{t.gate.register.bodyAfter}
             </p>
             <div className="mt-6 grid gap-3">
               <input
                 value={gateName}
                 onChange={e => setGateName(e.target.value)}
                 maxLength={60}
-                placeholder="怎么称呼你"
+                placeholder={t.gate.register.namePlaceholder}
                 className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
               />
               <input
                 value={gateContact}
                 onChange={e => setGateContact(e.target.value)}
                 maxLength={120}
-                placeholder="微信号（或邮箱）"
+                placeholder={t.gate.register.contactPlaceholder}
                 className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
               />
             </div>
@@ -957,21 +974,21 @@ export default function PhilCoachExperience() {
                 type="button"
                 className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-40"
               >
-                {gateState === 'sending' ? '正在提交…' : '提交登记'}
+                {gateState === 'sending' ? t.gate.register.sending : t.gate.register.cta}
               </button>
               {gateState === 'error' && (
-                <span className="text-[13px] text-coral-soft">没成功，稍后再试一次。</span>
+                <span className="text-[13px] text-coral-soft">{t.gate.registerFailed}</span>
               )}
             </div>
             <p className="mt-5 text-[12px] leading-relaxed text-white/32">
-              这些信息只用于认识你、联系你，不做别的。已经是森林里的树？
+              {t.gate.register.privacy}{t.gate.loginPrompt}
               <Link
                 href="/login"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="ml-1 text-white/50 underline underline-offset-2 hover:text-white"
               >
-                直接登录（新窗口，不影响这段对话）
+                {t.gate.loginLink}
               </Link>
             </p>
           </>
@@ -986,16 +1003,16 @@ export default function PhilCoachExperience() {
         {gateOverlay}
         <div className="mb-8 flex items-center gap-4 text-[12px] text-white/36">
           <span className="h-px w-10 bg-white/20" />
-          <span>不用选对，只选最像今天的那一条。先从一条小径开始，剩下的慢慢聊。</span>
+          <span>{t.chooseHint}</span>
         </div>
         {loggedIn && (
           <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-white/40">
             <span>
               {importState === 'importing'
-                ? 'phil-coach 正在读你的资料，好认识你…'
+                ? t.profile.importing
                 : profileKnown
-                  ? 'phil-coach 已经认识了你的资料。'
-                  : '让 phil-coach 先认识一下你的资料吧。'}
+                  ? t.profile.known
+                  : t.profile.unknown}
             </span>
             <button
               onClick={importProfile}
@@ -1003,7 +1020,7 @@ export default function PhilCoachExperience() {
               type="button"
               className="text-coral-soft underline-offset-4 transition-colors hover:text-white hover:underline disabled:opacity-50"
             >
-              {profileKnown ? '重新导入' : '导入我的资料'}
+              {profileKnown ? t.profile.reimport : t.profile.import}
             </button>
           </div>
         )}
@@ -1022,11 +1039,11 @@ export default function PhilCoachExperience() {
                   className="text-[1.5rem] font-semibold leading-snug text-white"
                   style={{ fontFamily: 'var(--font-display)' }}
                 >
-                  {p.label}
+                  {t.paths[p.id as PathId].label}
                 </h3>
-                <p className="mt-3 text-[14px] leading-relaxed text-white/78">{p.hint}</p>
+                <p className="mt-3 text-[14px] leading-relaxed text-white/78">{t.paths[p.id as PathId].hint}</p>
                 <span className="mt-6 inline-flex items-center gap-2 text-[13px] text-white/82">
-                  {conversationReady ? '开始对话' : '正在准备对话…'}
+                  {conversationReady ? t.enter : t.entering}
                   <span className="transition-transform group-hover:translate-x-1">→</span>
                 </span>
               </div>
@@ -1043,15 +1060,15 @@ export default function PhilCoachExperience() {
       <div className="mb-7 flex items-center justify-between gap-4">
         <div>
           <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
-            {path.label}
+            {t.paths[path.id as PathId].label}
           </div>
-          <div className="mt-2 text-[12px] text-white/30">这一段只在此刻发生，不会被保存 · 说完就散</div>
+          <div className="mt-2 text-[12px] text-white/30">{t.ephemeral}</div>
         </div>
         <button
           onClick={reset}
           className="text-[13px] text-white/40 underline-offset-4 transition-colors hover:text-white"
         >
-          换一条小径
+          {t.switchPath}
         </button>
       </div>
 
@@ -1070,7 +1087,7 @@ export default function PhilCoachExperience() {
             ) : (
               <div key={i} className="max-w-[86%] self-end">
                 <div className="mb-1 text-right text-[10px] uppercase tracking-[0.2em] text-white/28">
-                  我
+                  {t.me}
                 </div>
                 <div className="whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-coral-soft/85 px-5 py-3.5 text-[15px] leading-[1.9] text-[#20140f]">
                   {item.text}
@@ -1082,10 +1099,10 @@ export default function PhilCoachExperience() {
           {voiceIn.transcribing && voiceMode === 'direct' && (
             <div className="max-w-[86%] self-end">
               <div className="mb-1 text-right text-[10px] uppercase tracking-[0.2em] text-white/28">
-                我
+                {t.me}
               </div>
               <div className="animate-pulse whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-coral-soft/45 px-5 py-3.5 text-[15px] leading-[1.9] text-[#20140f]/75">
-                {liveCaption || '正在把这段话变成文字…'}
+                {liveCaption || t.transcribing}
               </div>
             </div>
           )}
@@ -1095,7 +1112,7 @@ export default function PhilCoachExperience() {
                 phil-coach
               </div>
               <div className="rounded-2xl rounded-tl-sm border border-white/10 bg-white/[0.06] px-5 py-3.5 text-[15px] leading-[1.9] text-white/48">
-                我在听，等我把你刚才说的放在心里看一看…
+                {t.thinking}
               </div>
             </div>
           )}
@@ -1115,14 +1132,14 @@ export default function PhilCoachExperience() {
                   与其让人去浏览器设置里翻，不如就地把设备列出来点一下。 */}
               {voiceIn.inputDevices.length > 0 && (
                 <span className="mt-2 flex flex-wrap gap-1.5">
-                  {voiceIn.inputDevices.map(d => (
+                  {voiceIn.inputDevices.map(device => (
                     <button
-                      key={d.id}
+                      key={device.id}
                       type="button"
-                      onClick={() => voiceIn.chooseInputDevice(d.id)}
+                      onClick={() => voiceIn.chooseInputDevice(device.id)}
                       className="rounded-full border border-coral-soft/40 px-2.5 py-1 text-[11.5px] text-coral-soft transition-colors hover:bg-coral-soft/12"
                     >
-                      {d.label}
+                      {device.label}
                     </button>
                   ))}
                 </span>
@@ -1139,13 +1156,13 @@ export default function PhilCoachExperience() {
           )}
           {voiceOut.playbackBlocked && (
             <div role="status" className="mb-3 flex flex-wrap items-center gap-2 text-[12px] text-white/55">
-              浏览器挡住了自动播放
+              {t.voice.autoplayBlocked}
               <button
                 onClick={voiceOut.resume}
                 type="button"
                 className="rounded-full border border-coral-soft/40 px-2.5 py-1 text-coral-soft transition-colors hover:bg-coral-soft/12"
               >
-                点一下就能听
+                {t.voice.autoplayCta}
               </button>
             </div>
           )}
@@ -1163,8 +1180,8 @@ export default function PhilCoachExperience() {
                   <button
                     onClick={cancelVoice}
                     type="button"
-                    aria-label="取消这段录音"
-                    title="取消"
+                    aria-label={t.voice.cancelRecording}
+                    title={t.voice.cancel}
                     className="absolute right-2 top-2 z-10 grid h-11 w-11 place-items-center rounded-full text-white/30 transition-colors hover:bg-white/10 hover:text-white"
                   >
                     <CloseIcon />
@@ -1174,7 +1191,7 @@ export default function PhilCoachExperience() {
                   onClick={finishVoice}
                   disabled={!voiceIn.recording}
                   type="button"
-                  aria-label={voiceIn.recording ? '再次点击以完成录音' : '正在准备'}
+                  aria-label={voiceIn.recording ? t.voice.speakStop : t.voice.speakPreparing}
                   className="flex w-full flex-col items-center gap-5 px-4 py-10 disabled:cursor-default"
                 >
                   <span
@@ -1198,12 +1215,12 @@ export default function PhilCoachExperience() {
                   <span className="text-center">
                     <span className="block text-[14.5px] text-white/80">
                       {voiceIn.requesting
-                        ? '正在打开麦克风…'
-                        : `正在听 · ${formatSeconds(voiceIn.elapsed)}`}
+                        ? t.voice.opening
+                        : t.voice.listening(formatSeconds(voiceIn.elapsed))}
                     </span>
                     {voiceIn.recording && (
                       <span className="mt-1.5 block text-[12.5px] text-white/40">
-                        再次点击，说完直接发给它
+                        {t.voice.speakHint}
                       </span>
                     )}
                     {voiceIn.recording && liveCaption && (
@@ -1231,7 +1248,7 @@ export default function PhilCoachExperience() {
                   readOnly={dictating}
                   rows={3}
                   maxLength={1200}
-                  placeholder={dictating ? '说吧，字会出现在这里…' : '照此刻真实的样子说就好…'}
+                  placeholder={dictating ? t.voice.dictatingPlaceholder : t.voice.draftPlaceholder}
                   className="w-full resize-none rounded-2xl border-0 bg-transparent px-4 pb-1 pt-3.5 text-[15px] leading-relaxed text-white placeholder:text-white/28 focus:outline-none disabled:opacity-55"
                 />
                 {dictating ? (
@@ -1241,8 +1258,8 @@ export default function PhilCoachExperience() {
                       <button
                         onClick={cancelVoice}
                         type="button"
-                        aria-label="取消听写"
-                        title="取消"
+                        aria-label={t.voice.dictateCancel}
+                        title={t.voice.cancel}
                         className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white/40 transition-colors hover:bg-white/10 hover:text-white"
                       >
                         <CloseIcon />
@@ -1252,10 +1269,10 @@ export default function PhilCoachExperience() {
                       <WaveBars level={voiceIn.level} active={voiceIn.recording} maxHeight={20} />
                       <span className="truncate text-[12.5px] text-coral-soft/90">
                         {voiceIn.transcribing
-                          ? '正在把话变成字…'
+                          ? t.voice.converting
                           : voiceIn.requesting
-                            ? '正在打开麦克风…'
-                            : `正在听 · ${formatSeconds(voiceIn.elapsed)}`}
+                            ? t.voice.opening
+                            : t.voice.listening(formatSeconds(voiceIn.elapsed))}
                       </span>
                     </div>
                     <button
@@ -1263,8 +1280,8 @@ export default function PhilCoachExperience() {
                       onClick={voiceIn.recording ? finishVoice : cancelVoice}
                       disabled={voiceIn.transcribing}
                       type="button"
-                      aria-label={voiceIn.recording ? '完成听写' : '退出听写'}
-                      title={voiceIn.recording ? '完成' : '退出'}
+                      aria-label={voiceIn.recording ? t.voice.dictateDone : t.voice.dictateExit}
+                      title={voiceIn.recording ? t.voice.done : t.voice.exit}
                       className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-coral-soft text-[#24140f] transition-opacity disabled:opacity-45"
                     >
                       <span aria-hidden="true" className="block h-3.5 w-3.5 rounded-[3px] bg-current" />
@@ -1280,8 +1297,8 @@ export default function PhilCoachExperience() {
                     type="button"
                     title={
                       voiceOut.enabled
-                        ? 'phil-coach 的回复会读出来 · 点一下关掉'
-                        : '打开后，phil-coach 的回复会用语音回复'
+                        ? t.voice.readOn
+                        : t.voice.readOff
                     }
                     className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] transition-colors ${
                       voiceOut.enabled
@@ -1292,9 +1309,9 @@ export default function PhilCoachExperience() {
                     <SpeakerIcon waves={voiceOut.enabled} />
                     {voiceOut.enabled
                       ? voiceOut.loading
-                        ? '准备中'
-                        : '语音回复 · 开'
-                      : '语音回复 · 关'}
+                        ? t.voice.readPreparing
+                        : t.voice.readStateOn
+                      : t.voice.readStateOff}
                   </button>
                   {/* 换嗓音：只在开着朗读时出现，一颗按钮在两个嗓音之间轮换
                       （手机宽度放不下两颗并排的音色） */}
@@ -1305,7 +1322,7 @@ export default function PhilCoachExperience() {
                         voiceOut.setVoice(PHIL_COACH_VOICES[(i + 1) % PHIL_COACH_VOICES.length].id);
                       }}
                       type="button"
-                      title="点一下换个嗓音"
+                      title={t.voice.switchVoice}
                       className="rounded-full px-2.5 py-1.5 text-[12px] text-white/45 transition-colors hover:bg-white/[0.06] hover:text-white"
                     >
                       {PHIL_COACH_VOICES.find(v => v.id === voiceOut.voiceId)?.label}
@@ -1319,8 +1336,8 @@ export default function PhilCoachExperience() {
                         onClick={() => void startVoice('dictate')}
                         disabled={loading || voiceBusy || displayedDraft.length >= 1200}
                         type="button"
-                        aria-label="说话变文字"
-                        title="说话变文字，先进输入框，可改再发"
+                        aria-label={t.voice.dictateLabel}
+                        title={t.voice.dictateTitle}
                         className="grid h-10 w-10 place-items-center rounded-full border border-white/14 bg-white/[0.05] text-white/70 transition-colors hover:bg-white/12 hover:text-white disabled:opacity-40"
                       >
                         <MicrophoneIcon />
@@ -1329,8 +1346,8 @@ export default function PhilCoachExperience() {
                         onClick={() => void startVoice('direct')}
                         disabled={loading || voiceBusy}
                         type="button"
-                        aria-label="说完直接发给它"
-                        title="按一下开始说，说完直接发给它"
+                        aria-label={t.voice.speakLabel}
+                        title={t.voice.speakTitle}
                         className="grid h-10 w-10 place-items-center rounded-full bg-coral-soft/90 text-[#24140f] transition-colors hover:bg-coral-soft disabled:opacity-40"
                       >
                         <VoiceWaveIcon />
@@ -1345,13 +1362,13 @@ export default function PhilCoachExperience() {
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
             <span className="text-[12px] text-white/45">
               {polishing
-                ? '正在顺一遍刚才的话…'
+                ? t.tidying
                 : displayedDraft.length >= 1200
-                  ? '已到 1200 字上限'
-                  : `${displayedDraft.length}/1200 字 · ⌘/Ctrl + Enter 发送`}
+                  ? t.draftLimit
+                  : t.draftCount(displayedDraft.length)}
             </span>
             <div className="flex flex-wrap gap-3">
-              {hasConversation && loggedIn && session.thread.some(t => t.kind === 'me') && (
+              {hasConversation && loggedIn && session.thread.some(item => item.kind === 'me') && (
                 <button
                   onClick={keepThread}
                   disabled={keepState === 'saving' || keepState === 'saved'}
@@ -1359,12 +1376,12 @@ export default function PhilCoachExperience() {
                   className="rounded-full border border-coral-soft/40 bg-coral-soft/10 px-5 py-2.5 text-[14px] text-coral-soft transition-colors hover:bg-coral-soft/20 disabled:opacity-60"
                 >
                   {keepState === 'saved'
-                    ? '已留住 · 下次它会记得'
+                    ? t.keep.done
                     : keepState === 'saving'
-                      ? '正在留住…'
+                      ? t.keep.saving
                       : keepState === 'error'
-                        ? '没留上，再试一次'
-                        : '留住这一段'}
+                        ? t.keep.failed
+                        : t.keep.idle}
                 </button>
               )}
               {hasConversation && (
@@ -1373,7 +1390,7 @@ export default function PhilCoachExperience() {
                   type="button"
                   className="rounded-full border border-white/16 bg-white/[0.06] px-5 py-2.5 text-[14px] text-white/70 transition-colors hover:bg-white/12 hover:text-white"
                 >
-                  {copied ? '已复制' : '把这段留给自己'}
+                  {copied ? t.copied : t.copy}
                 </button>
               )}
               <button
@@ -1389,7 +1406,7 @@ export default function PhilCoachExperience() {
                 type="button"
                 className="rounded-full bg-white px-6 py-2.5 text-[14px] font-medium text-[#141a12] transition-opacity disabled:opacity-35"
               >
-                {loading ? '正在回应' : '发送'}
+                {loading ? t.sending : t.send}
               </button>
             </div>
           </div>
@@ -1402,7 +1419,7 @@ export default function PhilCoachExperience() {
           type="button"
           className="rounded-full border border-white/16 bg-white/[0.06] px-5 py-2.5 text-[14px] text-white/78 transition-colors hover:bg-white/12 hover:text-white"
         >
-          再走一条小径
+          {t.againPath}
         </button>
         <Link
           href="/#join"
@@ -1410,7 +1427,7 @@ export default function PhilCoachExperience() {
           rel="noopener noreferrer"
           className="rounded-full bg-coral-soft px-5 py-2.5 text-[14px] font-medium text-[#20140f] no-underline transition-opacity hover:opacity-90"
         >
-          成为森林里的一棵树
+          {t.join}
         </Link>
       </div>
     </div>

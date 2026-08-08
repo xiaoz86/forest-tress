@@ -3,9 +3,11 @@
 // 「phil-coach 记得的」——节点主人查看/删除自己留住的对话记忆。
 // 只在本人的节点页渲染（隐私：管理员也看不到）。
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { PHIL_PATHS, PROFILE_PATH } from '@/lib/philCoach';
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
+import { PROFILE_PATH } from '@/lib/philCoach';
 
 type Memory = {
   id: string;
@@ -15,18 +17,27 @@ type Memory = {
   created_at: string;
 };
 
-function pathLabel(id: string): string {
-  if (id === PROFILE_PATH) return '来自你的资料';
-  return PHIL_PATHS.find(p => p.id === id)?.label ?? '';
+type Copy = ReturnType<typeof dict>['philCoach'];
+
+/** 小径名和日期都随语言变，所以从模块级函数挪进组件里现取 */
+function pathLabel(id: string, t: Copy): string {
+  if (id === PROFILE_PATH) return t.memories.fromProfile;
+  return t.experience.paths[id as keyof Copy['experience']['paths']]?.label ?? '';
 }
 
-function fmtDate(iso: string): string {
+function fmtDate(iso: string, t: Copy): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  return t.memories.date(d.getFullYear(), d.getMonth() + 1, d.getDate());
 }
 
-export default function PhilMemoriesManager() {
+/**
+ * 文案在客户端自己取。字典里有函数（date 这些），函数跨不过 server → client
+ * 那道序列化边界，整片切片当 props 传会让页面直接崩。只传 locale。
+ */
+export default function PhilMemoriesManager({ locale }: { locale: Locale }) {
+  const d = useMemo(() => dict(locale).philCoach, [locale]);
+  const t = d.memories;
   const [memories, setMemories] = useState<Memory[] | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -57,21 +68,21 @@ export default function PhilMemoriesManager() {
       <div className="flex items-end justify-between gap-4">
         <div>
           <div className="text-[11px] font-semibold tracking-[0.18em] text-moss uppercase">
-            phil-coach 记得的
+            {t.title}
           </div>
           <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">
-            这些是你在对话里亲手选择留住的片段。它们只有你自己能看到，随时可以删除。
+            {t.lede}
           </p>
         </div>
       </div>
 
       {memories.length === 0 ? (
         <p className="mt-5 text-[13px] leading-relaxed text-text-light">
-          还没有留住的对话。下次在
+          {t.empty.before}
           <Link href="/phil-coach" className="mx-1 text-forest-deep underline underline-offset-2">
-            回到自己
+            {t.empty.link}
           </Link>
-          聊到重要处，点一下「留住这一段」。
+          {t.empty.after}
         </p>
       ) : (
         <ul className="mt-5 space-y-3">
@@ -86,8 +97,8 @@ export default function PhilMemoriesManager() {
                     {m.takeaway || m.content.slice(0, 60)}
                   </p>
                   <p className="mt-1.5 text-[11px] text-text-light">
-                    {fmtDate(m.created_at)}
-                    {pathLabel(m.path_id) ? ` · ${pathLabel(m.path_id)}` : ''}
+                    {fmtDate(m.created_at, d)}
+                    {pathLabel(m.path_id, d) ? ` · ${pathLabel(m.path_id, d)}` : ''}
                   </p>
                 </div>
                 <button
@@ -96,13 +107,13 @@ export default function PhilMemoriesManager() {
                   type="button"
                   className="shrink-0 text-[12px] text-text-light underline-offset-2 transition-colors hover:text-coral hover:underline disabled:opacity-40"
                 >
-                  {deleting === m.id ? '删除中…' : '删除'}
+                  {deleting === m.id ? t.removing : t.remove}
                 </button>
               </div>
               {m.content && (
                 <details className="mt-2">
                   <summary className="cursor-pointer list-none text-[12px] text-text-light hover:text-forest-deep [&::-webkit-details-marker]:hidden">
-                    展开这段对话
+                    {t.expand}
                   </summary>
                   <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg bg-[#f4f4ef] p-3 text-[12px] leading-[1.9] text-text-secondary">
                     {m.content}

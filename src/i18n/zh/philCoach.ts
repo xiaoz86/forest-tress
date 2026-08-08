@@ -97,6 +97,219 @@ export const philCoach = {
   experience: {
     eyebrow: '现在就坐一会儿',
     title: '给自己十分钟',
+
+    // —— 四张小径卡那一屏 ——
+    chooseHint: '不用选对，只选最像今天的那一条。先从一条小径开始，剩下的慢慢聊。',
+    /**
+     * 四条小径的卡面文字。llmHint（给大模型的意图提示）留在 lib/philCoach.ts 里，
+     * 那个不展示给人看，也不用翻。
+     */
+    paths: {
+      heard: { label: '我想被听见', hint: '心里堵着点什么，先不急着解决' },
+      untangle: { label: '我有点乱，想理理', hint: '很多事挤在一起，想看清方向' },
+      choice: { label: '我在一个选择前纠结', hint: '两边都放不下，来回权衡' },
+      mirror: { label: '我想认识此刻的自己', hint: '停下来，照见现在的自己' },
+    },
+    enter: '开始对话',
+    entering: '正在准备对话…',
+
+    // 只有登录成员看得到：把注册资料导给 phil-coach 当记忆
+    profile: {
+      importing: 'phil-coach 正在读你的资料，好认识你…',
+      known: 'phil-coach 已经认识了你的资料。',
+      unknown: '让 phil-coach 先认识一下你的资料吧。',
+      reimport: '重新导入',
+      import: '导入我的资料',
+    },
+
+    /**
+     * 开场白。轮换着用，登录并导入过资料的才带称呼。
+     * 英文那边语序不一样，所以整句写成函数，不要在外面拼。
+     */
+    opening: {
+      named: {
+        v1: (name: string) => `Hi，${name}，今天想和我聊点什么？`,
+        v2: (name: string) => `Hi，${name}。此刻有什么想和我说说？`,
+        v3: (name: string) => `${name}，我在。你想从哪里开始聊起？`,
+        v4: (name: string) => `见到你了，${name}。今天想把什么带到这里？`,
+      },
+      anon: {
+        v1: 'Hi，今天想和我聊点什么？',
+        v2: '我在。此刻有什么想和我说说？',
+        v3: '不用想得太完整，你想从哪里开始聊起？',
+        v4: '见到你了。今天想把什么带到这里？',
+      },
+    },
+
+    // —— 进到对话里之后 ——
+    ephemeral: '这一段只在此刻发生，不会被保存 · 说完就散',
+    switchPath: '换一条小径',
+    /** 用户那一侧气泡的署名 */
+    me: '我',
+    transcribing: '正在把这段话变成文字…',
+    thinking: '我在听，等我把你刚才说的放在心里看一看…',
+    /** 复制整段对话时，给每一句加的前缀 */
+    copyPrefix: { coach: 'phil-coach：', me: '我：' },
+
+    send: '发送',
+    sending: '正在回应',
+    copy: '把这段留给自己',
+    copied: '已复制',
+    tidying: '正在顺一遍刚才的话…',
+    /** 输入框右下角的字数。到顶时换成另一句，不显示数字 */
+    draftLimit: '已到 1200 字上限',
+    draftCount: (used: number) => `${used}/1200 字 · ⌘/Ctrl + Enter 发送`,
+
+    // 把这一段存进记忆
+    keep: {
+      idle: '留住这一段',
+      saving: '正在留住…',
+      done: '已留住 · 下次它会记得',
+      failed: '没留上，再试一次',
+    },
+
+    againPath: '再走一条小径',
+    join: '成为森林里的一棵树',
+
+    error: {
+      send: '刚才这段没有送出去。可以稍后再试，或先把它留给自己。',
+      resend: '刚才这段没有送出去。可以稍后再试。',
+    },
+
+    // —— 语音 ——
+    voice: {
+      /** 录音/听写把字塞进输入框时撞上 1200 字上限 */
+      overflowAll: '输入框已到 1200 字，这段录音没有加入。',
+      overflowPart: '输入框已到 1200 字，这段话只有前面一部分被加入。',
+
+      autoplayBlocked: '浏览器挡住了自动播放',
+      autoplayCta: '点一下就能听',
+
+      opening: '正在打开麦克风…',
+      /** 录音中的计时，形如「正在听 · 0:07」 */
+      listening: (elapsed: string) => `正在听 · ${elapsed}`,
+      converting: '正在把话变成字…',
+
+      // 直接说给它听
+      speakLabel: '说完直接发给它',
+      speakTitle: '按一下开始说，说完直接发给它',
+      speakHint: '再次点击，说完直接发给它',
+      speakStop: '再次点击以完成录音',
+      speakPreparing: '正在准备',
+      cancelRecording: '取消这段录音',
+
+      // 听写进输入框
+      dictateLabel: '说话变文字',
+      dictateTitle: '说话变文字，先进输入框，可改再发',
+      dictateCancel: '取消听写',
+      dictateDone: '完成听写',
+      dictateExit: '退出听写',
+      dictatingPlaceholder: '说吧，字会出现在这里…',
+      draftPlaceholder: '照此刻真实的样子说就好…',
+
+      cancel: '取消',
+      done: '完成',
+      exit: '退出',
+
+      // 朗读回复
+      readOn: 'phil-coach 的回复会读出来 · 点一下关掉',
+      readOff: '打开后，phil-coach 的回复会用语音回复',
+      readPreparing: '准备中',
+      readStateOn: '语音回复 · 开',
+      readStateOff: '语音回复 · 关',
+      switchVoice: '点一下换个嗓音',
+    },
+
+    // —— 登记 / 等待开通那张浮层卡 ——
+    gate: {
+      close: '先关闭，回去看对话',
+      loginPrompt: '已经是森林里的树？',
+      loginLink: '直接登录（新窗口，不影响这段对话）',
+
+      // 免费期满，申请续期
+      expired: {
+        eyebrow: '一段旅程走完了',
+        title: '免费 3 个月已满',
+        bodyBefore: '你的免费使用期到了。想继续的话，点下面申请续期——我们确认后，会为你',
+        bodyAccent: '再开 3 个月的免费使用与答疑',
+        bodyAfter: '（通常很快）。你的对话记录都还在下面，随时可以回看。',
+        cta: '申请续期',
+        sending: '正在申请…',
+        sent: '申请已发出，我们确认后就能继续。',
+        check: '看看续上了吗',
+      },
+
+      // 登记过了，等主理人开通
+      waiting: {
+        eyebrow: '就快好了',
+        title: '已收到，正在为你开通',
+        bodyBefore: '我们已经收到你的登记，正在为你开通',
+        bodyAccent: '免费 3 个月的 phil-coach 使用与答疑',
+        bodyAfter: '（通常很快）。通过后，我们也会按你留下的微信号来加你、邀你进附近森林社群。你的对话记录都还在下面，开通后接着聊就行。',
+        check: '看看开通了吗',
+      },
+
+      // 第一次被拦下，留个称呼
+      register: {
+        eyebrow: '继续之前',
+        title: '留个称呼，继续免费用',
+        bodyBefore: '第一段路你已经走完了。留下称呼和微信号，我们确认后，附近森林为你',
+        bodyAccent: '继续开放免费 3 个月的 phil-coach 使用与答疑',
+        bodyMiddle: '（通常很快），并按微信号加你、邀你进社群——群里可以交流反馈，也有',
+        bodyAccent2: '真人教练答疑陪伴',
+        bodyAfter: '。你下面的对话记录一直都在，随时可以回看。',
+        namePlaceholder: '怎么称呼你',
+        contactPlaceholder: '微信号（或邮箱）',
+        cta: '提交登记',
+        sending: '正在提交…',
+        privacy: '这些信息只用于认识你、联系你，不做别的。',
+      },
+
+      checking: '看看去…',
+      stillPending: '还在路上，稍等一会儿再试试。',
+      failed: '没发出去，稍后再试一次。',
+      registerFailed: '没成功，稍后再试一次。',
+    },
+  },
+
+  // 体验区下面那块反馈 / 咨询真人教练
+  feedback: {
+    eyebrow: '说给我们听',
+    title: '留下你的反馈',
+    lede: '这条小径还很年轻。你用下来的感受、期待，或想被一个真实的人陪一程的心意，都可以留在这里。',
+
+    kindFeedback: '给点反馈',
+    kindCoach: '想咨询真人教练',
+
+    placeholderFeedback: '哪里让你觉得好、哪里还不对味，都可以说…',
+    placeholderCoach: '说说你想被怎样陪伴，或此刻在经历什么…',
+    contactFeedback: '想要回音的话，留个联系方式（选填）',
+    contactCoach: '留个联系方式，方便我们找到你（微信 / 邮箱）',
+
+    send: '送出',
+    sending: '正在送出',
+    failed: '没送出去，稍后再试一次。',
+
+    /** 送出之后。前半句两种情况共用，后半句按选的类型分岔 */
+    doneLead: '收到了，谢谢你愿意说。',
+    doneFeedback: '你的每一句反馈，都会让这条小径长得更像它该有的样子。',
+    doneCoach: '如果你留了联系方式，我们会尽快联系你，聊聊真人教练陪伴。',
+    doneAgain: '再说一点',
+  },
+
+  // 「phil-coach 记得的」——只在节点主人自己的节点页渲染
+  memories: {
+    title: 'phil-coach 记得的',
+    lede: '这些是你在对话里亲手选择留住的片段。它们只有你自己能看到，随时可以删除。',
+    /** 一条都还没留住时。中间「回到自己」是个指向 /phil-coach 的链接 */
+    empty: { before: '还没有留住的对话。下次在', link: '回到自己', after: '聊到重要处，点一下「留住这一段」。' },
+    /** 由注册资料导进去的那条，不属于任何一条小径 */
+    fromProfile: '来自你的资料',
+    expand: '展开这段对话',
+    remove: '删除',
+    removing: '删除中…',
+    /** 中文写「2026年8月8日」，英文那边语序不一样，所以整句写成函数 */
+    date: (y: number, m: number, d: number) => `${y}年${m}月${d}日`,
   },
 
   outro: {

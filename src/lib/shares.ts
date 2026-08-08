@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { tr } from '@/lib/contentTranslate';
+import type { Locale } from '@/lib/locale';
 
 export type ShareMediaKind = 'video' | 'image' | 'poster';
 export type ShareStatus = 'pending' | 'published' | 'rejected';
@@ -189,8 +191,16 @@ export function getPendingShares(content: ShareContent): ShareEntry[] {
   return content.shares.filter(share => share.status === 'pending');
 }
 
-export function getShareBadgeLabel(share: ShareEntry): string {
-  return share.badgeLabel || `${share.author} · ${share.authorLabel}`;
+/**
+ * 卡片下面那行小字，形如「联合创始人团队 · 首次分享」。
+ *
+ * 三个字段都是主理人在后台填的，所以逐段过 tr() 查对照表，
+ * 而不是把拼好的整句拿去查——拼句在表里根本不存在，查了必然回落成中文。
+ * 中间那个「·」两边都通用，不用翻。
+ */
+export function getShareBadgeLabel(share: ShareEntry, locale: Locale = 'zh'): string {
+  if (share.badgeLabel) return tr(share.badgeLabel, locale);
+  return `${tr(share.author, locale)} · ${tr(share.authorLabel, locale)}`;
 }
 
 export async function fetchShareContent(): Promise<ShareContent> {

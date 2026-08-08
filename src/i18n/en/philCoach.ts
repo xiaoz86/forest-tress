@@ -121,6 +121,192 @@ export const philCoach: typeof zhPhilCoach = {
   experience: {
     eyebrow: 'Sit here a while',
     title: 'Give yourself ten minutes',
+
+    chooseHint: 'There’s no right one. Just pick whichever sounds most like today—start on one path, and the rest can come slowly.',
+    paths: {
+      heard: { label: 'I want to be heard', hint: 'Something’s sitting in me; no rush to fix it' },
+      untangle: { label: 'I’m tangled, I want to sort it out', hint: 'Too much at once, and I want to see a direction' },
+      choice: { label: 'I’m stuck on a choice', hint: 'I can’t let go of either side' },
+      mirror: { label: 'I want to meet who I am right now', hint: 'Stop for a moment and see yourself as you are' },
+    },
+    enter: 'Start talking',
+    entering: 'Getting ready…',
+
+    profile: {
+      importing: 'phil-coach is reading your profile, to get to know you…',
+      known: 'phil-coach knows your profile.',
+      unknown: 'Let phil-coach get to know your profile first.',
+      reimport: 'Import again',
+      import: 'Import my profile',
+    },
+
+    opening: {
+      named: {
+        v1: (name: string) => `Hi ${name}, what would you like to talk about today?`,
+        v2: (name: string) => `Hi ${name}. What’s here for you right now?`,
+        v3: (name: string) => `${name}, I’m here. Where would you like to start?`,
+        v4: (name: string) => `Good to see you, ${name}. What would you like to bring here today?`,
+      },
+      anon: {
+        v1: 'Hi, what would you like to talk about today?',
+        v2: 'I’m here. What’s here for you right now?',
+        v3: 'It doesn’t have to be fully formed—where would you like to start?',
+        v4: 'Good to see you. What would you like to bring here today?',
+      },
+    },
+
+    ephemeral: 'This happens only now. Nothing is saved · it goes when you’re done',
+    switchPath: 'Take another path',
+    me: 'Me',
+    transcribing: 'Turning what you said into words…',
+    thinking: 'I’m listening—give me a moment to hold what you just said…',
+    copyPrefix: { coach: 'phil-coach: ', me: 'Me: ' },
+
+    send: 'Send',
+    sending: 'Responding',
+    copy: 'Keep this for yourself',
+    copied: 'Copied',
+    tidying: 'Smoothing out what you just said…',
+    draftLimit: 'You’ve reached the 1200-character limit',
+    draftCount: (used: number) => `${used}/1200 · ⌘/Ctrl + Enter to send`,
+
+    keep: {
+      idle: 'Keep this part',
+      saving: 'Keeping…',
+      done: 'Kept · it will remember next time',
+      failed: 'Didn’t save. Try again',
+    },
+
+    againPath: 'Walk another path',
+    join: 'Become a tree in the forest',
+
+    error: {
+      send: 'That didn’t go through. Try again in a moment, or keep it for yourself for now.',
+      resend: 'That didn’t go through. Try again in a moment.',
+    },
+
+    voice: {
+      overflowAll: 'The box is at 1200 characters, so this recording wasn’t added.',
+      overflowPart: 'The box is at 1200 characters, so only the first part of this was added.',
+
+      autoplayBlocked: 'Your browser blocked autoplay',
+      autoplayCta: 'Tap to listen',
+
+      opening: 'Opening the microphone…',
+      listening: (elapsed: string) => `Listening · ${elapsed}`,
+      converting: 'Turning speech into text…',
+
+      speakLabel: 'Speak and send straight to it',
+      speakTitle: 'Tap to start speaking; when you’re done it goes straight to it',
+      speakHint: 'Tap again, and it goes straight to it',
+      speakStop: 'Tap again to finish recording',
+      speakPreparing: 'Getting ready',
+      cancelRecording: 'Cancel this recording',
+
+      dictateLabel: 'Speech to text',
+      dictateTitle: 'Speech to text—goes into the box first, so you can edit before sending',
+      dictateCancel: 'Cancel dictation',
+      dictateDone: 'Finish dictation',
+      dictateExit: 'Exit dictation',
+      dictatingPlaceholder: 'Go ahead—your words will appear here…',
+      draftPlaceholder: 'Just say it the way it really is right now…',
+
+      cancel: 'Cancel',
+      done: 'Done',
+      exit: 'Exit',
+
+      readOn: 'phil-coach reads its replies aloud · tap to turn off',
+      readOff: 'Turn on to hear phil-coach reply in voice',
+      readPreparing: 'Getting ready',
+      readStateOn: 'Voice reply · on',
+      readStateOff: 'Voice reply · off',
+      switchVoice: 'Tap to switch voice',
+    },
+
+    gate: {
+      close: 'Close for now, back to the conversation',
+      loginPrompt: 'Already a tree in the forest?',
+      loginLink: 'Log in (new window, won’t affect this conversation)',
+
+      expired: {
+        eyebrow: 'One journey done',
+        title: 'Your free 3 months are up',
+        bodyBefore: 'Your free period has ended. To keep going, ask for an extension below—once we confirm, we’ll open',
+        bodyAccent: 'another 3 free months of phil-coach and support',
+        bodyAfter: ' (usually quickly). Your conversation is still below, there to read any time.',
+        cta: 'Ask for an extension',
+        sending: 'Sending…',
+        sent: 'Your request is in. Once we confirm, you can carry on.',
+        check: 'Check if it’s renewed',
+      },
+
+      waiting: {
+        eyebrow: 'Almost there',
+        title: 'Got it—we’re setting you up',
+        bodyBefore: 'We’ve received your details and we’re opening up',
+        bodyAccent: '3 free months of phil-coach and support',
+        bodyAfter: ' (usually quickly). Once you’re through, we’ll also add you on WeChat and invite you into the Nearby Forest group. Your conversation is still below—just carry on once it’s open.',
+        check: 'Check if it’s open',
+      },
+
+      register: {
+        eyebrow: 'Before you carry on',
+        title: 'Leave a name, keep using it free',
+        bodyBefore: 'You’ve walked the first stretch. Leave a name and a WeChat ID, and once we confirm, Nearby Forest will keep',
+        bodyAccent: '3 free months of phil-coach and support',
+        bodyMiddle: ' open for you (usually quickly). We’ll add you on WeChat and invite you into the group—where you can share feedback, and where there are also',
+        bodyAccent2: 'real coaches on hand',
+        bodyAfter: '. Your conversation below stays put, there to read any time.',
+        namePlaceholder: 'What should we call you',
+        contactPlaceholder: 'WeChat ID (or email)',
+        cta: 'Submit',
+        sending: 'Sending…',
+        privacy: 'We only use this to get to know you and reach you—nothing else.',
+      },
+
+      checking: 'Checking…',
+      stillPending: 'Still on its way—try again in a little while.',
+      failed: 'That didn’t send. Try again in a moment.',
+      registerFailed: 'That didn’t work. Try again in a moment.',
+    },
+  },
+
+  feedback: {
+    eyebrow: 'Tell us',
+    title: 'Leave your feedback',
+    lede: 'This path is still young. However it felt to use, what you hoped for, or a wish to be accompanied by a real person—all of it can be left here.',
+
+    kindFeedback: 'Give feedback',
+    kindCoach: 'Ask about a real coach',
+
+    placeholderFeedback: 'What worked for you, what still feels off—anything goes…',
+    placeholderCoach: 'Tell us how you’d like to be accompanied, or what you’re going through right now…',
+    contactFeedback: 'If you’d like a reply, leave a way to reach you (optional)',
+    contactCoach: 'Leave a way to reach you (WeChat / email)',
+
+    send: 'Send',
+    sending: 'Sending',
+    failed: 'That didn’t send. Try again in a moment.',
+
+    doneLead: 'Got it—thank you for saying it.',
+    doneFeedback: 'Every piece of feedback helps this path grow into what it should be.',
+    doneCoach: 'If you left a way to reach you, we’ll be in touch soon about being accompanied by a real coach.',
+    doneAgain: 'Say a bit more',
+  },
+
+  memories: {
+    title: 'What phil-coach remembers',
+    lede: 'These are the moments you chose to keep during a conversation. Only you can see them, and you can delete them any time.',
+    empty: {
+      before: 'Nothing kept yet. Next time you’re at',
+      link: 'coming back to yourself',
+      after: 'and you reach something that matters, tap “Keep this part”.',
+    },
+    fromProfile: 'From your profile',
+    expand: 'Open this conversation',
+    remove: 'Delete',
+    removing: 'Deleting…',
+    date: (y: number, m: number, d: number) => `${['January','February','March','April','May','June','July','August','September','October','November','December'][m - 1]} ${d}, ${y}`,
   },
 
   outro: {

@@ -110,8 +110,10 @@ function buildPathContext(pathId: unknown): string {
   if (typeof pathId !== 'string') return '';
   const path = getPhilPath(pathId);
   if (!path) return '';
-  const hint = path.llmHint || path.hint;
-  return `\n\n用户选择的小径：${path.label}\n这条小径怎么陪：${hint}\n沿着这个方向回应，但跟着 ta 此刻真实说的走，不要机械套用。`;
+  // 这一段是拼给大模型的提示词，不展示给人看，所以整段保持中文。
+  // 小径的中文名（label）已经搬进字典了，这里用 id 指代——llmHint 里
+  // 本来就写清楚了这条小径要怎么陪，模型不靠那个名字也认得出。
+  return `\n\n用户选择的小径：${path.id}\n这条小径怎么陪：${path.llmHint}\n沿着这个方向回应，但跟着 ta 此刻真实说的走，不要机械套用。`;
 }
 
 export async function POST(request: Request) {

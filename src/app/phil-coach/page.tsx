@@ -210,11 +210,11 @@ export default async function PhilCoachPage() {
               <h2 className="text-2xl font-semibold">{t.experience.title}</h2>
             </div>
 
-            <PhilCoachExperience />
+            <PhilCoachExperience locale={locale} />
           </section>
 
           {/* 反馈 / 咨询真人教练 */}
-          <PhilFeedback />
+          <PhilFeedback locale={locale} />
 
           {/* 尾部 */}
           <section className="mt-20 rounded-2xl border border-white/10 bg-white/[0.03] p-10 text-center max-md:p-6">

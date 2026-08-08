@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Nav from '@/components/Nav';
 import { dict } from '@/i18n';
 import { tr } from '@/lib/contentTranslate';
-import { getLocale } from '@/lib/locale';
+import { getLocale, type Locale } from '@/lib/locale';
 import ShareSubmitForm from '@/components/ShareSubmitForm';
 import { isAdminId } from '@/lib/admin';
 import { getAuthenticatedMemberId } from '@/lib/session';
@@ -74,12 +74,12 @@ export default async function SharesPage() {
 
           <div className="grid grid-cols-3 gap-7 max-lg:grid-cols-2 max-md:grid-cols-1">
             {publishedShares.map(share => (
-              <ShareCard key={share.id} share={share} />
+              <ShareCard key={share.id} share={share} locale={locale} />
             ))}
           </div>
 
           <section id="submit" className="mt-16 scroll-mt-28">
-            <ShareSubmitForm isLoggedIn={!!memberId} />
+            <ShareSubmitForm isLoggedIn={!!memberId} locale={locale} />
           </section>
         </div>
       </main>
@@ -87,28 +87,33 @@ export default async function SharesPage() {
   );
 }
 
-function ShareCard({ share }: { share: ShareEntry }) {
+/**
+ * 卡片上的字全是主理人在后台填的，代码里翻不了——每一段都过 tr()
+ * 查 content-en.json 那张对照表。表里没有的会原样回落成中文，
+ * 所以后台新加了分享之后要重跑一次 scripts/translate-content.mjs。
+ */
+function ShareCard({ share, locale }: { share: ShareEntry; locale: Locale }) {
   const inner = (
     <article className="group overflow-hidden rounded-lg border border-forest-deep/10 bg-white/72 shadow-[0_14px_50px_rgba(26,46,26,0.06)]">
-      <ShareMedia share={share} />
+      <ShareMedia share={share} locale={locale} />
       <div className="p-6">
         <div className="mb-4 flex items-center gap-3 text-[11px] tracking-[0.16em] text-coral uppercase">
           <span className="h-px w-7 bg-coral-soft/60" />
-          {share.kicker}
+          {tr(share.kicker, locale)}
         </div>
         <h2 className="text-[1.35rem] font-semibold leading-[1.45] text-forest-deep">
-          {share.title}
+          {tr(share.title, locale)}
         </h2>
         <p className="mt-3 text-[13.5px] leading-[1.85] text-text-secondary">
-          {share.summary}
+          {tr(share.summary, locale)}
         </p>
         <div className="mt-5 text-[12px] text-text-light">
-          {getShareBadgeLabel(share)}
+          {getShareBadgeLabel(share, locale)}
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
           {share.tags.map(tag => (
             <span key={tag} className="rounded-full border border-forest-deep/10 px-3 py-1 text-[12px] text-forest-deep/55">
-              {tag}
+              {tr(tag, locale)}
             </span>
           ))}
         </div>
@@ -124,7 +129,7 @@ function ShareCard({ share }: { share: ShareEntry }) {
   );
 }
 
-function ShareMedia({ share }: { share: ShareEntry }) {
+function ShareMedia({ share, locale }: { share: ShareEntry; locale: Locale }) {
   if (share.mediaKind === 'video' && share.mediaUrl) {
     return (
       <video
@@ -139,11 +144,11 @@ function ShareMedia({ share }: { share: ShareEntry }) {
   }
 
   if ((share.mediaKind === 'image' || share.mediaKind === 'poster') && share.mediaUrl) {
-    return <img src={share.mediaUrl} alt={share.title} className="aspect-video w-full object-cover bg-[#173018]" />;
+    return <img src={share.mediaUrl} alt={tr(share.title, locale)} className="aspect-video w-full object-cover bg-[#173018]" />;
   }
 
   if (share.posterUrl) {
-    return <img src={share.posterUrl} alt={share.title} className="aspect-video w-full object-cover bg-[#173018]" />;
+    return <img src={share.posterUrl} alt={tr(share.title, locale)} className="aspect-video w-full object-cover bg-[#173018]" />;
   }
 
   return (

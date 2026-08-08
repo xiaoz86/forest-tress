@@ -36,57 +36,64 @@ export const PHIL_ROLES: PhilRole[] = [
   },
 ];
 
-/** 一个引导步骤：coach 说一句话；若 input 为 true，则等你写下回应 */
+/**
+ * 一个引导步骤。
+ *
+ * 注意：beats 现在基本是死的。seedThread 只推到第一个 input 就 break，
+ * 而四条小径的第一拍都带 input——所以除了开场白，coach 这些话一句都渲染不出来，
+ * placeholder 更是全站没人读。真实对话早就交给 /api/phil-coach 动态生成了，
+ * 大模型拿的是 llmHint。这些文案留着当参考，别再花力气翻译它们。
+ */
 export type Beat = {
   coach: string;
   input?: boolean;
   placeholder?: string;
 };
 
+/**
+ * 小径的**结构**。卡面上的 label 和 hint 是给人看的，已经搬进
+ * src/i18n/{zh,en}/philCoach.ts 的 experience.paths 里按 id 取。
+ * 这里只留不随语言变的东西：id、配色、给大模型的意图提示。
+ */
 export type PhilPath = {
   id: string;
-  label: string;
-  hint: string;
   /** 主色调，用于卡片渐变 */
   mood: 'companion' | 'clarity' | 'choice' | 'mirror';
-  /** 给大模型的小径意图提示（不展示给用户） */
-  llmHint?: string;
+  /** 给大模型的小径意图提示（不展示给用户，所以不翻） */
+  llmHint: string;
   beats: Beat[];
 };
-
-const NAMED_OPENINGS = [
-  (name: string) => `Hi，${name}，今天想和我聊点什么？`,
-  (name: string) => `Hi，${name}。此刻有什么想和我说说？`,
-  (name: string) => `${name}，我在。你想从哪里开始聊起？`,
-  (name: string) => `见到你了，${name}。今天想把什么带到这里？`,
-];
-
-const ANONYMOUS_OPENINGS = [
-  'Hi，今天想和我聊点什么？',
-  '我在。此刻有什么想和我说说？',
-  '不用想得太完整，你想从哪里开始聊起？',
-  '见到你了。今天想把什么带到这里？',
-];
 
 export function normalizePhilProfileName(value: unknown): string {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, 60) : '';
 }
 
-/** 按次序轮换开场；只有已导入资料记忆时，调用方才传入用户称呼。 */
-export function getPhilOpening(profileName: string, variantIndex: number): string {
+/**
+ * 按次序轮换开场；只有已导入资料记忆时，调用方才传入用户称呼。
+ *
+ * 四句开场白本身是文案，住在字典里（experience.opening），
+ * 由调用方按语言取好再传进来——这里只管轮到第几句。
+ */
+export function getPhilOpening(
+  copy: PhilOpeningCopy,
+  profileName: string,
+  variantIndex: number,
+): string {
   const name = normalizePhilProfileName(profileName);
-  const variants = name ? NAMED_OPENINGS : ANONYMOUS_OPENINGS;
   const safeIndex = Number.isFinite(variantIndex) ? Math.abs(Math.trunc(variantIndex)) : 0;
-  const opening = variants[safeIndex % variants.length];
-  return typeof opening === 'function' ? opening(name) : opening;
+  const slot = (['v1', 'v2', 'v3', 'v4'] as const)[safeIndex % 4];
+  return name ? copy.named[slot](name) : copy.anon[slot];
 }
+
+export type PhilOpeningCopy = {
+  named: Record<'v1' | 'v2' | 'v3' | 'v4', (name: string) => string>;
+  anon: Record<'v1' | 'v2' | 'v3' | 'v4', string>;
+};
 
 /** 四条自我探索小径——每条都是一段可以一个人走完的十分钟 */
 export const PHIL_PATHS: PhilPath[] = [
   {
     id: 'heard',
-    label: '我想被听见',
-    hint: '心里堵着点什么，先不急着解决',
     mood: 'companion',
     llmHint:
       '这条小径以陪伴为主：接住、命名、允许情绪在场，基本不给建议、不推进解决；情绪被看见后，才轻轻问 ta 想不想多说一点或往前走。',
@@ -118,8 +125,6 @@ export const PHIL_PATHS: PhilPath[] = [
   },
   {
     id: 'untangle',
-    label: '我有点乱，想理理',
-    hint: '很多事挤在一起，想看清方向',
     mood: 'clarity',
     llmHint:
       '这条小径帮 ta 从一团乱里看清：先陪 ta 把最占地方的事说出来，再探索 ta 自己真正想要什么、为什么重要，最后才轻轻落到一小步。不替 ta 整理，让 ta 自己长出方向。',
@@ -160,8 +165,6 @@ export const PHIL_PATHS: PhilPath[] = [
   },
   {
     id: 'choice',
-    label: '我在一个选择前纠结',
-    hint: '两边都放不下，来回权衡',
     mood: 'choice',
     llmHint:
       '这条小径陪 ta 看清选择：探索纠结底下守护的价值、什么可控什么不可控、身体对各选项的反应；可以提议小而可逆的试探，但绝不替 ta 选。',
@@ -202,8 +205,6 @@ export const PHIL_PATHS: PhilPath[] = [
   },
   {
     id: 'mirror',
-    label: '我想认识此刻的自己',
-    hint: '停下来，照见现在的自己',
     mood: 'mirror',
     llmHint:
       '这条小径是照见自己：陪 ta 看见此刻状态、亮起来的时刻（潜能共鸣）与拦住 ta 的内在声音；对那个声音做温和的分离与理解（它想保护什么），最后回到 ta 更大的自己。',
