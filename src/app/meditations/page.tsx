@@ -44,7 +44,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
 
   // 音频「在哪」在这里就全部摘掉，只留「有没有」——播放统一走 stream 路由
   const paidPrograms = await fetchPaidPrograms(memberId);
-  const content = prepareClientContent(rawContent);
+  const content = prepareClientContent(rawContent, locale);
 
   // 不带 category（或给了个不存在的）就展示声音林。
   // 原来会默默落到第一个分类——进门就被塞进一条小径，看不到还有哪些路。

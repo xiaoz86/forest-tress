@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import { trDeep } from '@/lib/contentTranslate';
+import type { Locale } from '@/lib/locale';
 
 export type TrackMood =
   | 'forest' | 'daily' | 'emotion' | 'care' | 'healing' | 'body' | 'kindness' | 'sleep';
@@ -568,8 +570,11 @@ export function resolveAudioPath(track: MeditationTrack): string {
  * 由那条路由校验资格后现发一条短时效签名链接。这样即使有人扒源码、
  * 转发链接，拿到的也只是一个会 403 或很快过期的入口。
  */
-export function prepareClientContent(content: MeditationContent): MeditationContent {
-  return {
+export function prepareClientContent(
+  content: MeditationContent,
+  locale: Locale = 'zh',
+): MeditationContent {
+  const stripped: MeditationContent = {
     ...content,
     tracks: content.tracks.map(track => {
       const rest: MeditationTrack = { ...track, hasAudio: Boolean(resolveAudioPath(track)) };
@@ -578,6 +583,13 @@ export function prepareClientContent(content: MeditationContent): MeditationCont
       return rest;
     }),
   };
+  /*
+    分类名、音频标题这些字是主理人在后台填的，存在库里，代码改不了。
+    英文界面下按原文查一遍译文表（对照表由 scripts/translate-content.mjs 生成）：
+    库里的原文一个字不动，查不到就照旧显示中文。
+    id、mood、coverUrl 这些不含中文的字段查表时会原样返回，不用单独排除。
+  */
+  return trDeep(stripped, locale);
 }
 
 /**

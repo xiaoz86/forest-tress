@@ -1,13 +1,24 @@
+import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { getContent } from '@/lib/content';
 import Nav from '@/components/Nav';
+import { tr, trDeep } from '@/lib/contentTranslate';
+import { getLocale } from '@/lib/locale';
 
-export const metadata = {
-  title: '附近森林的来处 · 缘起、理念与生态',
-  description:
-    '为什么我们做附近森林，相信什么，怎么让独立的个体在爱中彼此连接、流动、共创。',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const zh = {
+    title: '附近森林的来处 · 缘起、理念与生态',
+    description:
+      '为什么我们做附近森林，相信什么，怎么让独立的个体在爱中彼此连接、流动、共创。',
+  };
+  const en = {
+    title: 'Where Nearby Forest comes from · Origin, beliefs, ecosystem',
+    description:
+      'Why we are building Nearby Forest, what we believe, and how independent people connect, flow, and create together in love.',
+  };
+  return (await getLocale()) === 'en' ? en : zh;
+}
 
 // Parse simple YAML-like list items from markdown content
 function parseItems(content: string): Array<Record<string, string | string[]>> {
@@ -65,18 +76,29 @@ const avatarColorMap: Record<string, string> = {
   gold: 'from-gold to-gold-light',
 };
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const locale = await getLocale();
+
+  /*
+    中文继续读 content/*.md，一个字不动——那是主理人自己维护的正文，
+    改 md 页面就要跟着变，这条链路不能断。
+    英文不改原文，而是把解析出来的每一句拿去查译文表
+    （src/i18n/generated/content-en.json，由 scripts/translate-content.mjs 生成）。
+    查不到就照旧显示中文：主理人刚改完还没重跑脚本时，降级成现状而不是出错。
+  */
   const origin = getContent('origin');
   const philosophy = getContent('philosophy');
   const voices = getContent('voices');
   const howItWorks = getContent('how-it-works');
   const offline = getContent('offline');
 
-  const originSections = parseOriginSections(origin.content);
-  const philItems = parseItems(philosophy.content);
-  const voiceItems = parseItems(voices.content);
-  const stepItems = parseItems(howItWorks.content);
-  const offlineItems = parseItems(offline.content);
+  // 先按中文原文分段（段落的键是「引言」「核心信念」这些中文小标题），再逐句查表
+  const originSections = trDeep(parseOriginSections(origin.content), locale);
+  const philItems = trDeep(parseItems(philosophy.content), locale);
+  const voiceItems = trDeep(parseItems(voices.content), locale);
+  const stepItems = trDeep(parseItems(howItWorks.content), locale);
+  const offlineItems = trDeep(parseItems(offline.content), locale);
+  const fm = (c: { frontmatter: Record<string, unknown> }) => trDeep(c.frontmatter, locale);
 
   return (
     <>
@@ -90,21 +112,21 @@ export default function AboutPage() {
             className="inline-flex items-center gap-1.5 text-[13px] text-text-light hover:text-forest-mid transition-colors"
           >
             <span>←</span>
-            <span>回首页</span>
+            <span>{tr('回首页', locale)}</span>
           </Link>
         </div>
         <div className="max-w-[680px] mx-auto">
           <div className="inline-block text-[11px] tracking-[3px] text-moss uppercase mb-5 font-medium">
-            来处
+            {tr('来处', locale)}
           </div>
           <h1
             className="text-[clamp(2rem,4vw,2.8rem)] font-semibold tracking-normal text-forest-deep leading-[1.25] max-md:text-[28px]"
             style={{ fontFamily: 'var(--font-display)' }}
           >
-            附近森林的来处
+            {tr('附近森林的来处', locale)}
           </h1>
           <p className="mt-5 text-[15px] text-text-secondary leading-[1.95] max-w-[560px] mx-auto">
-            关于这片森林从哪里来，往哪里去。
+            {tr('关于这片森林从哪里来，往哪里去。', locale)}
           </p>
         </div>
       </header>
@@ -112,8 +134,8 @@ export default function AboutPage() {
       {/* === 缘起 === */}
       <section id="origin" className="py-24 px-10 bg-white max-md:py-16 max-md:px-7">
         <div className="text-center max-w-[720px] mx-auto mb-14">
-          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{String(origin.frontmatter.label)}</div>
-          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35]">{String(origin.frontmatter.title)}</h2>
+          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{String(fm(origin).label)}</div>
+          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35]">{String(fm(origin).title)}</h2>
         </div>
         <div className="max-w-[720px] mx-auto">
           {originSections['引言']?.map((text, i) => (
@@ -151,28 +173,16 @@ export default function AboutPage() {
       {/* === 理念 === */}
       <section id="philosophy" className="py-24 px-10 bg-warm-cream max-md:py-16 max-md:px-7">
         <div className="text-center max-w-[760px] mx-auto mb-10">
-          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">生态理念</div>
-          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-4">
-            每一棵树，<br />都以自己的方式生长
-          </h2>
+          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{tr('生态理念', locale)}</div>
+          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-4">{tr('每一棵树，', locale)}<br />{tr('都以自己的方式生长', locale)}</h2>
         </div>
         <div className="max-w-[760px] mx-auto mb-14">
-          <p className="text-[15.5px] text-text-secondary leading-[2] mb-6">
-            每一棵树都是独一无二的。它按自己的节奏、用自己的方式生长；但没有哪一棵树真正独自长成。看不见的地下，根系悄然相连，彼此支撑，也彼此滋养。
-          </p>
-          <p className="text-[15.5px] text-text-secondary leading-[2] mb-6">
-            人也一样。每个人的路不同，但都需要被理解，也需要和信任的人一起做些什么。
-          </p>
-          <p className="text-[15.5px] text-text-secondary leading-[2] mb-8">
-            附近森林就是在试着做这件事——让人慢下来，遇到同频的人，一起把想法变成真实的事。
-          </p>
-          <div className="font-serif text-[1.05rem] font-semibold text-forest-deep leading-[1.8] py-6 px-7 bg-white/70 rounded-lg border-l border-coral-soft">
-            我们希望科技，尤其是人工智能，帮助人更深地理解自己、靠近他人，而不是取代人与人之间真实的相遇。
-          </div>
+          <p className="text-[15.5px] text-text-secondary leading-[2] mb-6">{tr('每一棵树都是独一无二的。它按自己的节奏、用自己的方式生长；但没有哪一棵树真正独自长成。看不见的地下，根系悄然相连，彼此支撑，也彼此滋养。', locale)}</p>
+          <p className="text-[15.5px] text-text-secondary leading-[2] mb-6">{tr('人也一样。每个人的路不同，但都需要被理解，也需要和信任的人一起做些什么。', locale)}</p>
+          <p className="text-[15.5px] text-text-secondary leading-[2] mb-8">{tr('附近森林就是在试着做这件事——让人慢下来，遇到同频的人，一起把想法变成真实的事。', locale)}</p>
+          <div className="font-serif text-[1.05rem] font-semibold text-forest-deep leading-[1.8] py-6 px-7 bg-white/70 rounded-lg border-l border-coral-soft">{tr('我们希望科技，尤其是人工智能，帮助人更深地理解自己、靠近他人，而不是取代人与人之间真实的相遇。', locale)}</div>
         </div>
-        <div className="text-center text-[11px] tracking-[0.2em] text-moss uppercase mb-7 font-semibold">
-          这片森林相信的六件事
-        </div>
+        <div className="text-center text-[11px] tracking-[0.2em] text-moss uppercase mb-7 font-semibold">{tr('这片森林相信的六件事', locale)}</div>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-7 max-w-[1100px] mx-auto">
           {philItems.map((item, i) => (
             <div key={i} className="group relative p-9 bg-white/70 rounded-lg border border-moss/10 transition-all duration-300 overflow-hidden hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_12px_36px_rgba(26,46,26,0.05)]">
@@ -191,11 +201,9 @@ export default function AboutPage() {
       <section id="voices" className="py-24 px-10 bg-gradient-to-br from-forest-deep via-[#1f3a1f] to-forest-mid relative overflow-hidden max-md:py-16 max-md:px-7">
         <div className="absolute inset-0 bg-[linear-gradient(160deg,rgba(255,255,255,0.045),transparent_42%,rgba(232,201,160,0.045))] pointer-events-none" />
         <div className="text-center max-w-[720px] mx-auto mb-14 relative z-[2]">
-          <div className="inline-block text-xs tracking-[3px] text-coral-soft uppercase mb-4 font-medium">{String(voices.frontmatter.label)}</div>
-          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-white leading-[1.35] mb-4">
-            在这片森林里，<br />连接正在发生
-          </h2>
-          <p className="text-[15px] text-white/55 leading-[1.8]">{String(voices.frontmatter.description)}</p>
+          <div className="inline-block text-xs tracking-[3px] text-coral-soft uppercase mb-4 font-medium">{String(fm(voices).label)}</div>
+          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-white leading-[1.35] mb-4">{tr('在这片森林里，', locale)}<br />{tr('连接正在发生', locale)}</h2>
+          <p className="text-[15px] text-white/55 leading-[1.8]">{String(fm(voices).description)}</p>
         </div>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-6 max-w-[1100px] mx-auto relative z-[2]">
           {voiceItems.map((item, i) => {
@@ -230,11 +238,9 @@ export default function AboutPage() {
       {/* === 运作方式 === */}
       <section id="how-it-works" className="py-24 px-10 bg-warm-cream max-md:py-16 max-md:px-7">
         <div className="text-center max-w-[720px] mx-auto mb-14">
-          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{String(howItWorks.frontmatter.label)}</div>
-          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-4">
-            从一棵树，<br />到一片森林
-          </h2>
-          <p className="text-[15px] text-text-secondary leading-[1.8]">{String(howItWorks.frontmatter.description)}</p>
+          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{String(fm(howItWorks).label)}</div>
+          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-4">{tr('从一棵树，', locale)}<br />{tr('到一片森林', locale)}</h2>
+          <p className="text-[15px] text-text-secondary leading-[1.8]">{String(fm(howItWorks).description)}</p>
         </div>
         <div className="max-w-[840px] mx-auto relative">
           <div className="absolute left-[23px] top-2 bottom-6 w-px bg-gradient-to-b from-coral-soft via-leaf to-mist max-md:left-[21px]" />
@@ -267,9 +273,9 @@ export default function AboutPage() {
       {/* === 线下活动 === */}
       <section className="py-24 px-10 bg-cream max-md:py-16 max-md:px-7">
         <div className="text-center max-w-[720px] mx-auto mb-14">
-          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{String(offline.frontmatter.label)}</div>
-          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-4">{String(offline.frontmatter.title)}</h2>
-          <p className="text-[15px] text-text-secondary leading-[1.8]">{String(offline.frontmatter.description)}</p>
+          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{String(fm(offline).label)}</div>
+          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-4">{String(fm(offline).title)}</h2>
+          <p className="text-[15px] text-text-secondary leading-[1.8]">{String(fm(offline).description)}</p>
         </div>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-5 max-w-[1100px] mx-auto">
           {offlineItems.map((item, i) => (
@@ -288,53 +294,33 @@ export default function AboutPage() {
       {/* === 织一张网 === */}
       <section className="pt-24 pb-10 px-10 bg-gradient-to-b from-warm-cream to-white text-center max-md:pt-16 max-md:pb-10 max-md:px-7">
         <div className="text-center max-w-[720px] mx-auto mb-14">
-          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">织一张网</div>
-          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35]">让光继续传递</h2>
+          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{tr('织一张网', locale)}</div>
+          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35]">{tr('让光继续传递', locale)}</h2>
         </div>
         <div className="max-w-[680px] mx-auto">
-          <p className="font-serif text-[clamp(1.1rem,2.2vw,1.4rem)] font-semibold text-forest-deep leading-[1.8] mb-8">
-            附近森林不是一个人能做成的事。<br />它是很多人一起在做的一件事。
-          </p>
-          <p className="text-[15px] text-text-secondary leading-[2] mb-6">
-            我能做的其实很少：把自己经历过的、学到的东西分享出来。如果刚好对谁有一点用，那就是最好的事了。
-          </p>
-          <p className="text-[15px] text-text-secondary leading-[2] mb-6">
-            慢慢地，让更多人找到彼此。也让这片森林，一点一点地长出来。
-          </p>
-          <div className="inline-block px-7 py-3.5 bg-white/70 rounded-lg font-serif text-[1rem] font-semibold text-forest-deep border border-moss/10 mt-4">
-            在一个容易让人各自待着的世界里，重新把一些人连在一起。
-          </div>
+          <p className="font-serif text-[clamp(1.1rem,2.2vw,1.4rem)] font-semibold text-forest-deep leading-[1.8] mb-8">{tr('附近森林不是一个人能做成的事。', locale)}<br />{tr('它是很多人一起在做的一件事。', locale)}</p>
+          <p className="text-[15px] text-text-secondary leading-[2] mb-6">{tr('我能做的其实很少：把自己经历过的、学到的东西分享出来。如果刚好对谁有一点用，那就是最好的事了。', locale)}</p>
+          <p className="text-[15px] text-text-secondary leading-[2] mb-6">{tr('慢慢地，让更多人找到彼此。也让这片森林，一点一点地长出来。', locale)}</p>
+          <div className="inline-block px-7 py-3.5 bg-white/70 rounded-lg font-serif text-[1rem] font-semibold text-forest-deep border border-moss/10 mt-4">{tr('在一个容易让人各自待着的世界里，重新把一些人连在一起。', locale)}</div>
         </div>
       </section>
 
       {/* === 社群联结 === */}
       <section id="community" className="pt-12 pb-24 px-10 bg-white max-md:pt-10 max-md:pb-16 max-md:px-7">
         <div className="text-center max-w-[780px] mx-auto mb-14">
-          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">社群联结</div>
-          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-8">
-            附近森林生态社区生长社群
-          </h2>
+          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{tr('社群联结', locale)}</div>
+          <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-8">{tr('附近森林生态社区生长社群', locale)}</h2>
           <div className="text-left text-[15.5px] text-text-secondary leading-[2]">
-            <p className="mb-5">
-              附近森林生态社区生长社群，是给注册和使用附近森林、愿意陪伴社区最新作品一起成长的超级创造者们，一个相聚、走近彼此的附近社群。
-            </p>
-            <p className="mb-5">
-              我们希望这里既是大家走近附近、交流联结的地方，也是可以自在共享想法💡的地方。
-            </p>
-            <p>
-              也期待听到大家使用 PhilCoach 等社区作品时，任何体验上的反馈。
-            </p>
+            <p className="mb-5">{tr('附近森林生态社区生长社群，是给注册和使用附近森林、愿意陪伴社区最新作品一起成长的超级创造者们，一个相聚、走近彼此的附近社群。', locale)}</p>
+            <p className="mb-5">{tr('我们希望这里既是大家走近附近、交流联结的地方，也是可以自在共享想法💡的地方。', locale)}</p>
+            <p>{tr('也期待听到大家使用 PhilCoach 等社区作品时，任何体验上的反馈。', locale)}</p>
           </div>
         </div>
 
         <div className="text-center max-w-[720px] mx-auto mb-10">
-          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">联系我们</div>
-          <h3 className="font-serif text-[clamp(1.45rem,3vw,1.9rem)] font-bold text-forest-deep leading-[1.4] mb-4">
-            从一次真实的招呼开始
-          </h3>
-          <p className="text-[15px] text-text-secondary leading-[1.9]">
-            想进一步了解、加入社群，或分享使用中的感受，可以添加两位创始人的微信。
-          </p>
+          <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{tr('联系我们', locale)}</div>
+          <h3 className="font-serif text-[clamp(1.45rem,3vw,1.9rem)] font-bold text-forest-deep leading-[1.4] mb-4">{tr('从一次真实的招呼开始', locale)}</h3>
+          <p className="text-[15px] text-text-secondary leading-[1.9]">{tr('想进一步了解、加入社群，或分享使用中的感受，可以添加两位创始人的微信。', locale)}</p>
         </div>
 
         <div className="grid grid-cols-2 gap-7 max-w-[820px] mx-auto max-md:grid-cols-1">
@@ -370,21 +356,17 @@ export default function AboutPage() {
 
       {/* === 回到主页 CTA === */}
       <section className="py-20 px-10 bg-forest-deep text-center max-md:py-14 max-md:px-7">
-        <h2 className="font-serif text-[clamp(1.4rem,2.8vw,1.8rem)] font-bold text-white mb-6 leading-[1.4]">
-          也想把自己这棵树，放进森林？
-        </h2>
+        <h2 className="font-serif text-[clamp(1.4rem,2.8vw,1.8rem)] font-bold text-white mb-6 leading-[1.4]">{tr('也想把自己这棵树，放进森林？', locale)}</h2>
         <Link
           href="/#join"
           className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-bold text-[15px] rounded-full no-underline shadow-[0_4px_24px_rgba(212,160,160,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(212,160,160,0.45)] transition-all"
-        >
-          种下一棵树
-        </Link>
+        >{tr('种下一棵树', locale)}</Link>
       </section>
 
       {/* === Footer === */}
       <footer className="bg-forest-deep py-10 px-8 text-white/45 text-center text-[11px] border-t border-white/5 max-md:px-7">
         <p>附近森林 · Nearby Forest</p>
-        <p className="mt-1.5 text-white/30">让独立的个体彼此连接、流动、共创</p>
+        <p className="mt-1.5 text-white/30">{tr('让独立的个体彼此连接、流动、共创', locale)}</p>
       </footer>
     </>
   );
