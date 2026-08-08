@@ -1,6 +1,10 @@
 /* eslint-disable @next/next/no-img-element */
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
+import { dict } from '@/i18n';
+import { tr } from '@/lib/contentTranslate';
+import { getLocale } from '@/lib/locale';
 import ShareSubmitForm from '@/components/ShareSubmitForm';
 import { isAdminId } from '@/lib/admin';
 import { getAuthenticatedMemberId } from '@/lib/session';
@@ -8,16 +12,18 @@ import { fetchShareContent, getPublishedShares, getShareBadgeLabel, type ShareEn
 
 export const dynamic = 'force-dynamic';
 
-export const metadata = {
-  title: '林间分享 · 附近森林',
-  description: '附近森林里超级个体的作品、产品、活动与体验片段。',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = dict(await getLocale()).shares;
+  return { title: t.metaTitle, description: t.metaDescription };
+}
 
 export default async function SharesPage() {
-  const [content, memberId] = await Promise.all([
+  const [content, memberId, locale] = await Promise.all([
     fetchShareContent(),
     getAuthenticatedMemberId(),
+    getLocale(),
   ]);
+  const t = dict(locale).shares;
   const isAdmin = isAdminId(memberId);
   const publishedShares = getPublishedShares(content);
 
@@ -30,16 +36,16 @@ export default async function SharesPage() {
             <div className="max-w-[720px]">
               <div className="mb-8 h-px w-20 bg-coral-soft/70" />
               <div className="mb-5 text-[11px] font-medium tracking-[3px] text-coral uppercase">
-                {content.eyebrow}
+                {tr(content.eyebrow, locale)}
               </div>
               <h1
                 className="whitespace-pre-line text-[clamp(2.2rem,4.6vw,3.6rem)] font-semibold leading-[1.22] text-forest-deep"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
-                更多超级个体的分享
+                {t.heroTitle}
               </h1>
               <p className="mt-6 max-w-[620px] text-[15px] leading-[2] text-text-secondary">
-                有些价值，需要先被人真实地进入。这里会慢慢放下有温度的超级个体带来的作品、产品、活动和体验。
+                {t.heroLede}
               </p>
             </div>
             <div className="flex gap-3 max-md:mt-8">
@@ -47,20 +53,20 @@ export default async function SharesPage() {
                 href="#submit"
                 className="rounded-full border border-forest-deep/12 bg-white/70 px-5 py-2.5 text-sm font-medium text-forest-deep/70 no-underline transition-colors hover:bg-forest-deep hover:text-white"
               >
-                带来我的分享
+                {t.submitCta}
               </a>
               <Link
                 href="/#experience"
                 className="rounded-full border border-forest-deep/12 bg-white/70 px-5 py-2.5 text-sm font-medium text-forest-deep/70 no-underline transition-colors hover:bg-forest-deep hover:text-white"
               >
-                回到首页
+                {t.backHome}
               </Link>
               {isAdmin && (
                 <Link
                   href="/shares/admin"
                   className="rounded-full border border-coral-soft/35 bg-coral-soft/10 px-5 py-2.5 text-sm font-medium text-coral no-underline"
                 >
-                  管理分享
+                  {t.manage}
                 </Link>
               )}
             </div>

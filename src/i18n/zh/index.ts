@@ -2,6 +2,8 @@ import { nav } from '@/i18n/zh/nav';
 import { home } from '@/i18n/zh/home';
 import { meditations } from '@/i18n/zh/meditations';
 import { philCoach } from '@/i18n/zh/philCoach';
+import { shares } from '@/i18n/zh/shares';
+import { creators } from '@/i18n/zh/creators';
 
 // about 切片（zh/about.ts、en/about.ts）已经译好，但先不接进来：
 // /about 的正文是从 content/*.md 里按中文小标题分段读出来的，不是写死在组件里的。
@@ -13,7 +15,7 @@ import { philCoach } from '@/i18n/zh/philCoach';
  *   node --env-file=.env.local scripts/translate-i18n.mjs <切片名>
  * 生成英文，然后人工过一遍调性最重的那几句。
  *
- * 只收「对外那几屏」：导航、首页、/about、声音林、phil-coach 介绍页。
+ * 只收「对外那几屏」：导航、首页、/about、声音林、phil-coach 介绍页、林间分享、创造者森林。
  * 注册、付款、管理员后台仍然是写死的中文——那几处涉及正在跑的收款流程，
  * 分开一步走，别在同一次改动里既动文案又动付费路径。
  *
@@ -24,4 +26,6 @@ export const zh = {
   home,
   meditations,
   philCoach,
+  shares,
+  creators,
 };

@@ -3,6 +3,8 @@ import { nav } from '@/i18n/en/nav';
 import { home } from '@/i18n/en/home';
 import { meditations } from '@/i18n/en/meditations';
 import { philCoach } from '@/i18n/en/philCoach';
+import { shares } from '@/i18n/en/shares';
+import { creators } from '@/i18n/en/creators';
 
 // about 切片先不接，原因见 src/i18n/zh/index.ts 里的说明。
 
@@ -12,4 +14,6 @@ export const en: typeof zh = {
   home,
   meditations,
   philCoach,
+  shares,
+  creators,
 };
