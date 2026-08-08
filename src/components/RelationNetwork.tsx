@@ -51,6 +51,22 @@ function labelHeight(scale: number): number {
   return 6 + (nameFontSize(scale) + cityFontSize(scale)) * 1.5;
 }
 
+/**
+ * 坐标进 DOM 之前先量化到 0.01px。
+ *
+ * 这些点是一路浮点算下来的，服务端和客户端会在最后一两位上分家
+ * （y1 服务端 200.7712323428285、客户端 200.77123234282848）。
+ * React 比的是属性字符串，于是每次加载都报一次
+ * 「hydrated but some attributes didn't match」，并且明确说
+ * 「This won't be patched up」——首屏那批连线用的一直是服务端的值。
+ *
+ * 差异在 1e-13 量级，量化到 0.01px 足够把它抹平，
+ * 而 0.01px 远在亚像素以下，画面上看不出任何区别。
+ */
+function snap(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 export default function RelationNetwork({
   graph,
   isMember = false,
@@ -97,8 +113,8 @@ export default function RelationNetwork({
   const R = 0.46 * Math.min(W, H); // layoutGraph 的最外圈半径
   const positions = layoutGraph(graph, W, H).map(p => ({
     ...p,
-    x: cx + ((p.x - W / 2) / R) * (availW / 2),
-    y: cy + ((p.y - H / 2) / R) * (availH / 2),
+    x: snap(cx + ((p.x - W / 2) / R) * (availW / 2)),
+    y: snap(cy + ((p.y - H / 2) / R) * (availH / 2)),
   }));
   const posById = new Map(positions.map(p => [p.id, p]));
 
