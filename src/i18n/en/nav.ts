@@ -15,6 +15,7 @@ export const nav: typeof zhNav = {
     shares: 'Create',
     creators: 'Nearby',
     about: 'About',
+    contact: 'Contact us',
   },
   ctaJoin: 'Plant a tree',
   ctaMember: 'My page',

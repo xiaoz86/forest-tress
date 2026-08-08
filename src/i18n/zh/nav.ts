@@ -8,6 +8,8 @@ export const nav = {
     shares: '个体创造',
     creators: '遇见附近',
     about: '生态社区',
+    /** 指向 /about 里那块二维码，不是新页面 */
+    contact: '联系我们',
   },
   ctaJoin: '种下一棵树',
   ctaMember: '个人中心',

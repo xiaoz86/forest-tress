@@ -306,7 +306,7 @@ export default async function AboutPage() {
       </section>
 
       {/* === 社群联结 === */}
-      <section id="community" className="pt-12 pb-24 px-10 bg-white max-md:pt-10 max-md:pb-16 max-md:px-7">
+      <section id="community" className="scroll-mt-24 pt-12 pb-24 px-10 bg-white max-md:pt-10 max-md:pb-16 max-md:px-7">
         <div className="text-center max-w-[780px] mx-auto mb-14">
           <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{tr('社群联结', locale)}</div>
           <h2 className="font-serif text-[clamp(1.8rem,3.5vw,2.4rem)] font-bold text-forest-deep leading-[1.35] mb-8">{tr('附近森林生态社区生长社群', locale)}</h2>
@@ -317,7 +317,9 @@ export default async function AboutPage() {
           </div>
         </div>
 
-        <div className="text-center max-w-[720px] mx-auto mb-10">
+        {/* 导航栏「联系我们」直接落到这里，所以要有自己的锚点。
+            scroll-mt 给悬浮导航留出高度，否则标题会被顶栏盖住。 */}
+        <div id="contact" className="scroll-mt-28 text-center max-w-[720px] mx-auto mb-10">
           <div className="inline-block text-xs tracking-[3px] text-moss uppercase mb-4 font-medium">{tr('联系我们', locale)}</div>
           <h3 className="font-serif text-[clamp(1.45rem,3vw,1.9rem)] font-bold text-forest-deep leading-[1.4] mb-4">{tr('从一次真实的招呼开始', locale)}</h3>
           <p className="text-[15px] text-text-secondary leading-[1.9]">{tr('想进一步了解、加入社群，或分享使用中的感受，可以添加两位创始人的微信。', locale)}</p>

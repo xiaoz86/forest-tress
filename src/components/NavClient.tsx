@@ -71,6 +71,10 @@ export default function NavClient({ locale, t }: Props) {
     { href: '/about', label: t.links.about, type: 'route', icon: '林' },
   ];
 
+  // 「联系我们」单拎出来：它落到 /about 里那块二维码，是个次级 CTA，
+  // 所以用描边胶囊，和上面那排纯文字链接区分开，不混在 baseLinks 里。
+  const contactHref = '/about#contact';
+
   // 登录态：挂载后问一次 /api/session。整个站内跳转期间不会变
   // （登录和退出都是整页加载），所以只问一次。
   useEffect(() => {
@@ -171,6 +175,12 @@ export default function NavClient({ locale, t }: Props) {
               {link.label}
             </Link>
           ))}
+          <Link
+            href={contactHref}
+            className="rounded-full border border-forest/20 px-4 py-1.5 text-[15px] no-underline transition-colors hover:border-forest/45 hover:text-forest"
+          >
+            {t.links.contact}
+          </Link>
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
@@ -274,6 +284,25 @@ export default function NavClient({ locale, t }: Props) {
                 <span className="text-[15px] font-medium text-[#33403a]">{link.label}</span>
               </Link>
             ))}
+            {/*
+              「联系我们」占满一行、用描边而不是实底——和上面那排一级入口
+              区分开，跟桌面端那颗胶囊是同一个意思。汉字符号取自
+              那一段的标题「从一次真实的招呼开始」。
+            */}
+            <Link
+              href={contactHref}
+              onClick={() => setMenuOpen(false)}
+              className="col-span-2 flex items-center gap-3 rounded-2xl border border-forest/20 px-4 py-3.5 no-underline transition-colors active:bg-forest/10"
+            >
+              <span
+                aria-hidden="true"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-paper-soft text-[15px] text-forest"
+                style={{ fontFamily: 'var(--font-serif)' }}
+              >
+                招
+              </span>
+              <span className="text-[15px] font-medium text-[#33403a]">{t.links.contact}</span>
+            </Link>
             {!pending && !memberId && !session?.legacy && (
               <Link
                 href="/login"
