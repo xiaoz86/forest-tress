@@ -59,6 +59,12 @@ export type PhilPath = {
   id: string;
   /** 主色调，用于卡片渐变 */
   mood: 'companion' | 'clarity' | 'choice' | 'mirror';
+  /**
+   * 小径的中文名，只拼进给大模型的提示词，不展示给用户，所以不随语言变。
+   * 卡面上那个会翻译的 label 在字典里（experience.paths），别混用：
+   * 提示词整段是中文写的，中间塞一个英文小径名会让上下文变碎。
+   */
+  llmLabel: string;
   /** 给大模型的小径意图提示（不展示给用户，所以不翻） */
   llmHint: string;
   beats: Beat[];
@@ -94,6 +100,7 @@ export type PhilOpeningCopy = {
 export const PHIL_PATHS: PhilPath[] = [
   {
     id: 'heard',
+    llmLabel: '我想被听见',
     mood: 'companion',
     llmHint:
       '这条小径以陪伴为主：接住、命名、允许情绪在场，基本不给建议、不推进解决；情绪被看见后，才轻轻问 ta 想不想多说一点或往前走。',
@@ -125,6 +132,7 @@ export const PHIL_PATHS: PhilPath[] = [
   },
   {
     id: 'untangle',
+    llmLabel: '我有点乱，想理理',
     mood: 'clarity',
     llmHint:
       '这条小径帮 ta 从一团乱里看清：先陪 ta 把最占地方的事说出来，再探索 ta 自己真正想要什么、为什么重要，最后才轻轻落到一小步。不替 ta 整理，让 ta 自己长出方向。',
@@ -165,6 +173,7 @@ export const PHIL_PATHS: PhilPath[] = [
   },
   {
     id: 'choice',
+    llmLabel: '我在一个选择前纠结',
     mood: 'choice',
     llmHint:
       '这条小径陪 ta 看清选择：探索纠结底下守护的价值、什么可控什么不可控、身体对各选项的反应；可以提议小而可逆的试探，但绝不替 ta 选。',
@@ -205,6 +214,7 @@ export const PHIL_PATHS: PhilPath[] = [
   },
   {
     id: 'mirror',
+    llmLabel: '我想认识此刻的自己',
     mood: 'mirror',
     llmHint:
       '这条小径是照见自己：陪 ta 看见此刻状态、亮起来的时刻（潜能共鸣）与拦住 ta 的内在声音；对那个声音做温和的分离与理解（它想保护什么），最后回到 ta 更大的自己。',

@@ -10,9 +10,6 @@ import {
 } from '@/lib/voiceServer';
 import type { VoiceAnalysis } from '@/lib/philCoachVoice';
 import { dict } from '@/i18n';
-
-/** 以字典里的键为准：lib 里加了小径却没配文案，这里会当场编译报错 */
-type PathId = keyof ReturnType<typeof dict>['philCoach']['experience']['paths'];
 import type { Locale } from '@/lib/locale';
 import {
   PHIL_PATHS,
@@ -22,6 +19,9 @@ import {
   normalizePhilProfileName,
   type PhilPath,
 } from '@/lib/philCoach';
+
+/** 以字典里的键为准：lib 里加了小径却没配文案，这里会当场编译报错 */
+type PathId = keyof ReturnType<typeof dict>['philCoach']['experience']['paths'];
 
 const MOOD_GRADIENT: Record<PhilPath['mood'], string> = {
   companion: 'bg-[linear-gradient(135deg,#cf9087_0%,#ead0bf_52%,#c7d8cb_100%)]',
