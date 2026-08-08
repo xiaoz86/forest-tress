@@ -1,4 +1,6 @@
 import type { NodeCard } from './supabase';
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 import type { ShareEntry } from './shares';
 
 // 默认收件人：两位主理人。可通过 NOTIFY_EMAILS 环境变量覆盖，逗号分隔支持多个。
@@ -254,45 +256,57 @@ export async function notifyNewNode(node: NodeCard): Promise<EmailSendResult> {
 // 给新成员本人发的「欢迎 + 登录入口」邮件
 // ──────────────────────────────────────────────────────────────────
 
-function buildWelcomeHtml(node: NodeCard, profileUrl: string, magicLink: string): string {
+function buildWelcomeHtml(
+  node: NodeCard,
+  profileUrl: string,
+  magicLink: string,
+  locale: Locale,
+): string {
+  const t = dict(locale).email.welcome;
   return `<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>欢迎加入附近森林</title></head>
+<head><meta charset="utf-8"><title>${escape(t.subject)}</title></head>
 <body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(26,46,26,0.08);">
     <div style="padding:32px 32px 20px;background:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#fff;">
-      <div style="font-size:13px;opacity:0.75;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · Welcome</div>
-      <h1 style="margin:0;font-size:22px;font-weight:700;">🌱 ${escape(node.name)}，你已成为森林的一棵树</h1>
+      <div style="font-size:13px;opacity:0.75;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">${escape(t.eyebrow)}</div>
+      <h1 style="margin:0;font-size:22px;font-weight:700;">${escape(t.heading(node.name || ''))}</h1>
     </div>
     <div style="padding:24px 32px 8px;color:#2a2a2a;font-size:14px;line-height:1.8;">
-      <p style="margin:0 0 12px;">这是你专属的个人页：</p>
+      <p style="margin:0 0 12px;">${escape(t.profileLead)}</p>
       <p style="margin:0 0 18px;"><a href="${profileUrl}" style="color:#2d4a2d;font-weight:600;text-decoration:underline;">${profileUrl}</a></p>
-      <p style="margin:0 0 12px;">下面这条「登录链接」可以让你随时回到个人页编辑信息、查看 AI 为你生成的连接推荐：</p>
+      <p style="margin:0 0 12px;">${escape(t.linkLead)}</p>
       <p style="margin:18px 0;text-align:center;">
         <a href="${magicLink}"
            style="display:inline-block;padding:12px 28px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">
-          点击登录我的节点
+          ${escape(t.cta)}
         </a>
       </p>
-      <p style="margin:0 0 6px;font-size:12px;color:#8a8a8a;">链接 7 天内有效。如未点击就过期，可随时回到 nearby-forest.club/login 重新获取。</p>
+      <p style="margin:0 0 6px;font-size:12px;color:#8a8a8a;">${escape(t.expiry)}</p>
     </div>
     <div style="padding:18px 32px 24px;background:#faf8f2;font-size:12px;color:#8a8a8a;text-align:center;">
-      这封邮件由 nearby-forest.club 自动发送。
+      ${escape(t.footer)}
     </div>
   </div>
 </body>
 </html>`;
 }
 
-function buildWelcomeText(node: NodeCard, profileUrl: string, magicLink: string): string {
+function buildWelcomeText(
+  node: NodeCard,
+  profileUrl: string,
+  magicLink: string,
+  locale: Locale,
+): string {
+  const t = dict(locale).email.welcome;
   return [
-    `欢迎加入附近森林，${node.name || ''}。`,
+    t.textGreeting(node.name || ''),
     `─────────────────────`,
-    `你的个人页：${profileUrl}`,
-    `登录链接（7 天内有效）：${magicLink}`,
+    t.textProfile(profileUrl),
+    t.textLink(magicLink),
     ``,
-    `点击登录链接即可回到个人页继续编辑信息、查看 AI 推荐。`,
-    `如链接过期，可在 nearby-forest.club/login 重新获取。`,
+    t.textBody,
+    t.textExpiry,
   ].join('\n');
 }
 
@@ -303,6 +317,8 @@ function buildWelcomeText(node: NodeCard, profileUrl: string, magicLink: string)
 export async function notifyWelcome(
   node: NodeCard,
   magicLink: string,
+  /** 发信那一刻这个人在站上看到的语言，收到的信就是哪种语言 */
+  locale: Locale,
 ): Promise<EmailSendResult> {
   const to = (node.email || '').trim();
   if (!to) {
@@ -313,7 +329,7 @@ export async function notifyWelcome(
 
   const from = process.env.NOTIFY_FROM?.trim() || '';
   const profileUrl = `${getSiteOrigin()}/creators/${node.id}`;
-  const subject = `🌱 欢迎加入附近森林`;
+  const subject = dict(locale).email.welcome.subject;
 
   return sendCriticalEmail(
     'welcome',
@@ -321,8 +337,8 @@ export async function notifyWelcome(
       from,
       to: [to],
       subject,
-      html: buildWelcomeHtml(node, profileUrl, magicLink),
-      text: buildWelcomeText(node, profileUrl, magicLink),
+      html: buildWelcomeHtml(node, profileUrl, magicLink, locale),
+      text: buildWelcomeText(node, profileUrl, magicLink, locale),
     },
     `welcome/${node.id}`,
   );
@@ -335,6 +351,8 @@ export async function notifyWelcome(
 export async function notifyLoginLink(
   node: NodeCard,
   magicLink: string,
+  /** 申请登录链接那一刻的语言 */
+  locale: Locale,
 ): Promise<EmailSendResult> {
   const to = (node.email || '').trim();
   if (!to) return { ok: false, reason: 'skipped' };
@@ -342,28 +360,29 @@ export async function notifyLoginLink(
 
   const from = process.env.NOTIFY_FROM?.trim() || '';
   const profileUrl = `${getSiteOrigin()}/creators/${node.id}`;
-  const subject = `🔐 你的附近森林登录链接`;
+  const t = dict(locale).email.loginLink;
+  const subject = t.subject;
 
   const html = `<!DOCTYPE html>
 <html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:28px 32px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
-    <h2 style="margin:0 0 12px;font-size:18px;color:#2d4a2d;">登录到你的节点</h2>
-    <p style="font-size:14px;color:#2a2a2a;line-height:1.8;margin:0 0 18px;">点击下方按钮，即可登录到 ${escape(node.name)} 的个人页。</p>
+    <h2 style="margin:0 0 12px;font-size:18px;color:#2d4a2d;">${escape(t.heading)}</h2>
+    <p style="font-size:14px;color:#2a2a2a;line-height:1.8;margin:0 0 18px;">${escape(t.body(node.name || ''))}</p>
     <p style="text-align:center;margin:18px 0;">
-      <a href="${magicLink}" style="display:inline-block;padding:12px 28px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">点击登录</a>
+      <a href="${magicLink}" style="display:inline-block;padding:12px 28px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">${escape(t.cta)}</a>
     </p>
-    <p style="font-size:12px;color:#8a8a8a;margin:0 0 4px;">链接 7 天内有效。如果不是你本人申请，请忽略。</p>
-    <p style="font-size:12px;color:#8a8a8a;margin:0;">个人页：<a href="${profileUrl}" style="color:#2d4a2d;">${profileUrl}</a></p>
+    <p style="font-size:12px;color:#8a8a8a;margin:0 0 4px;">${escape(t.expiry)}</p>
+    <p style="font-size:12px;color:#8a8a8a;margin:0;">${escape(t.profileLabel)}<a href="${profileUrl}" style="color:#2d4a2d;">${profileUrl}</a></p>
   </div>
 </body></html>`;
 
   const text = [
-    `登录到你的节点（附近森林）`,
-    `点击下方链接即可登录（7 天内有效）：`,
+    t.textTitle,
+    t.textLead,
     magicLink,
     ``,
-    `如果不是你本人申请，请忽略此邮件。`,
-    `个人页：${profileUrl}`,
+    t.textIgnore,
+    t.textProfile(profileUrl),
   ].join('\n');
 
   return sendCriticalEmail(

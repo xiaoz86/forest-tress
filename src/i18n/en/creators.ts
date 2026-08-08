@@ -27,6 +27,12 @@ export const creators: typeof zhCreators = {
       ? '1 tree growing in the forest'
       : `${count} trees growing in the forest`,
 
+  tree: {
+    unnamed: 'An unnamed tree',
+    closer: 'Come closer',
+    network: (name: string) => `Keyword network for ${name}`,
+  },
+
   // 页尾那一屏
   cta: {
     title: 'Want to plant your own tree in the forest?',

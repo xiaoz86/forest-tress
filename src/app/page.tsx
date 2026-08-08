@@ -235,7 +235,7 @@ export default async function Home() {
       >
         <div className="pointer-events-none absolute left-1/2 top-0 h-px w-[min(760px,78vw)] -translate-x-1/2 bg-gradient-to-r from-transparent via-forest/15 to-transparent" />
         <div className="relative">
-          <JoinSection t={t.join} />
+          <JoinSection locale={locale} />
         </div>
       </section>
 

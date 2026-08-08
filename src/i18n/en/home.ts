@@ -193,6 +193,147 @@ export const home: typeof zhHome = {
     loginLead: 'One node card and you are in the forest; that is also how you sign up. Already here?',
     loginLink: 'Sign in with email',
     collapse: 'Hide the form',
+
+    wizard: {
+      progress: (total: number) => `${total} steps to finish your node card and let the forest see you`,
+      stepAria: (n: number) => `Step ${n}`,
+
+      // 显示成英文，入库仍是中文原值（见 zh 那份的说明）
+      topics: {
+        health: 'Health / Body-mind',
+        lifeEd: 'Life education',
+        aesthetics: 'Aesthetics / Design',
+        mindfulness: 'Mindfulness / Meditation',
+        psychology: 'Psychology / Coaching',
+        content: 'Content creation',
+        business: 'Business for good',
+        community: 'Community building',
+        family: 'Parenting / Family',
+        tech: 'AI / Tech',
+        craft: 'Craft / Floristry',
+        reading: 'Reading / Writing',
+      },
+
+      step1: {
+        title: 'Who are you?',
+        subtitle: 'Let people in the forest get to know you',
+        name: 'Your name / what you go by',
+        namePlaceholder: 'What should we call you',
+        city: 'Which city are you in',
+        cityPlaceholder: 'e.g. Shenyang, Beijing, Chengdu',
+        intro: 'Introduce yourself in one line',
+        introPlaceholder: 'What you are doing now, what you care about, or simply what kind of person you are',
+      },
+
+      step2: {
+        title: 'Which soil does your seed belong to?',
+        subtitle: 'Pick the areas you care about—up to 6',
+        hint: 'At least 1, at most 6',
+      },
+
+      step3: {
+        title: 'What you are here for…',
+        subtitle: 'Your experience, what you can offer, what you are looking for',
+        experience: 'Your experience, strengths, and what makes you you',
+        experiencePlaceholder: 'Where do you have experience? What is your particular strength?',
+        offer: 'What can you offer others?',
+        offerPlaceholder: 'e.g. I can share what I have learned about meditation, offer brand design advice, or run a reading group…',
+        seek: 'What kind of connection are you looking for?',
+        seekPlaceholder: 'e.g. partners to co-create an event with, people working in life education, or simply more eyes on the things I make…',
+      },
+
+      step4: {
+        title: 'What is beauty, in your life?',
+        subtitle: 'In Nearby Forest, beauty is not a right answer—it is what you have actually lived',
+        prose1: 'Beauty is a sweetness on the tongue, the moment tea tastes exactly right.',
+        prose2: 'Beauty is range—what your eyes have taken in from all the places you have been.',
+        prose3: 'Beauty comes from instinct, from the heart; it steps away from sameness, and lives in the moments no one could copy.',
+        words: { w1: 'Sweetness', w2: 'Range', w3: 'Instinct', w4: 'Realness', w5: 'Uncopyable' },
+        cards: {
+          taste: { label: 'A taste', body: 'The sweetness of the first sip of morning tea' },
+          scene: { label: 'A scene', body: 'Steam rising from a street stall at dusk' },
+          moment: { label: 'A moment', body: 'An unplanned conversation in an unfamiliar city' },
+          feeling: { label: 'A feeling', body: 'The quiet fullness after finishing something' },
+        },
+        moment: 'One moment of beauty in your life—',
+        momentPlaceholder: 'A cup of tea, a walk, a person, a thing… what made you think, this is it?',
+        create: 'What beauty do you want to make, or protect?',
+        createPlaceholder: 'Maybe a product, an experience, a space, a way of living…',
+        hobby: 'What you love doing',
+        hobbyPlaceholder: 'What moves you outside of work—hiking, baking, jazz, independent film…',
+        momentPrefix: '[Moment] ',
+        createPrefix: '[Want to make or protect] ',
+      },
+
+      step5: {
+        title: 'What is the seed you are carrying?',
+        subtitle: 'A dream, a thought, a plan not yet begun—any of it counts',
+        placeholder: 'e.g. I want to make a podcast about life education / open a neighbourhood flower shop / turn ten years of yoga into a course / I am not sure yet, but I want to find a direction…',
+      },
+
+      step6: {
+        title: 'Your work / projects (optional)',
+        subtitle: 'A newsletter, podcast, product, or service · once you join, it shows up on your own shelf',
+        workNo: (n: number) => `Work #${n}`,
+        removeWork: (n: number) => `Remove work ${n}`,
+        titlePlaceholder: 'Title (e.g. 1-on-1 coaching / the podcast “A Random Walk”)',
+        descPlaceholder: 'One-line description (optional)',
+        urlPlaceholder: 'Link (optional, https://…)',
+        addFirst: '+ Add your first piece',
+        addMore: '+ Add another',
+        max: (n: number) => `${n} at most · you can keep adding on your own page after joining`,
+        skip: 'You can skip this—after joining you can add pieces and change covers any time.',
+        cover: {
+          add: 'Add a cover image (optional)',
+          hint: 'Landscape 16:9 works best · ≤ 5MB',
+          replace: 'Click to replace',
+          remove: 'Remove cover',
+          uploadAria: (n: number) => `Upload a cover for work ${n}`,
+          changeAria: (n: number) => `Replace the cover for work ${n}`,
+          previewAlt: (n: number) => `Cover preview for work ${n}`,
+        },
+      },
+
+      step7: {
+        title: 'How can we reach you?',
+        subtitle: 'The forest sends your welcome letter and login link by email',
+        photo: 'Photo (optional)',
+        photoUploadAria: 'Upload a photo',
+        photoChangeAria: 'Replace photo',
+        photoAlt: 'Preview',
+        photoHint: 'A photo you are happy to be seen in',
+        photoSpec: 'JPG / PNG / WebP / HEIC · ≤ 5MB',
+        email: 'Email',
+        emailPlaceholder: 'Login links and notices go here',
+        emailHint: 'Required · this is how you get back to your page later',
+        wechat: 'WeChat (optional)',
+        wechatPlaceholder: 'So people in the forest can add you',
+      },
+
+      prev: '← Back',
+      next: 'Next →',
+      lastStep: 'Last step · how to reach you →',
+      submit: '🌱 Plant my seed',
+      submitting: 'Planting…',
+      consent: 'By submitting you agree to let the forest keep your details, and use them to introduce you to people in tune with you.',
+
+      done: {
+        title: 'Your seed is planted',
+        sent: (email: string) => `A welcome letter and login link are on their way to ${email}.`,
+        sentHint: 'Check your inbox and spam folder—open the link to carry on editing.',
+        mailFailed: 'Your node is created, but the welcome email could not be sent just now.',
+        mailFailedHint: (email: string) => `Head to the login page shortly and enter ${email} to get a fresh login link.`,
+      },
+
+      error: {
+        emailTaken: 'That email is already in the forest. Go to /login and enter it to get back to your node.',
+        emailInvalid: 'Please enter a valid email.',
+        submitFailed: 'That didn’t submit. Please try again shortly',
+        network: 'Network trouble. Please try again shortly',
+        badImage: 'Please upload a JPG / PNG / WebP / HEIC image',
+        imageTooLarge: 'That image is too large—please compress it to under 5MB',
+      },
+    },
   },
 
   footer: {

@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import type { Dictionary } from '@/i18n';
+import { useEffect, useMemo, useState } from 'react';
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 import JoinForm from './JoinForm';
 
 /**
@@ -12,10 +13,19 @@ import JoinForm from './JoinForm';
  *
  * 用 useState 控制，第一次 expanded 后自动 scrollIntoView，让用户看到表单出现。
  *
- * 这一屏的文案由首页从服务端传进来（客户端不自己判断语言）。
- * 里面那个 7 步向导（JoinForm）还是中文，那一屏另外走一轮。
+ * 文案只收 locale，不收字典切片。
+ *
+ * 这一屏原来是把 t={t.join} 整片传进来的，能跑是因为那片里全是字符串。
+ * 后来 join 底下多了 7 步向导（wizard），里面为了英文单复数用了函数，
+ * 函数跨不过 server → client 那道序列化边界，整个首页就崩在
+ * 「Functions cannot be passed directly to Client Components」——
+ * 而且 tsc 和 build 都查不出来，只有真在浏览器里打开才看得见。
+ *
+ * 这不违反「客户端不要自己判断语言」：locale 仍是服务端算好的，
+ * 这边不读 cookie，不会先渲染中文再闪成英文。
  */
-export default function JoinSection({ t }: { t: Dictionary['home']['join'] }) {
+export default function JoinSection({ locale }: { locale: Locale }) {
+  const t = useMemo(() => dict(locale).home.join, [locale]);
   const [open, setOpen] = useState(false);
 
   // 支持外部锚点跳转直接展开（hash = #join 时自动展开 + 滚动）
@@ -79,7 +89,7 @@ export default function JoinSection({ t }: { t: Dictionary['home']['join'] }) {
 
   return (
     <div id="join-form" className="scroll-mt-24">
-      <JoinForm />
+      <JoinForm locale={locale} />
       <div className="text-center mt-8">
         <button
           type="button"

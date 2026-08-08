@@ -144,7 +144,7 @@ export default async function CreatorsPage() {
                     href={node.id ? `/creators/${node.id}` : '/creators'}
                     className="no-underline block"
                   >
-                    <CreatorTree node={node} />
+                    <CreatorTree node={node} locale={locale} />
                   </Link>
                 ))}
               </div>

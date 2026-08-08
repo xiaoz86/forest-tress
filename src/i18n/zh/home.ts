@@ -186,6 +186,160 @@ export const home = {
     loginLead: '填一张节点卡即加入森林；这也是注册。已经加入过了？',
     loginLink: '用邮箱登录',
     collapse: '收起表单',
+
+    /**
+     * 7 步注册向导（JoinForm）。
+     *
+     * topics 特别注意：这十二个标签的**中文值会入库**（node_cards.topics），
+     * 之后原样显示在 /creators 的卡片上，和成员自己填的城市、简介混在一起。
+     * 所以入库一律取 dict('zh') 那份中文，字典这里只负责「显示成什么语言」。
+     * 英文用户选了 Health / Body-mind，存进去的仍是「健康 / 身心」，
+     * 中文访客看到的还是中文——否则同一片森林里会半中半英。
+     */
+    wizard: {
+      progress: (total: number) => `${total} 步完成你的节点卡，让森林看见你`,
+      stepAria: (n: number) => `第 ${n} 步`,
+
+      topics: {
+        health: '健康 / 身心',
+        lifeEd: '生命教育',
+        aesthetics: '美学 / 设计',
+        mindfulness: '正念 / 冥想',
+        psychology: '心理 / 教练',
+        content: '内容创作',
+        business: '向善商业',
+        community: '社区运营',
+        family: '亲子 / 家庭',
+        tech: 'AI / 技术',
+        craft: '手作 / 花艺',
+        reading: '阅读 / 写作',
+      },
+
+      step1: {
+        title: '你是谁?',
+        subtitle: '让森林里的人认识你',
+        name: '你的名字 / 昵称',
+        namePlaceholder: '怎么称呼你',
+        city: '你在哪座城市',
+        cityPlaceholder: '例如:沈阳、北京、成都',
+        intro: '用一句话介绍自己',
+        introPlaceholder: '你可以说说你现在在做什么、你关心什么、或者你是一个怎样的人',
+      },
+
+      step2: {
+        title: '你的种子属于哪片土壤?',
+        subtitle: '选择你关注的领域，可多选（最多 6 个）',
+        hint: '至少选 1 个，最多 6 个',
+      },
+
+      step3: {
+        title: '你想在森林里……',
+        subtitle: '你的经验，你能提供的，你在寻找的',
+        experience: '你的经验、优势与独特性',
+        experiencePlaceholder: '你在哪些领域有经验?你的独特优势是什么?',
+        offer: '你可以为别人提供什么?',
+        offerPlaceholder: '例如:我可以分享正念冥想的经验、提供品牌设计咨询、组织读书会……',
+        seek: '你正在寻找什么样的连接?',
+        seekPlaceholder: '例如:想找一起共创线下活动的伙伴、想认识做生命教育的人、想被更多人看见我的手作产品……',
+      },
+
+      step4: {
+        title: '你生命里的「美」是什么?',
+        subtitle: '在附近森林，美不是标准答案，而是你真切的体验',
+        /** 三句一组，中间要换行，所以分开写不要拼 */
+        prose1: '美是甘甜的味道，是喝茶喝美了的那一刻。',
+        prose2: '美是见识的多元，是走过不同的地方之后眼睛里装下的东西。',
+        prose3: '美来自直觉、来自于心，脱离同质化，是你生命里那些无法被复制的真切体验。',
+        /** 那一排小词，纯装饰 */
+        words: { w1: '甘甜', w2: '多元', w3: '直觉', w4: '真切', w5: '不可复制' },
+        /** 四张灵感卡，只展示不入库 */
+        cards: {
+          taste: { label: '一个味道', body: '清晨第一口茶的甘甜' },
+          scene: { label: '一个画面', body: '黄昏时路边摊冒出的热气' },
+          moment: { label: '一个瞬间', body: '陌生城市里一次偶遇的对话' },
+          feeling: { label: '一种感受', body: '做完一件事后的安静满足' },
+        },
+        moment: '你生命中一个「美」的时刻——',
+        momentPlaceholder: '一杯茶、一段路、一个人、一件事……什么让你觉得，这就是美?',
+        create: '你想创造或守护的「美」是什么?',
+        createPlaceholder: '也许是一个产品、一种体验、一个空间、一种生活方式……',
+        hobby: '兴趣爱好',
+        hobbyPlaceholder: '工作之外让你心动的事，如:徒步、烘焙、爵士乐、独立电影……',
+        /** 提交时给两段回答各加的前缀，会跟着答案一起入库 */
+        momentPrefix: '「时刻」',
+        createPrefix: '「想创造或守护」',
+      },
+
+      step5: {
+        title: '你心里的那颗种子是什么?',
+        subtitle: '一个梦想、一个念头、一个还没开始的计划——都可以',
+        placeholder: '例如:我想做一个关于生命教育的播客 / 我想开一间社区花店 / 我想把十年的瑜伽经验做成一门课 / 我还不确定，但我想找到方向……',
+      },
+
+      step6: {
+        title: '你的作品 / 项目集（可选）',
+        subtitle: '公众号、播客、产品、服务都可以 · 加入后会显示在你的个人页书架上',
+        workNo: (n: number) => `作品 #${n}`,
+        removeWork: (n: number) => `删除作品 ${n}`,
+        titlePlaceholder: '标题（如:1on1 教练服务 / 播客《随机漫步的进化》）',
+        descPlaceholder: '一句话描述（可选）',
+        urlPlaceholder: '跳转链接（可选，https://...）',
+        addFirst: '+ 添加你的第一个作品',
+        addMore: '+ 再加一条',
+        max: (n: number) => `最多 ${n} 条 · 加入后还能在个人页继续添加`,
+        skip: '不知道写什么也可以直接跳过 —— 加入后随时可以在个人页添加和换封面。',
+        cover: {
+          add: '添加封面图（可选）',
+          hint: '建议横版 16:9 · ≤ 5MB',
+          replace: '点击更换',
+          remove: '移除封面',
+          uploadAria: (n: number) => `上传作品 ${n} 的封面`,
+          changeAria: (n: number) => `更换作品 ${n} 的封面`,
+          previewAlt: (n: number) => `作品 ${n} 封面预览`,
+        },
+      },
+
+      step7: {
+        title: '怎么联系你?',
+        subtitle: '森林会用邮箱给你寄欢迎信和登录链接',
+        photo: '形象照（可选）',
+        photoUploadAria: '上传形象照',
+        photoChangeAria: '更换形象照',
+        photoAlt: '预览',
+        photoHint: '上传一张你愿意被看见的照片',
+        photoSpec: 'JPG / PNG / WebP / HEIC · ≤ 5MB',
+        email: '邮箱',
+        emailPlaceholder: '登录链接 / 通知会发到这里',
+        emailHint: '必填 · 你之后用它找回个人页',
+        wechat: '微信号（可选）',
+        wechatPlaceholder: '方便森林里的人加你',
+      },
+
+      prev: '← 上一步',
+      next: '下一步 →',
+      lastStep: '最后一步 · 留下联系方式 →',
+      submit: '🌱 种下我的种子',
+      submitting: '正在种下…',
+      consent: '提交即表示同意森林收下你的信息，用来撮合同频的人。',
+
+      done: {
+        title: '你的种子已经种下了',
+        sent: (email: string) => `欢迎邮件 + 登录链接正在发往 ${email}。`,
+        sentHint: '请留意收件箱和垃圾邮件夹，点开链接即可继续编辑。',
+        /** 节点建好了但信没发出去 */
+        mailFailed: '节点已经建立，但欢迎邮件暂时未能送出。',
+        mailFailedHint: (email: string) => `请稍后到登录页输入 ${email}，重新获取登录链接。`,
+      },
+
+      error: {
+        emailTaken: '这个邮箱已经在森林里了。直接到 /login 输入它就能找回你的节点。',
+        emailInvalid: '请填一个有效的邮箱。',
+        submitFailed: '提交失败，请稍后重试',
+        network: '网络异常，请稍后再试',
+        badImage: '请上传 JPG / PNG / WebP / HEIC 图片',
+        imageTooLarge: '图片过大，请压缩到 5MB 以内',
+      },
+    },
   },
 
   footer: {

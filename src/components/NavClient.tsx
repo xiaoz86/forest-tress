@@ -18,6 +18,13 @@ type NavLink =
 
 type Props = {
   locale: Locale;
+  /**
+   * 这是客户端组件，却整片收着字典切片——现在能跑，只因为 nav 里
+   * 恰好一个函数都没有。哪天为了英文单复数往 nav 加一个函数，
+   * 全站导航会立刻崩在「Functions cannot be passed directly to
+   * Client Components」，而 tsc 和 build 都查不出来（只有浏览器能）。
+   * 真要加函数，先把这里改成只收 locale、在客户端自己 dict(locale)。
+   */
   t: Dictionary['nav'];
 };
 

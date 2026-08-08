@@ -1,35 +1,33 @@
 'use client';
 
-import { useRef, useState, ChangeEvent } from 'react';
+import { useMemo, useRef, useState, ChangeEvent } from 'react';
 import MatchedNodes from './MatchedNodes';
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 import type { MatchedNode } from '@/lib/match';
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const AVATAR_MIME_LIST = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
 
-// 12 片预设土壤 — 让访客一键认领，不必自己想标签
-const TOPIC_CHIPS = [
-  '健康 / 身心',
-  '生命教育',
-  '美学 / 设计',
-  '正念 / 冥想',
-  '心理 / 教练',
-  '内容创作',
-  '向善商业',
-  '社区运营',
-  '亲子 / 家庭',
-  'AI / 技术',
-  '手作 / 花艺',
-  '阅读 / 写作',
-];
+/**
+ * 12 片预设土壤 — 让访客一键认领，不必自己想标签。
+ *
+ * 这里只留 id。标签文字在字典里（home.join.wizard.topics），
+ * 但**入库的值一律取中文那份**：topics 会原样显示在 /creators 的卡片上，
+ * 和成员自己填的城市、简介混在一起。英文用户选了 Health / Body-mind，
+ * 存进去的仍然是「健康 / 身心」，中文访客看到的还是中文。
+ */
+const TOPIC_IDS = [
+  'health', 'lifeEd', 'aesthetics', 'mindfulness', 'psychology', 'content',
+  'business', 'community', 'family', 'tech', 'craft', 'reading',
+] as const;
+type TopicId = (typeof TOPIC_IDS)[number];
 
-// 美 · 灵感卡（仅展示，不入库）
-const BEAUTY_CARDS = [
-  { label: '一个味道', body: '清晨第一口茶的甘甜' },
-  { label: '一个画面', body: '黄昏时路边摊冒出的热气' },
-  { label: '一个瞬间', body: '陌生城市里一次偶遇的对话' },
-  { label: '一种感受', body: '做完一件事后的安静满足' },
-];
+/** 入库用的中文值。不要改成按当前语言取——那会把英文标签写进数据库。 */
+const topicValue = (id: TopicId): string => dict('zh').home.join.wizard.topics[id];
+
+const BEAUTY_CARD_IDS = ['taste', 'scene', 'moment', 'feeling'] as const;
+const BEAUTY_WORD_IDS = ['w1', 'w2', 'w3', 'w4', 'w5'] as const;
 
 type WorkDraft = {
   title: string;
@@ -87,7 +85,13 @@ const empty: FormState = {
 
 const STEP_COUNT = 7;
 
-export default function JoinForm() {
+/**
+ * 文案在客户端自己取。字典里有函数（progress、workNo 这些），函数跨不过
+ * server → client 那道序列化边界，整片切片当 props 传会让页面直接崩。
+ * 只传 locale——它仍是服务端算好的，这边不读 cookie，不会闪一下中文。
+ */
+export default function JoinForm({ locale }: { locale: Locale }) {
+  const t = useMemo(() => dict(locale).home.join.wizard, [locale]);
   const [step, setStep] = useState(1);
   const [data, setData] = useState<FormState>(empty);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -102,13 +106,14 @@ export default function JoinForm() {
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setData(p => ({ ...p, [k]: v }));
 
-  const toggleTopic = (t: string) => {
+  /** 收进 data.topics 的一律是中文值，见 topicValue 的说明 */
+  const toggleTopic = (value: string) => {
     setData(p =>
-      p.topics.includes(t)
-        ? { ...p, topics: p.topics.filter(x => x !== t) }
+      p.topics.includes(value)
+        ? { ...p, topics: p.topics.filter(x => x !== value) }
         : p.topics.length >= 6
           ? p
-          : { ...p, topics: [...p.topics, t] },
+          : { ...p, topics: [...p.topics, value] },
     );
   };
 
@@ -143,11 +148,11 @@ export default function JoinForm() {
         return { ...p, works: next };
       }
       if (!WORK_IMAGE_MIME.split(',').includes(f.type)) {
-        setWorkErr(prev => ({ ...prev, [i]: '请上传 JPG / PNG / WebP / HEIC 图片' }));
+        setWorkErr(prev => ({ ...prev, [i]: t.error.badImage }));
         return p;
       }
       if (f.size > WORK_IMAGE_MAX_BYTES) {
-        setWorkErr(prev => ({ ...prev, [i]: '图片过大，请压缩到 5MB 以内' }));
+        setWorkErr(prev => ({ ...prev, [i]: t.error.imageTooLarge }));
         return p;
       }
       next[i] = { ...cur, file: f, preview: URL.createObjectURL(f) };
@@ -165,11 +170,11 @@ export default function JoinForm() {
       return;
     }
     if (!AVATAR_MIME_LIST.split(',').includes(f.type)) {
-      setPhotoError('请上传 JPG / PNG / WebP / HEIC 图片');
+      setPhotoError(t.error.badImage);
       return;
     }
     if (f.size > MAX_AVATAR_BYTES) {
-      setPhotoError('图片过大，请压缩到 5MB 以内');
+      setPhotoError(t.error.imageTooLarge);
       return;
     }
     setPhotoFile(f);
@@ -193,8 +198,8 @@ export default function JoinForm() {
 
     // beautyMoment + beautyCreate 合并进 beauty 列；空段自动跳过
     const beauty = [
-      data.beautyMoment.trim() ? `「时刻」${data.beautyMoment.trim()}` : '',
-      data.beautyCreate.trim() ? `「想创造或守护」${data.beautyCreate.trim()}` : '',
+      data.beautyMoment.trim() ? `${t.step4.momentPrefix}${data.beautyMoment.trim()}` : '',
+      data.beautyCreate.trim() ? `${t.step4.createPrefix}${data.beautyCreate.trim()}` : '',
     ]
       .filter(Boolean)
       .join('\n\n');
@@ -240,11 +245,11 @@ export default function JoinForm() {
       if (!res.ok) {
         const err = String(json.error || '');
         if (err === 'email-taken') {
-          setErrorMsg('这个邮箱已经在森林里了。直接到 /login 输入它就能找回你的节点。');
+          setErrorMsg(t.error.emailTaken);
         } else if (err === 'email-required' || err === 'email-invalid') {
-          setErrorMsg('请填一个有效的邮箱。');
+          setErrorMsg(t.error.emailInvalid);
         } else {
-          setErrorMsg('提交失败，请稍后重试');
+          setErrorMsg(t.error.submitFailed);
         }
         setStatus('error');
         return;
@@ -293,7 +298,7 @@ export default function JoinForm() {
         );
       }
     } catch {
-      setErrorMsg('网络异常，请稍后再试');
+      setErrorMsg(t.error.network);
       setStatus('error');
     }
   };
@@ -305,20 +310,20 @@ export default function JoinForm() {
           <div className="text-center mb-2">
             <div className="text-5xl mb-3">🌱</div>
             <h3 className="font-serif text-2xl font-bold text-forest-deep mb-2">
-              你的种子已经种下了
+              {t.done.title}
             </h3>
             <p className="text-sm text-text-secondary leading-relaxed">
               {welcomeEmailSent ? (
                 <>
-                  欢迎邮件 + 登录链接正在发往 {data.email}。
+                  {t.done.sent(data.email)}
                   <br />
-                  请留意收件箱和垃圾邮件夹，点开链接即可继续编辑。
+                  {t.done.sentHint}
                 </>
               ) : (
                 <>
-                  节点已经建立，但欢迎邮件暂时未能送出。
+                  {t.done.mailFailed}
                   <br />
-                  请稍后到登录页输入 {data.email}，重新获取登录链接。
+                  {t.done.mailFailedHint(data.email)}
                 </>
               )}
             </p>
@@ -334,7 +339,7 @@ export default function JoinForm() {
       {/* 进度提示 + 圆点 */}
       <div className="text-center mb-6">
         <p className="text-[14px] text-text-light mb-4">
-          {STEP_COUNT} 步完成你的节点卡，让森林看见你
+          {t.progress(STEP_COUNT)}
         </p>
         <div className="flex justify-center items-center gap-2">
           {Array.from({ length: STEP_COUNT }).map((_, i) => {
@@ -344,7 +349,7 @@ export default function JoinForm() {
             return (
               <span
                 key={n}
-                aria-label={`第 ${n} 步`}
+                aria-label={t.stepAria(n)}
                 className={`transition-all rounded-full ${
                   active
                     ? 'w-7 h-2 bg-leaf'
@@ -361,25 +366,25 @@ export default function JoinForm() {
       {/* 卡片主体 */}
       <div className="bg-white rounded-3xl p-10 max-md:p-6 shadow-[0_8px_40px_rgba(26,46,26,0.04)] border border-moss/10">
         {step === 1 && (
-          <StepBody title="你是谁?" subtitle="让森林里的人认识你">
-            <Field label="你的名字 / 昵称">
+          <StepBody title={t.step1.title} subtitle={t.step1.subtitle}>
+            <Field label={t.step1.name}>
               <Input
-                placeholder="怎么称呼你"
+                placeholder={t.step1.namePlaceholder}
                 value={data.name}
                 onChange={v => set('name', v)}
               />
             </Field>
-            <Field label="你在哪座城市">
+            <Field label={t.step1.city}>
               <Input
-                placeholder="例如:沈阳、北京、成都"
+                placeholder={t.step1.cityPlaceholder}
                 value={data.city}
                 onChange={v => set('city', v)}
               />
             </Field>
-            <Field label="用一句话介绍自己">
+            <Field label={t.step1.intro}>
               <Textarea
                 rows={3}
-                placeholder="你可以说说你现在在做什么、你关心什么、或者你是一个怎样的人"
+                placeholder={t.step1.introPlaceholder}
                 value={data.doing}
                 onChange={v => set('doing', v)}
               />
@@ -389,56 +394,58 @@ export default function JoinForm() {
 
         {step === 2 && (
           <StepBody
-            title="你的种子属于哪片土壤?"
-            subtitle="选择你关注的领域，可多选（最多 6 个）"
+            title={t.step2.title}
+            subtitle={t.step2.subtitle}
           >
             <div className="flex flex-wrap gap-2.5">
-              {TOPIC_CHIPS.map(t => {
-                const on = data.topics.includes(t);
+              {TOPIC_IDS.map(id => {
+                // 显示按语言，选中判断和入库都用中文值
+                const value = topicValue(id);
+                const on = data.topics.includes(value);
                 return (
                   <button
                     type="button"
-                    key={t}
-                    onClick={() => toggleTopic(t)}
+                    key={id}
+                    onClick={() => toggleTopic(value)}
                     className={`px-4 py-2 rounded-full border text-[13.5px] transition-all cursor-pointer ${
                       on
                         ? 'bg-leaf/15 border-leaf/40 text-forest-mid font-medium'
                         : 'bg-white border-mist text-text-secondary hover:border-leaf/40 hover:bg-leaf/5'
                     }`}
                   >
-                    {t}
+                    {t.topics[id]}
                   </button>
                 );
               })}
             </div>
             {data.topics.length === 0 && (
-              <p className="mt-4 text-[12px] text-text-light">至少选 1 个，最多 6 个</p>
+              <p className="mt-4 text-[12px] text-text-light">{t.step2.hint}</p>
             )}
           </StepBody>
         )}
 
         {step === 3 && (
-          <StepBody title="你想在森林里……" subtitle="你的经验，你能提供的，你在寻找的">
-            <Field label="你的经验、优势与独特性">
+          <StepBody title={t.step3.title} subtitle={t.step3.subtitle}>
+            <Field label={t.step3.experience}>
               <Textarea
                 rows={3}
-                placeholder="你在哪些领域有经验?你的独特优势是什么?"
+                placeholder={t.step3.experiencePlaceholder}
                 value={data.experience}
                 onChange={v => set('experience', v)}
               />
             </Field>
-            <Field label="你可以为别人提供什么?">
+            <Field label={t.step3.offer}>
               <Textarea
                 rows={3}
-                placeholder="例如:我可以分享正念冥想的经验、提供品牌设计咨询、组织读书会……"
+                placeholder={t.step3.offerPlaceholder}
                 value={data.offer}
                 onChange={v => set('offer', v)}
               />
             </Field>
-            <Field label="你正在寻找什么样的连接?">
+            <Field label={t.step3.seek}>
               <Textarea
                 rows={3}
-                placeholder="例如:想找一起共创线下活动的伙伴、想认识做生命教育的人、想被更多人看见我的手作产品……"
+                placeholder={t.step3.seekPlaceholder}
                 value={data.seeking}
                 onChange={v => set('seeking', v)}
               />
@@ -448,56 +455,58 @@ export default function JoinForm() {
 
         {step === 4 && (
           <StepBody
-            title="你生命里的「美」是什么?"
-            subtitle="在附近森林，美不是标准答案，而是你真切的体验"
+            title={t.step4.title}
+            subtitle={t.step4.subtitle}
           >
             <div className="border-l-[3px] border-leaf/40 pl-5 mb-6 py-1">
               <p className="text-[14px] text-text-secondary leading-[1.95]">
-                美是甘甜的味道，是喝茶喝美了的那一刻。<br />
-                美是见识的多元，是走过不同的地方之后眼睛里装下的东西。<br />
-                美来自直觉、来自于心，脱离同质化，是你生命里那些无法被复制的真切体验。
+                {t.step4.prose1}<br />
+                {t.step4.prose2}<br />
+                {t.step4.prose3}
               </p>
               <div className="flex flex-wrap gap-3 mt-3 text-[12px] text-text-light">
-                {['甘甜', '多元', '直觉', '真切', '不可复制'].map(t => (
-                  <span key={t}>{t}</span>
+                {BEAUTY_WORD_IDS.map(id => (
+                  <span key={id}>{t.step4.words[id]}</span>
                 ))}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1 mb-6">
-              {BEAUTY_CARDS.map(c => (
+              {BEAUTY_CARD_IDS.map(id => (
                 <div
-                  key={c.label}
+                  key={id}
                   className="rounded-xl bg-[#fafaf7] p-4 border border-moss/10"
                 >
-                  <div className="text-[12.5px] font-semibold text-forest-deep mb-1">{c.label}</div>
+                  <div className="text-[12.5px] font-semibold text-forest-deep mb-1">
+                    {t.step4.cards[id].label}
+                  </div>
                   <div className="text-[12.5px] text-text-secondary italic leading-relaxed">
-                    {c.body}
+                    {t.step4.cards[id].body}
                   </div>
                 </div>
               ))}
             </div>
 
-            <Field label="你生命中一个「美」的时刻——">
+            <Field label={t.step4.moment}>
               <Textarea
                 rows={3}
-                placeholder="一杯茶、一段路、一个人、一件事……什么让你觉得，这就是美?"
+                placeholder={t.step4.momentPlaceholder}
                 value={data.beautyMoment}
                 onChange={v => set('beautyMoment', v)}
               />
             </Field>
-            <Field label="你想创造或守护的「美」是什么?">
+            <Field label={t.step4.create}>
               <Textarea
                 rows={3}
-                placeholder="也许是一个产品、一种体验、一个空间、一种生活方式……"
+                placeholder={t.step4.createPlaceholder}
                 value={data.beautyCreate}
                 onChange={v => set('beautyCreate', v)}
               />
             </Field>
-            <Field label="兴趣爱好">
+            <Field label={t.step4.hobby}>
               <Textarea
                 rows={2}
-                placeholder="工作之外让你心动的事，如:徒步、烘焙、爵士乐、独立电影……"
+                placeholder={t.step4.hobbyPlaceholder}
                 value={data.interests}
                 onChange={v => set('interests', v)}
               />
@@ -507,13 +516,13 @@ export default function JoinForm() {
 
         {step === 5 && (
           <StepBody
-            title="你心里的那颗种子是什么?"
-            subtitle="一个梦想、一个念头、一个还没开始的计划——都可以"
+            title={t.step5.title}
+            subtitle={t.step5.subtitle}
           >
             <Field>
               <Textarea
                 rows={6}
-                placeholder="例如:我想做一个关于生命教育的播客 / 我想开一间社区花店 / 我想把十年的瑜伽经验做成一门课 / 我还不确定，但我想找到方向……"
+                placeholder={t.step5.placeholder}
                 value={data.seed}
                 onChange={v => set('seed', v)}
               />
@@ -523,8 +532,8 @@ export default function JoinForm() {
 
         {step === 6 && (
           <StepBody
-            title="你的作品 / 项目集（可选）"
-            subtitle="公众号、播客、产品、服务都可以 · 加入后会显示在你的个人页书架上"
+            title={t.step6.title}
+            subtitle={t.step6.subtitle}
           >
             {data.works.length > 0 && (
               <ul className="space-y-3">
@@ -535,12 +544,12 @@ export default function JoinForm() {
                   >
                     <div className="flex items-start justify-between gap-3 mb-2.5">
                       <span className="text-[11px] font-semibold tracking-wider text-text-light uppercase pt-2">
-                        作品 #{i + 1}
+                        {t.step6.workNo(i + 1)}
                       </span>
                       <button
                         type="button"
                         onClick={() => removeWork(i)}
-                        aria-label={`删除作品 ${i + 1}`}
+                        aria-label={t.step6.removeWork(i + 1)}
                         className="w-7 h-7 rounded-full inline-flex items-center justify-center text-text-light hover:text-coral hover:bg-coral/10 bg-transparent border-none cursor-pointer text-base leading-none"
                       >
                         ×
@@ -549,6 +558,7 @@ export default function JoinForm() {
 
                     {/* 封面图 picker — 大缩略图，加入后会在书架上显示 */}
                     <WorkCoverPicker
+                      t={t.step6.cover}
                       index={i}
                       preview={w.preview}
                       onPick={f => pickWorkCover(i, f)}
@@ -558,18 +568,18 @@ export default function JoinForm() {
 
                     <div className="grid gap-2.5 mt-3">
                       <Input
-                        placeholder="标题（如:1on1 教练服务 / 播客《随机漫步的进化》）"
+                        placeholder={t.step6.titlePlaceholder}
                         value={w.title}
                         onChange={v => updateWork(i, { title: v })}
                       />
                       <Textarea
                         rows={2}
-                        placeholder="一句话描述（可选）"
+                        placeholder={t.step6.descPlaceholder}
                         value={w.desc}
                         onChange={v => updateWork(i, { desc: v })}
                       />
                       <Input
-                        placeholder="跳转链接（可选，https://...）"
+                        placeholder={t.step6.urlPlaceholder}
                         value={w.url}
                         onChange={v => updateWork(i, { url: v })}
                       />
@@ -585,40 +595,40 @@ export default function JoinForm() {
                 onClick={addWork}
                 className="w-full py-3 rounded-xl border-[1.5px] border-dashed border-mist text-[13.5px] text-text-light hover:text-forest-deep hover:border-leaf/40 hover:bg-leaf/5 transition-colors bg-transparent cursor-pointer"
               >
-                {data.works.length === 0 ? '+ 添加你的第一个作品' : '+ 再加一条'}
+                {data.works.length === 0 ? t.step6.addFirst : t.step6.addMore}
               </button>
             ) : (
               <p className="text-[12px] text-text-light text-center py-2">
-                最多 {MAX_WORKS} 条 · 加入后还能在个人页继续添加
+                {t.step6.max(MAX_WORKS)}
               </p>
             )}
 
             <p className="text-[12px] text-text-light text-center mt-2 leading-relaxed">
-              不知道写什么也可以直接跳过 —— 加入后随时可以在个人页添加和换封面。
+              {t.step6.skip}
             </p>
           </StepBody>
         )}
 
         {step === 7 && (
-          <StepBody title="怎么联系你?" subtitle="森林会用邮箱给你寄欢迎信和登录链接">
-            <Field label="形象照（可选）">
+          <StepBody title={t.step7.title} subtitle={t.step7.subtitle}>
+            <Field label={t.step7.photo}>
               <div className="flex items-center gap-4">
                 <button
                   type="button"
                   onClick={() => photoRef.current?.click()}
                   className="relative w-20 h-20 rounded-full overflow-hidden border-[1.5px] border-dashed border-mist hover:border-coral-soft bg-warm-cream flex items-center justify-center text-text-light hover:text-coral transition-colors cursor-pointer shrink-0"
-                  aria-label={photoPreview ? '更换形象照' : '上传形象照'}
+                  aria-label={photoPreview ? t.step7.photoChangeAria : t.step7.photoUploadAria}
                 >
                   {photoPreview ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={photoPreview} alt="预览" className="w-full h-full object-cover" />
+                    <img src={photoPreview} alt={t.step7.photoAlt} className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-2xl leading-none">＋</span>
                   )}
                 </button>
                 <div className="text-[12.5px] text-text-light leading-relaxed">
-                  上传一张你愿意被看见的照片<br />
-                  JPG / PNG / WebP / HEIC · ≤ 5MB
+                  {t.step7.photoHint}<br />
+                  {t.step7.photoSpec}
                 </div>
                 <input
                   ref={photoRef}
@@ -634,22 +644,22 @@ export default function JoinForm() {
             <Field
               label={
                 <span>
-                  邮箱 <span className="text-coral">*</span>
+                  {t.step7.email} <span className="text-coral">*</span>
                 </span>
               }
             >
               <Input
                 type="email"
-                placeholder="登录链接 / 通知会发到这里"
+                placeholder={t.step7.emailPlaceholder}
                 value={data.email}
                 onChange={v => set('email', v)}
               />
-              <p className="mt-1 text-[12px] text-text-light">必填 · 你之后用它找回个人页</p>
+              <p className="mt-1 text-[12px] text-text-light">{t.step7.emailHint}</p>
             </Field>
 
-            <Field label="微信号（可选）">
+            <Field label={t.step7.wechat}>
               <Input
-                placeholder="方便森林里的人加你"
+                placeholder={t.step7.wechatPlaceholder}
                 value={data.wechat}
                 onChange={v => set('wechat', v)}
               />
@@ -669,7 +679,7 @@ export default function JoinForm() {
               onClick={() => setStep(s => s - 1)}
               className="px-5 py-2.5 rounded-full border border-mist text-[13.5px] text-text-secondary hover:border-leaf/40 hover:text-forest-mid hover:bg-leaf/5 transition-all bg-white cursor-pointer"
             >
-              ← 上一步
+              {t.prev}
             </button>
           ) : (
             <span />
@@ -686,7 +696,7 @@ export default function JoinForm() {
                   : 'border border-mist text-text-light/60 cursor-not-allowed'
               } bg-white`}
             >
-              {step === 6 ? '最后一步 · 留下联系方式 →' : '下一步 →'}
+              {step === 6 ? t.lastStep : t.next}
             </button>
           ) : (
             <button
@@ -699,14 +709,14 @@ export default function JoinForm() {
                   : 'bg-mist text-text-light/60 cursor-not-allowed'
               }`}
             >
-              {status === 'submitting' ? '正在种下…' : '🌱 种下我的种子'}
+              {status === 'submitting' ? t.submitting : t.submit}
             </button>
           )}
         </div>
       </div>
 
       <p className="text-center text-[11.5px] text-text-light/80 mt-5 leading-relaxed">
-        提交即表示同意森林收下你的信息，用来撮合同频的人。
+        {t.consent}
       </p>
     </div>
   );
@@ -805,12 +815,15 @@ function WorkCoverPicker({
   onPick,
   onClear,
   error,
+  t,
 }: {
   index: number;
   preview: string | null;
   onPick: (f: File) => void;
   onClear: () => void;
   error?: string;
+  /** 封面那一小片文案。同在客户端，函数当 props 传没有序列化问题 */
+  t: ReturnType<typeof dict>['home']['join']['wizard']['step6']['cover'];
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   return (
@@ -819,25 +832,25 @@ function WorkCoverPicker({
         type="button"
         onClick={() => inputRef.current?.click()}
         className="group relative w-full aspect-[16/9] rounded-lg overflow-hidden border-[1.5px] border-dashed border-mist hover:border-leaf/50 bg-white transition-colors cursor-pointer"
-        aria-label={preview ? `更换作品 ${index + 1} 的封面` : `上传作品 ${index + 1} 的封面`}
+        aria-label={preview ? t.changeAria(index + 1) : t.uploadAria(index + 1)}
       >
         {preview ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={preview}
-              alt={`作品 ${index + 1} 封面预览`}
+              alt={t.previewAlt(index + 1)}
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center text-white text-[12px] font-medium opacity-0 group-hover:opacity-100">
-              点击更换
+              {t.replace}
             </div>
           </>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-text-light group-hover:text-forest-deep transition-colors">
             <span className="text-2xl leading-none">＋</span>
-            <span className="text-[12px]">添加封面图（可选）</span>
-            <span className="text-[10.5px] text-text-light/70">建议横版 16:9 · ≤ 5MB</span>
+            <span className="text-[12px]">{t.add}</span>
+            <span className="text-[10.5px] text-text-light/70">{t.hint}</span>
           </div>
         )}
       </button>
@@ -859,7 +872,7 @@ function WorkCoverPicker({
             onClick={onClear}
             className="text-[11.5px] text-text-light hover:text-coral underline-offset-2 hover:underline bg-transparent border-none cursor-pointer"
           >
-            移除封面
+            {t.remove}
           </button>
         </div>
       )}

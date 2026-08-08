@@ -1,14 +1,19 @@
+import { dict } from '@/i18n';
+import type { Locale } from '@/lib/locale';
 import type { NodeCard } from '@/lib/supabase';
 
-type Props = { node: NodeCard };
+type Props = { node: NodeCard; locale: Locale };
 
 /**
  * 节点卡片：轨道式布局 — 姓名在中心，关键词围绕分布。
  *
  * 关键词来源优先级：keywords (AI 生成) → topics (用户填写) → 规则提取兜底。
  */
-export default function CreatorTree({ node }: Props) {
-  const name = node.name || '无名之树';
+export default function CreatorTree({ node, locale }: Props) {
+  // 服务端组件，字典直接在这儿取。卡上的姓名、城市、关键词是成员自己填的，
+  // 一律不翻——只有兜底名、「走近」和读屏描述属于页面框架。
+  const t = dict(locale).creators.tree;
+  const name = node.name || t.unnamed;
   const tags = buildTagStrip(node, 8);
   const positions = layoutOrbit(tags);
 
@@ -18,7 +23,7 @@ export default function CreatorTree({ node }: Props) {
 
       {/* 轨道区 */}
       <div className="relative px-2 pt-5 pb-1">
-        <OrbitNetwork name={name} city={node.city} positions={positions} />
+        <OrbitNetwork name={name} city={node.city} positions={positions} networkLabel={t.network(name)} />
       </div>
 
       {/* 底栏：在做 + 走近 */}
@@ -27,7 +32,7 @@ export default function CreatorTree({ node }: Props) {
           {firstSentence(node.doing, 36)}
         </p>
         <span className="text-[11px] text-text-light group-hover:text-forest-mid transition-colors whitespace-nowrap">
-          走近 <span className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
+          {t.closer} <span className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
         </span>
       </div>
     </article>
@@ -94,17 +99,19 @@ function OrbitNetwork({
   name,
   city,
   positions,
+  networkLabel,
 }: {
   name: string;
   city?: string | null;
   positions: OrbitPos[];
+  networkLabel: string;
 }) {
   return (
     <div className="relative w-full" style={{ aspectRatio: `${W} / ${H}` }}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="absolute inset-0 w-full h-full"
-        aria-label={`${name} 的关键词网络`}
+        aria-label={networkLabel}
       >
         {/* 同心圆装饰 */}
         <circle cx={CX} cy={CY} r={68} fill="none" stroke="#cfdcc8" strokeWidth="0.6" opacity="0.6" />

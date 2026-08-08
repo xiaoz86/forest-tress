@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { signLoginToken } from '@/lib/auth';
 import { notifyLoginLink, getSiteOrigin } from '@/lib/notify';
+import { getLocale } from '@/lib/locale';
 import type { NodeCard } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
@@ -87,9 +88,12 @@ export async function POST(request: NextRequest) {
       console.error('[api/login] AUTH_SECRET not configured');
     } else if (!memberCoolingDown(node.id)) {
       const magicLink = `${getSiteOrigin()}/api/login/verify?token=${encodeURIComponent(signed.token)}`;
+      // 语言必须在进 after 之前取好：after 里跑的时候请求上下文已经收了，
+      // 那时再读 cookie / 来源国家会拿不到，信就会一律发成中文。
+      const locale = await getLocale();
       // after 使用 Vercel/Next.js 的 waitUntil 生命周期保障，不阻塞响应，也不产生计时侧信道。
       after(async () => {
-        const delivery = await notifyLoginLink(node, magicLink);
+        const delivery = await notifyLoginLink(node, magicLink, locale);
         if (!delivery.ok) {
           console.error('[api/login] login email not accepted', {
             reason: delivery.reason,

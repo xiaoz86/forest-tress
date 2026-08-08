@@ -3,6 +3,7 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import { matchNodesAI, type MatchedNode } from '@/lib/match';
 import { generateKeywordsAI } from '@/lib/keywords';
 import { notifyNewNode, notifyWelcome, getSiteOrigin } from '@/lib/notify';
+import { getLocale } from '@/lib/locale';
 import {
   signLoginToken,
   signMemberSession,
@@ -170,9 +171,11 @@ export async function POST(request: NextRequest) {
       });
 
       if (signed.ok) {
+        // 按注册那一刻的语言发信：英文界面注册的人，收到的是英文欢迎信
         const welcomeEmailResult = await notifyWelcome(
           newNode,
           `${getSiteOrigin()}/api/login/verify?token=${encodeURIComponent(signed.token)}`,
+          await getLocale(),
         );
         welcomeEmailSent = welcomeEmailResult.ok;
         if (!welcomeEmailResult.ok) {

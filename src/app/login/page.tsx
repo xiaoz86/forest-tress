@@ -1,26 +1,39 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import LoginForm from '@/components/LoginForm';
-
-export const metadata = {
-  title: '登录 · 附近森林',
-  description: '用注册邮箱接收登录链接',
-};
+import { dict } from '@/i18n';
+import { getLocale } from '@/lib/locale';
 
 type Props = {
   searchParams: Promise<{ err?: string }>;
 };
 
-const ERR_TEXT: Record<string, string> = {
-  'no-secret': '服务尚未配置登录密钥，请联系主理人',
-  malformed: '登录链接格式不对，请重新申请',
-  'bad-sig': '登录链接无效，请重新申请',
-  expired: '登录链接已过期，请重新申请',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = dict(await getLocale()).login;
+  return { title: t.metaTitle, description: t.metaDescription };
+}
+
+/**
+ * ?err= 里那几个短码来自登录链接的校验环节（见 /api/login 那条回调）。
+ * 认不出的值一律回落到 unknown，不要把原始短码显示给人——
+ * 「bad-sig」对着屏幕的人来说不是信息。
+ */
+function errorText(err: string | undefined, t: ReturnType<typeof dict>['login']): string | null {
+  if (!err) return null;
+  const map: Record<string, string> = {
+    'no-secret': t.linkError.noSecret,
+    malformed: t.linkError.malformed,
+    'bad-sig': t.linkError.badSig,
+    expired: t.linkError.expired,
+  };
+  return map[err] || t.linkError.unknown;
+}
 
 export default async function LoginPage({ searchParams }: Props) {
-  const { err } = await searchParams;
-  const errMsg = err ? ERR_TEXT[err] || '登录链接无效，请重新申请' : null;
+  const [{ err }, locale] = await Promise.all([searchParams, getLocale()]);
+  const t = dict(locale).login;
+  const errMsg = errorText(err, t);
 
   return (
     <>
@@ -28,18 +41,18 @@ export default async function LoginPage({ searchParams }: Props) {
       <main className="min-h-screen pt-32 pb-20 px-6 bg-gradient-to-b from-[#fafaf7] via-[#f5f5f0] to-[#faf8f2]">
         <div className="max-w-[440px] mx-auto bg-white rounded-3xl border border-black/[0.06] shadow-[0_2px_24px_rgba(0,0,0,0.04)] p-8 max-md:p-6">
           <div className="text-[11px] font-semibold tracking-[0.18em] text-moss uppercase mb-2">
-            Login · 登录
+            {t.eyebrow}
           </div>
           <h1
             className="text-[26px] font-semibold tracking-[-0.01em] text-forest-deep mb-3"
             style={{ fontFamily: 'var(--font-display)' }}
           >
-            登录到你的节点
+            {t.title}
           </h1>
           <p className="text-[14px] leading-relaxed text-text-secondary mb-6">
-            输入注册时填写的邮箱，我们会把登录链接发到你邮箱。
+            {t.lede1}
             <br />
-            点击链接即可回到你的个人页。
+            {t.lede2}
           </p>
 
           {errMsg && (
@@ -48,16 +61,15 @@ export default async function LoginPage({ searchParams }: Props) {
             </div>
           )}
 
-          <LoginForm />
+          <LoginForm locale={locale} />
 
           <p className="mt-6 text-[12px] text-text-light leading-relaxed">
-            登录用于已加入的成员：可编辑资料、查看同频伙伴 AI 推荐，并解锁个性化
-            phil-coach——记得你的专属虚拟陪伴教练，等更多服务。
+            {t.benefits}
           </p>
           <p className="mt-2 text-[12px] text-text-light leading-relaxed">
-            还没有节点？
+            {t.noAccount.before}
             <Link href="/#join" className="text-forest-deep underline underline-offset-2 ml-1">
-              先填一张节点卡加入森林
+              {t.noAccount.link}
             </Link>
           </p>
         </div>
