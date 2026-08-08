@@ -126,7 +126,18 @@ export default async function Home() {
 
           <div className="mx-auto mb-7 h-px w-12 animate-fade-in-delay-2 bg-white/35" />
 
-          <p className="mx-auto mb-6 max-w-[680px] animate-fade-in-delay-2 text-[clamp(1.18rem,2.2vw,1.55rem)] font-medium leading-[1.9] text-white/92 [text-shadow:0_1px_14px_rgba(0,0,0,0.4)]">
+          {/*
+            这两句英文比中文长一倍：中文各占一行，英文按中文的宽度和字号会各折成两行，
+            整块被顶高，大标题第一行就钻到导航底下去了。
+            所以英文单独给一套宽度和字号——中文那套一个字符不动。
+          */}
+          <p
+            className={`mx-auto mb-6 animate-fade-in-delay-2 font-medium text-white/92 [text-shadow:0_1px_14px_rgba(0,0,0,0.4)] ${
+              locale === 'en'
+                ? 'max-w-[920px] text-[clamp(1.02rem,1.85vw,1.3rem)] leading-[1.75]'
+                : 'max-w-[680px] text-[clamp(1.18rem,2.2vw,1.55rem)] leading-[1.9]'
+            }`}
+          >
             {t.hero.taglineTop}
             <br />
             {t.hero.taglineBottom}

@@ -187,8 +187,12 @@ export default function NavClient({ locale, t }: Props) {
             )}
           </div>
 
-          {/* 登录态未知时先不出这个链接，免得一个登录着的人看它闪一下 */}
-          {!pending && !memberId && (
+          {/*
+            登录态未知时先不出这个链接，免得一个登录着的人看它闪一下。
+            右边那个大按钮已经是「登录」时（老 cookie 那一档）也不出——
+            否则一行里并排两个「登录」。
+          */}
+          {!pending && !memberId && !session?.legacy && (
             <Link
               href="/login"
               className="text-[16px] font-medium text-[#33403a]/85 no-underline transition-colors hover:text-forest max-md:hidden"
@@ -263,7 +267,7 @@ export default function NavClient({ locale, t }: Props) {
                 <span className="text-[15px] font-medium text-[#33403a]">{link.label}</span>
               </Link>
             ))}
-            {!pending && !memberId && (
+            {!pending && !memberId && !session?.legacy && (
               <Link
                 href="/login"
                 onClick={() => setMenuOpen(false)}

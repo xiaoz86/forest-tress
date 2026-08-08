@@ -1,17 +1,19 @@
 import type { nav as zhNav } from '@/i18n/zh/nav';
 
 /**
- * 品牌名和导航词是人工定的，不走机器翻译：
- * Nearby Forest 是这个产品的英文名，五条小径的名字要短、要像入口，
- * 直译（"Return to Yourself"、"Individual Creation"）在导航里又长又生硬。
+ * 品牌名和导航词人工定，不走机器翻译。
+ *
+ * 上一版为了短把原意丢了：「回到自己」译成 Companion（那是陪伴，不是回到自己）、
+ * 「遇见附近」译成 People（附近没了）、「生态社区」译成 About（变成了「关于我们」）。
+ * 这一版以忠于原意为先——导航词长一点没关系，指错方向才是问题。
  */
 export const nav: typeof zhNav = {
   brand: 'Nearby Forest',
   links: {
-    meditations: 'Listen',
-    philCoach: 'Companion',
-    shares: 'Creations',
-    creators: 'People',
+    meditations: 'Explore',
+    philCoach: 'Within',
+    shares: 'Create',
+    creators: 'Nearby',
     about: 'About',
   },
   ctaJoin: 'Plant a tree',

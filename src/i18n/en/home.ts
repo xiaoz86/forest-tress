@@ -19,12 +19,19 @@ export const home: typeof zhHome = {
 
   hero: {
     // 前后各带一个空格：中文那版靠 CSS 的 mx-1 留气口，英文要的是真空格
-    titleLead: 'Thousands of creators who ',
-    titleAccent: 'still feel',
-    titleTail: ' like people',
-    taglineTop: 'We find what we are capable of, and we are seen.',
-    taglineBottom: 'We meet, we make things, we grow.',
-    lede: 'For people doing their own work, who would rather not do it alone.',
+    //
+    // 上一版把「有温度」译成 "still feel like people"，把整句拧成了
+    // 「还像个人的创造者」——原文没有这个对照意味，它说的是「带着温度的人」。
+    // 绿色高亮落在 warmth 上，和中文版把「有温度」标绿是同一处。
+    // 这四句是主理人自己定的稿，不要再润色。
+    // 绿色高亮落在 warm-hearted 上，和中文版标绿「有温度」是同一处。
+    titleLead: 'Connect with ',
+    titleAccent: 'warm-hearted',
+    titleTail: ' creators.',
+    taglineTop: 'Here, we discover what’s possible within ourselves — and be truly seen.',
+    taglineBottom:
+      'Through meaningful encounters, we create, grow, and bring new possibilities to life together.',
+    lede: 'Walk your own path. Be seen. Find your people. Create together.',
     // 术语表定的是 看见 = notice，这里跟着定：六个词都是动词，读下来是一串动作
     chips: ['Breathe', 'Notice', 'Resonate', 'Meet', 'Create', 'Grow'],
     cta: 'Walk into the forest',
