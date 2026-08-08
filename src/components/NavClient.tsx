@@ -71,9 +71,10 @@ export default function NavClient({ locale, t }: Props) {
     { href: '/about', label: t.links.about, type: 'route', icon: '林' },
   ];
 
-  // 「联系我们」单拎出来：它落到 /about 里那块二维码，是个次级 CTA，
-  // 所以用描边胶囊，和上面那排纯文字链接区分开，不混在 baseLinks 里。
+  // 「联系我们」落到 /about 里那块二维码。桌面端它是颗描边胶囊，
+  // 和那排纯文字链接区分开，所以不混进 baseLinks。
   const contactHref = '/about#contact';
+
 
   // 登录态：挂载后问一次 /api/session。整个站内跳转期间不会变
   // （登录和退出都是整页加载），所以只问一次。
@@ -87,6 +88,22 @@ export default function NavClient({ locale, t }: Props) {
 
   const memberId = session?.memberId ?? null;
   const pending = session === undefined;
+
+  /**
+   * 手机菜单里的全部条目。
+   *
+   * 之前「联系我们」和「登录」各自单独渲染、前者还占满一整行，
+   * 面板比现在高两行——展开后把页面内容整个顶下去。
+   * 现在七项走同一个网格自然流成两列，奇数时最后一张占满。
+   */
+  const menuItems: (NavLink & { icon: string; outline?: boolean })[] = [
+    ...baseLinks,
+    { href: contactHref, label: t.links.contact, type: 'route', icon: '招', outline: true },
+    // 登录只在确定没登录时出现（pending 期间不出，免得登录着的人看它闪一下）
+    ...(!pending && !memberId && !session?.legacy
+      ? [{ href: '/login', label: t.login, type: 'route' as const, icon: '登' }]
+      : []),
+  ];
 
   /**
    * 切语言要整页重来：文案是服务端渲染的，只改 cookie 不刷新，
@@ -260,23 +277,25 @@ export default function NavClient({ locale, t }: Props) {
           面板还被拉到近半屏。两列把宽度用满、行数减半，
           汉字符号也和首页四条小径对得上。
         */
-        <div className="hidden border-t border-forest/10 px-4 pb-4 pt-3 max-lg:block">
+        <div className="hidden border-t border-forest/10 px-4 pb-3 pt-2.5 max-lg:block">
           <div className="grid grid-cols-2 gap-2">
-            {baseLinks.map((link, i) => (
+            {menuItems.map((link, i) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMenuOpen(false)}
-                className={`flex items-center gap-3 rounded-2xl bg-forest/[0.05] px-4 py-3.5 no-underline transition-colors active:bg-forest/10 ${
-                  // 奇数个时最后一张占满整行，不留半个空格
-                  i === baseLinks.length - 1 && baseLinks.length % 2 === 1 && memberId
-                    ? 'col-span-2'
-                    : ''
+                className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 no-underline transition-colors active:bg-forest/10 ${
+                  // 「联系我们」用描边而不是实底：它是次级入口，
+                  // 和桌面端那颗胶囊是同一个意思
+                  link.outline ? 'border border-forest/20' : 'bg-forest/[0.05]'
+                } ${
+                  // 总数是奇数时，最后一张占满整行，不留半个空格
+                  i === menuItems.length - 1 && menuItems.length % 2 === 1 ? 'col-span-2' : ''
                 }`}
               >
                 <span
                   aria-hidden="true"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-paper-soft text-[15px] text-forest"
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-paper-soft text-[14px] text-forest"
                   style={{ fontFamily: 'var(--font-serif)' }}
                 >
                   {link.icon}
@@ -284,40 +303,6 @@ export default function NavClient({ locale, t }: Props) {
                 <span className="text-[15px] font-medium text-[#33403a]">{link.label}</span>
               </Link>
             ))}
-            {/*
-              「联系我们」占满一行、用描边而不是实底——和上面那排一级入口
-              区分开，跟桌面端那颗胶囊是同一个意思。汉字符号取自
-              那一段的标题「从一次真实的招呼开始」。
-            */}
-            <Link
-              href={contactHref}
-              onClick={() => setMenuOpen(false)}
-              className="col-span-2 flex items-center gap-3 rounded-2xl border border-forest/20 px-4 py-3.5 no-underline transition-colors active:bg-forest/10"
-            >
-              <span
-                aria-hidden="true"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-paper-soft text-[15px] text-forest"
-                style={{ fontFamily: 'var(--font-serif)' }}
-              >
-                招
-              </span>
-              <span className="text-[15px] font-medium text-[#33403a]">{t.links.contact}</span>
-            </Link>
-            {!pending && !memberId && !session?.legacy && (
-              <Link
-                href="/login"
-                onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-3 rounded-2xl bg-forest/[0.05] px-4 py-3.5 no-underline transition-colors active:bg-forest/10"
-              >
-                <span
-                  aria-hidden="true"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-paper-soft text-[13px] text-forest"
-                >
-                  ↪
-                </span>
-                <span className="text-[15px] font-medium text-[#33403a]">{t.login}</span>
-              </Link>
-            )}
           </div>
 
           {/* 语言放在菜单最后一行：它不是常用动作，但要找得到 */}
