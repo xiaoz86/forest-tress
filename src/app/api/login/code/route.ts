@@ -21,7 +21,16 @@ export const runtime = 'nodejs';
  * 那几个路由同款）。要真正精确得上 KV，届时这里和其余几处一起换。
  */
 const WINDOW_MS = 10 * 60 * 1000;
-const MAX_ATTEMPTS_PER_IP = 12;
+
+/**
+ * 20 而不是更小：真正挡住「猜某个人的码」的是单码 5 次上限 + 60 秒发码冷却，
+ * 算下来 10 分钟里对同一个邮箱最多约 50 次尝试，对 100 万空间可以忽略。
+ * 这道 IP 闸防的是拿很多码去撒网，不需要卡得太死。
+ *
+ * 卡太死反而会误伤：公司网、运营商 NAT 后面的人共用出口 IP，
+ * 一个人手抖几次会把同网段的人一起锁在外面。
+ */
+const MAX_ATTEMPTS_PER_IP = 20;
 const ipBuckets = new Map<string, number[]>();
 
 function rateLimited(ip: string): boolean {
@@ -37,6 +46,18 @@ function rateLimited(ip: string): boolean {
     for (const key of Array.from(ipBuckets.keys()).slice(0, 2500)) ipBuckets.delete(key);
   }
   return false;
+}
+
+/**
+ * 登录成功就把这次尝试从额度里退回去。
+ *
+ * 额度是用来挡瞎猜的，不是用来限制「正常登录几次」。不退的话，
+ * 一家人共用一个出口 IP、或者同一个人在几台设备上登录，很快就会
+ * 被自己的成功登录挤到限流里去——那是纯粹的误伤。
+ */
+function refundAttempt(ip: string): void {
+  const bucket = ipBuckets.get(ip);
+  if (bucket?.length) bucket.pop();
 }
 
 /**
@@ -115,6 +136,7 @@ export async function POST(request: NextRequest) {
   // 对上了。先把码作废再发 cookie——顺序反过来的话，两个并发请求
   // 可能都拿到登录态；虽然同一个人无害，但没有理由留这个口子。
   await sb.from('login_codes').update({ consumed_at: new Date().toISOString() }).eq('id', row.id);
+  refundAttempt(ip);
 
   if (!row.node_id) {
     return NextResponse.json({ error: 'code-invalid' }, { status: 400 });
