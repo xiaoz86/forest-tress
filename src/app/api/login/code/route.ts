@@ -6,7 +6,13 @@ import {
   SESSION_COOKIE,
   signMemberSession,
 } from '@/lib/auth';
-import { CODE_MAX_ATTEMPTS, codeMatches, normalizeCodeInput, normalizeEmail } from '@/lib/loginCode';
+import { normalizeCodeInput, normalizeEmail } from '@/lib/loginCode';
+import { consumeCode } from '@/lib/loginCodeStore';
+import { getLocale } from '@/lib/locale';
+import { notifyNewNode, notifyWelcome, getSiteOrigin } from '@/lib/notify';
+import { signLoginToken } from '@/lib/auth';
+import { after } from 'next/server';
+import type { NodeCard } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
 
@@ -86,6 +92,10 @@ export async function POST(request: NextRequest) {
 
   const email = normalizeEmail((body as { email?: unknown })?.email);
   const code = normalizeCodeInput((body as { code?: unknown })?.code);
+  // 称呼只在「这个邮箱还不是成员」时才用得上——当场开号要有个名字。
+  // 已经是成员的话直接忽略，不拿它去覆盖人家自己填过的名字。
+  const rawName = (body as { name?: unknown })?.name;
+  const name = typeof rawName === 'string' ? rawName.trim().slice(0, 60) : '';
   if (!email || !code) {
     return NextResponse.json({ error: 'code-invalid' }, { status: 400 });
   }
@@ -96,53 +106,62 @@ export async function POST(request: NextRequest) {
   }
 
   const sb = createClient(supabaseUrl, serviceKey);
-  const { data: row, error } = await sb
-    .from('login_codes')
-    .select('id, node_id, code_hash, expires_at, attempts')
-    .eq('email', email)
-    .is('consumed_at', null)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    console.error('[api/login/code] supabase error', error.message);
-    return NextResponse.json({ error: 'code-invalid' }, { status: 400 });
-  }
-  if (!row) {
+  const verdict = await consumeCode(sb, email, code);
+  if (!verdict.ok) {
+    // 对外一律同一句，不区分「没有这个码」「错了」「过期」「试太多次」——
+    // 任何区分都会把「这个邮箱注册过没有」漏出去
     return NextResponse.json({ error: 'code-invalid' }, { status: 400 });
   }
 
-  // 过期的直接作废，不给它继续被猜的机会
-  if (new Date(row.expires_at).getTime() < Date.now()) {
-    await sb.from('login_codes').update({ consumed_at: new Date().toISOString() }).eq('id', row.id);
-    return NextResponse.json({ error: 'code-invalid' }, { status: 400 });
-  }
-
-  // 错满即作废：一个码只给 5 次机会，剩下的 99.999% 空间就不用猜了
-  if ((row.attempts ?? 0) >= CODE_MAX_ATTEMPTS) {
-    await sb.from('login_codes').update({ consumed_at: new Date().toISOString() }).eq('id', row.id);
-    return NextResponse.json({ error: 'code-invalid' }, { status: 400 });
-  }
-
-  if (!codeMatches(email, code, row.code_hash)) {
-    await sb
-      .from('login_codes')
-      .update({ attempts: (row.attempts ?? 0) + 1 })
-      .eq('id', row.id);
-    return NextResponse.json({ error: 'code-invalid' }, { status: 400 });
-  }
-
-  // 对上了。先把码作废再发 cookie——顺序反过来的话，两个并发请求
-  // 可能都拿到登录态；虽然同一个人无害，但没有理由留这个口子。
-  await sb.from('login_codes').update({ consumed_at: new Date().toISOString() }).eq('id', row.id);
   refundAttempt(ip);
 
-  if (!row.node_id) {
-    return NextResponse.json({ error: 'code-invalid' }, { status: 400 });
+  /**
+   * 码对上了 = 这个邮箱确实是本人的。
+   *
+   * 如果发码时它还不是成员（node_id 为空），现在当场开一张节点卡。
+   * phil-coach 聊到额度用完的人走的就是这条路：填称呼和邮箱、收码、
+   * 填回来，一步成为森林里的一棵树，对话接着走。
+   *
+   * 卡是空的，所以这里**不跑撮合也不生成关键词**——对一张只有名字的卡
+   * 做撮合没有意义，而且那是两次大模型调用，会把这一秒卡死。
+   * 等 ta 填完资料再算。
+   */
+  let memberId = verdict.nodeId;
+  let createdNode: NodeCard | null = null;
+
+  if (!memberId) {
+    // 并发兜底：两个标签页同时验同一个码时，先查一次有没有已经被建出来
+    const { data: existing } = await sb
+      .from('node_cards')
+      .select('id')
+      .ilike('email', email)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing?.id) {
+      memberId = existing.id;
+    } else {
+      const { data: inserted, error: insertError } = await sb
+        .from('node_cards')
+        .insert([{ name: name || email.split('@')[0], email, email_verified_at: new Date().toISOString() }])
+        .select();
+      if (insertError || !inserted?.[0]?.id) {
+        console.error('[api/login/code] cannot create member', insertError?.message);
+        return NextResponse.json({ error: 'create-failed' }, { status: 500 });
+      }
+      createdNode = inserted[0] as NodeCard;
+      memberId = createdNode.id!;
+    }
   }
 
-  const session = signMemberSession(row.node_id);
+  // 到这里 memberId 一定有值（要么原本就是成员，要么刚建出来），
+  // 但类型上还是 string | null，显式收一下窄
+  if (!memberId) {
+    console.error('[api/login/code] no member id after verification');
+    return NextResponse.json({ error: 'create-failed' }, { status: 500 });
+  }
+
+  const session = signMemberSession(memberId);
   if (!session.ok) {
     console.error('[api/login/code] AUTH_SECRET not configured');
     return NextResponse.json({ error: 'not-configured' }, { status: 500 });
@@ -152,13 +171,26 @@ export async function POST(request: NextRequest) {
   const { error: stampError } = await sb
     .from('node_cards')
     .update({ email_verified_at: new Date().toISOString() })
-    .eq('id', row.node_id);
+    .eq('id', memberId);
   if (stampError) {
     console.error('[api/login/code] cannot stamp email_verified_at', stampError.message);
   }
 
-  const res = NextResponse.json({ ok: true, memberId: row.node_id });
-  res.cookies.set(MEMBER_COOKIE, row.node_id, {
+  // 新开的号：欢迎信和主理人通知都不阻塞响应——这一秒人还等着对话续上
+  if (createdNode) {
+    const locale = await getLocale();
+    const signed = signLoginToken(memberId);
+    const magicLink = signed.ok
+      ? `${getSiteOrigin()}/api/login/verify?token=${encodeURIComponent(signed.token)}`
+      : '';
+    after(async () => {
+      await notifyNewNode(createdNode!);
+      if (magicLink) await notifyWelcome(createdNode!, magicLink, locale);
+    });
+  }
+
+  const res = NextResponse.json({ ok: true, memberId, created: Boolean(createdNode) });
+  res.cookies.set(MEMBER_COOKIE, memberId, {
     httpOnly: false,
     sameSite: 'lax',
     path: '/',

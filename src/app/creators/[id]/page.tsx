@@ -13,6 +13,7 @@ import PhilMemoriesManager from '@/components/PhilMemoriesManager';
 import { buildRelationGraph } from '@/lib/network';
 import { isAdminId } from '@/lib/admin';
 import { getAuthenticatedMemberId } from '@/lib/session';
+import { canSeeContacts } from '@/lib/memberTrust';
 import { dict } from '@/i18n';
 import { getLocale, type Locale } from '@/lib/locale';
 import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
@@ -59,7 +60,13 @@ export default async function CreatorDetail({ params }: Props) {
 
   const [memberId, locale] = await Promise.all([getAuthenticatedMemberId(), getLocale()]);
   const t = dict(locale).creatorDetail;
-  const isMember = Boolean(memberId);
+  /**
+   * 能不能看别人的联系方式，看的是「邮箱验证过没有」，不只是「登录了没有」。
+   * 注册流程不验证邮箱，只认登录态的话，任何人编个邮箱就能抄走整份通讯录。
+   * 老成员按已验证对待，见 canSeeContacts。
+   */
+  const viewer = memberId ? all.find(n => n.id === memberId) ?? null : null;
+  const isMember = canSeeContacts(viewer);
   const isOwner = memberId === me.id;
   const isAdmin = isAdminId(memberId);
   const canEditAvatar = isOwner || isAdmin;

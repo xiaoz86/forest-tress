@@ -2,7 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { notifyLoginCode } from '@/lib/notify';
 import { getLocale } from '@/lib/locale';
-import { CODE_TTL_MS, generateCode, hashCode, normalizeEmail } from '@/lib/loginCode';
+import { normalizeEmail } from '@/lib/loginCode';
+import { issueCode } from '@/lib/loginCodeStore';
 import type { NodeCard } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
@@ -11,7 +12,14 @@ const RATE_WINDOW_MS = 10 * 60 * 1000;
 const MAX_REQUESTS_PER_IP = 10;
 const EMAIL_COOLDOWN_MS = 60 * 1000;
 const ipBuckets = new Map<string, number[]>();
-const memberCooldowns = new Map<string, number>();
+/**
+ * 按邮箱做冷却，不是按成员 id。
+ *
+ * 未注册的邮箱现在也会收到码（phil-coach 闸门和注册验证都靠它），
+ * 所以冷却必须在「还不知道是不是成员」的阶段就能算——否则这个接口
+ * 就成了给任意地址发骚扰邮件的工具。
+ */
+const emailCooldowns = new Map<string, number>();
 
 function rateLimited(ip: string): boolean {
   const now = Date.now();
@@ -25,11 +33,14 @@ function rateLimited(ip: string): boolean {
   return false;
 }
 
-function memberCoolingDown(memberId: string): boolean {
+function emailCoolingDown(email: string): boolean {
   const now = Date.now();
-  const lastRequest = memberCooldowns.get(memberId) || 0;
-  if (now - lastRequest < EMAIL_COOLDOWN_MS) return true;
-  memberCooldowns.set(memberId, now);
+  const last = emailCooldowns.get(email) || 0;
+  if (now - last < EMAIL_COOLDOWN_MS) return true;
+  emailCooldowns.set(email, now);
+  if (emailCooldowns.size > 5000) {
+    for (const key of Array.from(emailCooldowns.keys()).slice(0, 2500)) emailCooldowns.delete(key);
+  }
   return false;
 }
 
@@ -86,49 +97,30 @@ export async function POST(request: NextRequest) {
   const node = ((data || []) as NodeCard[]).find(
     row => row.email?.trim().toLowerCase() === normalized,
   ) || null;
-  if (node?.id) {
-    const code = generateCode();
-    const codeHash = hashCode(normalized, code);
-    if (!codeHash) {
-      console.error('[api/login] AUTH_SECRET not configured');
-    } else if (!memberCoolingDown(node.id)) {
-      // 语言必须在进 after 之前取好：after 里跑的时候请求上下文已经收了，
-      // 那时再读 cookie / 来源国家会拿不到，信就会一律发成中文。
-      const locale = await getLocale();
-      // after 使用 Vercel/Next.js 的 waitUntil 生命周期保障，不阻塞响应，也不产生计时侧信道。
-      after(async () => {
-        // 先把这个邮箱之前没用掉的码全部作废：永远只有最新那个能用。
-        // 不作废的话，攻击者可以攒一堆码来提高蒙中的概率。
-        await sb
-          .from('login_codes')
-          .update({ consumed_at: new Date().toISOString() })
-          .eq('email', normalized)
-          .is('consumed_at', null);
-
-        const { error: insertError } = await sb.from('login_codes').insert({
-          email: normalized,
-          node_id: node.id,
-          code_hash: codeHash,
-          expires_at: new Date(Date.now() + CODE_TTL_MS).toISOString(),
+  // node 为 null 表示还不是成员——照样发码。
+  // phil-coach 闸门那条路要靠它当场开号；从外面看两种情况完全一样，
+  // 这本身也是「不暴露某人注册过没有」的一部分。
+  if (!emailCoolingDown(normalized)) {
+    // 语言必须在进 after 之前取好：after 里跑的时候请求上下文已经收了，
+    // 那时再读 cookie / 来源国家会拿不到，信就会一律发成中文。
+    const locale = await getLocale();
+    // after 使用 Vercel/Next.js 的 waitUntil 生命周期保障，不阻塞响应，也不产生计时侧信道。
+    after(async () => {
+      const issued = await issueCode(sb, normalized, node?.id ?? null);
+      if (!issued.ok) {
+        console.error('[api/login] cannot issue code', issued.reason);
+        return;
+      }
+      const delivery = await notifyLoginCode(normalized, issued.code, locale);
+      if (!delivery.ok) {
+        console.error('[api/login] login code email not accepted', {
+          reason: delivery.reason,
+          status: delivery.status,
         });
-        if (insertError) {
-          console.error('[api/login] cannot store login code', insertError.message);
-          return;
-        }
-
-        const delivery = await notifyLoginCode(normalized, code, locale);
-        if (!delivery.ok) {
-          console.error('[api/login] login code email not accepted', {
-            reason: delivery.reason,
-            status: delivery.status,
-          });
-        }
-      });
-    } else {
-      console.log('[api/login] member email cooldown active');
-    }
+      }
+    });
   } else {
-    console.log('[api/login] no node for email');
+    console.log('[api/login] email cooldown active');
   }
 
   return NextResponse.json({ ok: true });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, ChangeEvent } from 'react';
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import MatchedNodes from './MatchedNodes';
 import { dict } from '@/i18n';
 import type { Locale } from '@/lib/locale';
@@ -97,8 +97,17 @@ export default function JoinForm({ locale }: { locale: Locale }) {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'verify' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  /**
+   * 第八步：邮箱验证码。
+   *
+   * 七步填完先发码、不建号；码验过了才真的插入。原来插入成功就当场发
+   * 会话 cookie 且从不验证邮箱——那正是「编个邮箱就能看到全站通讯录」
+   * 的根因。这一步是把「这个邮箱确实是本人的」钉死的最轻办法。
+   */
+  const [verifyCode, setVerifyCode] = useState('');
+  const [verifyCooldown, setVerifyCooldown] = useState(0);
   const [matches, setMatches] = useState<MatchedNode[]>([]);
   const [welcomeEmailSent, setWelcomeEmailSent] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
@@ -191,6 +200,12 @@ export default function JoinForm({ locale }: { locale: Locale }) {
     return false;
   })();
 
+  useEffect(() => {
+    if (verifyCooldown <= 0) return;
+    const id = setTimeout(() => setVerifyCooldown(c => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [verifyCooldown]);
+
   const submit = async () => {
     if (!canNext) return;
     setStatus('submitting');
@@ -244,6 +259,11 @@ export default function JoinForm({ locale }: { locale: Locale }) {
 
       if (!res.ok) {
         const err = String(json.error || '');
+        if (err === 'code-invalid') {
+          setErrorMsg(t.verify.error.code);
+          setStatus('verify');
+          return;
+        }
         if (err === 'email-taken') {
           setErrorMsg(t.error.emailTaken);
         } else if (err === 'email-required' || err === 'email-invalid') {
@@ -252,6 +272,14 @@ export default function JoinForm({ locale }: { locale: Locale }) {
           setErrorMsg(t.error.submitFailed);
         }
         setStatus('error');
+        return;
+      }
+
+      // 第一次提交没带码，服务端只发码不建号——展开验证那一步
+      if (json.needCode === true) {
+        setStatus('verify');
+        setVerifyCode('');
+        setVerifyCooldown(60);
         return;
       }
 
@@ -302,6 +330,75 @@ export default function JoinForm({ locale }: { locale: Locale }) {
       setStatus('error');
     }
   };
+
+  // 第八步：邮箱验证码。七步的内容都还在 state 里，验过码再一起提交。
+  if (status === 'verify') {
+    const code = verifyCode.replace(/\s+/g, '');
+    return (
+      <div className="max-w-[680px] mx-auto">
+        <div className="bg-white rounded-3xl p-10 max-md:p-6 shadow-[0_8px_40px_rgba(26,46,26,0.06)] border border-moss/10">
+          <h3 className="font-serif text-2xl font-bold text-forest-deep mb-2">{t.verify.title}</h3>
+          <p className="text-sm text-text-secondary leading-relaxed mb-1">
+            {t.verify.sentTo(data.email.trim())}
+          </p>
+          <p className="text-[13px] text-text-light leading-relaxed mb-6">{t.verify.hint}</p>
+
+          <input
+            value={verifyCode}
+            onChange={e => setVerifyCode(e.target.value.replace(/[^\d\s]/g, '').slice(0, 8))}
+            onKeyDown={e => {
+              if (e.key === 'Enter') void submit();
+            }}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={8}
+            autoFocus
+            placeholder={t.verify.placeholder}
+            className="w-full rounded-lg border border-forest-deep/10 bg-white/75 px-4 py-3 text-center font-mono text-[20px] tracking-[0.4em] text-forest-deep outline-none transition-colors focus:border-coral-soft/70"
+          />
+
+          <div className="mt-5 flex flex-wrap items-center gap-4">
+            <button
+              type="button"
+              onClick={submit}
+              disabled={code.length !== 6}
+              className="rounded-full bg-forest-deep px-6 py-3 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+            >
+              {t.verify.cta}
+            </button>
+            {errorMsg && <span className="text-sm leading-relaxed text-coral">{errorMsg}</span>}
+          </div>
+
+          <div className="mt-6 flex items-center justify-between text-[12px] text-text-light">
+            <button
+              type="button"
+              onClick={() => {
+                setStatus('idle');
+                setStep(7);
+                setVerifyCode('');
+                setErrorMsg(null);
+              }}
+              className="underline-offset-2 hover:text-forest-deep hover:underline"
+            >
+              {t.verify.back}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setVerifyCode('');
+                setErrorMsg(null);
+                void submit();
+              }}
+              disabled={verifyCooldown > 0}
+              className="underline-offset-2 hover:text-forest-deep hover:underline disabled:no-underline disabled:hover:text-text-light"
+            >
+              {verifyCooldown > 0 ? t.verify.resendIn(verifyCooldown) : t.verify.resend}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (status === 'success') {
     return (

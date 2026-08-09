@@ -26,7 +26,7 @@ export const email: typeof zhEmail = {
     heading: 'Your login code',
     body: 'Enter these six digits back on the page you came from, and you’re in.',
     expiry: 'The code is valid for 10 minutes and can only be used once.',
-    ignore: 'If this wasn’t you, you can ignore this email — without these digits, no one gets in.',
+    ignore: 'If this wasn’t you, you can ignore this email.',
 
     textTitle: 'Your Nearby Forest login code',
     textCode: (code: string) => `Code: ${code}`,

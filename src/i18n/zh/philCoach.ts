@@ -223,52 +223,36 @@ export const philCoach = {
     // —— 登记 / 等待开通那张浮层卡 ——
     gate: {
       close: '先关闭，回去看对话',
-      loginPrompt: '已经是森林里的树？',
-      loginLink: '直接登录（新窗口，不影响这段对话）',
 
-      // 免费期满，申请续期
-      expired: {
-        eyebrow: '一段旅程走完了',
-        title: '免费 3 个月已满',
-        bodyBefore: '你的免费使用期到了。想继续的话，点下面申请续期——我们确认后，会为你',
-        bodyAccent: '再开 3 个月的免费使用与答疑',
-        bodyAfter: '（通常很快）。你的对话记录都还在下面，随时可以回看。',
-        cta: '申请续期',
-        sending: '正在申请…',
-        sent: '申请已发出，我们确认后就能继续。',
-        check: '看看续上了吗',
+      // 第一步：留称呼和邮箱
+      eyebrow: '继续之前',
+      title: '留个称呼，接着聊',
+      body: '第一段路你已经走完了。留下称呼和邮箱就能继续——你也会成为森林里的一棵树，phil-coach 免费用三个月。',
+      namePlaceholder: '怎么称呼你',
+      emailPlaceholder: '你的邮箱',
+      cta: '继续',
+      sending: '正在发送…',
+      privacy: '这些只用于认识你、联系你，不做别的。',
+      /** 已经是成员的人填同一个邮箱就是登录，不用另找入口 */
+      alreadyMember: '已经是森林里的树？填同一个邮箱就行，我认得出。',
+
+      // 第二步：填验证码（就地完成，不跳页——对话在这个标签页里）
+      codeSentTo: (email: string) => `验证码已发到 ${email}`,
+      codeHint: '10 分钟内有效。没收到就看看垃圾邮件夹。',
+      codePlaceholder: '六位验证码',
+      codeCta: '好了',
+      verifying: '正在确认…',
+      resend: '重新发送',
+      resendIn: (seconds: number) => `${seconds} 秒后可重新发送`,
+      changeEmail: '改一下邮箱',
+
+      error: {
+        /** 不区分「码错了」和「这个邮箱没注册过」 */
+        code: '验证码不对，或者已经过期了。可以重新发送一个。',
+        tooMany: '试得有点多了，等几分钟再来。',
+        send: '没发出去，稍后再试一次。',
+        network: '网络不太顺，稍后再试。',
       },
-
-      // 登记过了，等主理人开通
-      waiting: {
-        eyebrow: '就快好了',
-        title: '已收到，正在为你开通',
-        bodyBefore: '我们已经收到你的登记，正在为你开通',
-        bodyAccent: '免费 3 个月的 phil-coach 使用与答疑',
-        bodyAfter: '（通常很快）。通过后，我们也会按你留下的微信号来加你、邀你进附近森林社群。你的对话记录都还在下面，开通后接着聊就行。',
-        check: '看看开通了吗',
-      },
-
-      // 第一次被拦下，留个称呼
-      register: {
-        eyebrow: '继续之前',
-        title: '留个称呼，继续免费用',
-        bodyBefore: '第一段路你已经走完了。留下称呼和微信号，我们确认后，附近森林为你',
-        bodyAccent: '继续开放免费 3 个月的 phil-coach 使用与答疑',
-        bodyMiddle: '（通常很快），并按微信号加你、邀你进社群——群里可以交流反馈，也有',
-        bodyAccent2: '真人教练答疑陪伴',
-        bodyAfter: '。你下面的对话记录一直都在，随时可以回看。',
-        namePlaceholder: '怎么称呼你',
-        contactPlaceholder: '微信号（或邮箱）',
-        cta: '提交登记',
-        sending: '正在提交…',
-        privacy: '这些信息只用于认识你、联系你，不做别的。',
-      },
-
-      checking: '看看去…',
-      stillPending: '还在路上，稍等一会儿再试试。',
-      failed: '没发出去，稍后再试一次。',
-      registerFailed: '没成功，稍后再试一次。',
     },
   },
 

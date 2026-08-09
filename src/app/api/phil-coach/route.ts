@@ -161,37 +161,44 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'llm-not-configured' }, { status: 500 });
   }
 
-  // 轻登记闸门（方案A + 审核流）：第一条小径免登记；之后需登记且
-  // 经主理人在邮件里点击「通过开通」后（status=approved）才能继续。
+  /**
+   * 闸门：免费额度用完之后，要求「是森林里的一棵树」，而不是「登记过的游客」。
+   *
+   * 原来是轻登记 + 主理人在邮件里点一下「通过开通」。那一下点击是个人工
+   * 时间差——人在情绪最浓的时候被拦下，还要等另一个人有空。而且就算通过了，
+   * ta 仍然不是成员：没有节点卡、进不了撮合、「留住这一段」也用不了。
+   *
+   * 现在填称呼和邮箱、收码、填回来，一步成为成员，对话当场续上。
+   * 存量游客（phil_coach_guests）继续认到 90 天走完，不把人踢出去。
+   */
   const cookieStore = await cookies();
   const memberIdRaw = (await getAuthenticatedMemberId()) || undefined;
-  const guestId = cookieStore.get(GUEST_COOKIE)?.value;
   const assistantTurns = messages.filter(m => m.role === 'assistant').length;
+
   if (!memberIdRaw && assistantTurns >= GUEST_FREE_TURNS) {
-    if (!guestId) {
-      return NextResponse.json({ error: 'guest-required' }, { status: 403 });
-    }
+    const guestId = cookieStore.get(GUEST_COOKIE)?.value;
     const sb = memoryClient();
     if (sb) {
-      const { data: guest } = await sb
-        .from('phil_coach_guests')
-        .select('status, approved_at')
-        .eq('id', guestId)
-        .maybeSingle();
-      if (!guest) {
-        return NextResponse.json({ error: 'guest-required' }, { status: 403 });
+      // 老游客还在免费期内就照旧放行——他们当初按规矩登记过，
+      // 不能因为我们换了设计就把人拦在外面。
+      let legacyOk = false;
+      if (guestId) {
+        const { data: guest } = await sb
+          .from('phil_coach_guests')
+          .select('status, approved_at')
+          .eq('id', guestId)
+          .maybeSingle();
+        legacyOk = Boolean(guest && guestActive(guest.status, guest.approved_at));
+        if (legacyOk) {
+          sb.from('phil_coach_guests')
+            .update({ last_seen: new Date().toISOString() })
+            .eq('id', guestId)
+            .then(() => {});
+        }
       }
-      if (guest.status !== 'approved') {
-        return NextResponse.json({ error: 'guest-pending' }, { status: 403 });
+      if (!legacyOk) {
+        return NextResponse.json({ error: 'member-required' }, { status: 403 });
       }
-      if (!guestActive(guest.status, guest.approved_at)) {
-        return NextResponse.json({ error: 'guest-expired' }, { status: 403 });
-      }
-      // 已开通：记活跃时间（尽力而为，不阻塞）
-      sb.from('phil_coach_guests')
-        .update({ last_seen: new Date().toISOString() })
-        .eq('id', guestId)
-        .then(() => {});
     }
     // Supabase 不可用时放行——对话可用性优先于闸门严格性
   }

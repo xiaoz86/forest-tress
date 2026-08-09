@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { after, NextRequest, NextResponse } from 'next/server';
+import { normalizeCodeInput } from '@/lib/loginCode';
+import { consumeCode, issueCode } from '@/lib/loginCodeStore';
+import { notifyLoginCode } from '@/lib/notify';
 import { matchNodesAI, type MatchedNode } from '@/lib/match';
 import { generateKeywordsAI } from '@/lib/keywords';
 import { notifyNewNode, notifyWelcome, getSiteOrigin } from '@/lib/notify';
@@ -95,7 +98,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    /**
+     * 邮箱验证：走完七步之后还要填一次验证码，验过了才真的建号。
+     *
+     * 为什么必须有这一步：原来插入成功就当场发会话 cookie，全程不验证邮箱。
+     * 而节点详情页把成员的微信号和邮箱发给「登录了的人」——等于任何人
+     * 编一个邮箱就能拿到整份通讯录。验证码是把「这个邮箱确实是本人的」
+     * 这件事钉死的最轻办法。
+     *
+     * 第一次提交（没带 code）：发码，回 needCode，前端展开验证码那一步。
+     * 第二次提交（带 code）：核销，通过了才往下建号。
+     */
+    const code = normalizeCodeInput(body.code);
+    if (!code) {
+      const locale = await getLocale();
+      after(async () => {
+        const issued = await issueCode(supabase, email, null);
+        if (!issued.ok) {
+          console.error('[api/join] cannot issue code', issued.reason);
+          return;
+        }
+        const delivery = await notifyLoginCode(email, issued.code, locale);
+        if (!delivery.ok) {
+          console.error('[api/join] code email not accepted', delivery.reason);
+        }
+      });
+      return NextResponse.json({ needCode: true });
+    }
+
+    const verdict = await consumeCode(supabase, email, code);
+    if (!verdict.ok) {
+      return NextResponse.json({ error: 'code-invalid' }, { status: 400 });
+    }
+
     const baseRow: Record<string, unknown> = {
+      // 码是刚刚核销掉的，所以这个邮箱确实是本人的
+      email_verified_at: new Date().toISOString(),
       name: body.name,
       city: body.city,
       doing: body.doing,

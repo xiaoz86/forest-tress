@@ -222,15 +222,20 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const [profileName, setProfileName] = useState('');
   const [identityReady, setIdentityReady] = useState(false);
   const [importState, setImportState] = useState<'idle' | 'importing' | 'done' | 'error'>('idle');
-  const [guestKnown, setGuestKnown] = useState(false);
-  const [guestApproved, setGuestApproved] = useState(false);
-  const [guestExpired, setGuestExpired] = useState(false);
-  const [renewState, setRenewState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  /**
+   * 老游客：登记过、还在 90 天免费期内的人照旧放行。
+   * 换了设计不能把当初按规矩登记过的人拦在外面。
+   */
+  const [legacyGuestOk, setLegacyGuestOk] = useState(false);
   const [showGate, setShowGate] = useState(false);
+  /** 浮层两步：留称呼和邮箱 → 填验证码。都在这一页完成，不跳走。 */
+  const [gateStep, setGateStep] = useState<'form' | 'code'>('form');
   const [gateName, setGateName] = useState('');
-  const [gateContact, setGateContact] = useState('');
-  const [gateState, setGateState] = useState<'idle' | 'sending' | 'error'>('idle');
-  const [checkState, setCheckState] = useState<'idle' | 'checking' | 'still-pending'>('idle');
+  const [gateEmail, setGateEmail] = useState('');
+  const [gateCode, setGateCode] = useState('');
+  const [gateBusy, setGateBusy] = useState(false);
+  const [gateError, setGateError] = useState('');
+  const [gateCooldown, setGateCooldown] = useState(0);
   const [pendingPathId, setPendingPathId] = useState<string | null>(null);
   const [pendingRetry, setPendingRetry] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -522,29 +527,20 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   }, []);
 
   // 轻登记检测（方案A：第一条小径免登记，之后登记并经主理人通过后继续）
+  // 老游客还在免费期内就照旧放行（新人不会有这个 cookie，拿到的是 false）
   useEffect(() => {
     fetch('/api/phil-coach/guest')
       .then(r => (r.ok ? r.json() : null))
-      .then(json => {
-        setGuestKnown(Boolean(json?.registered));
-        setGuestApproved(Boolean(json?.approved));
-        setGuestExpired(Boolean(json?.expired));
-      })
+      .then(json => setLegacyGuestOk(Boolean(json?.approved)))
       .catch(() => {});
   }, []);
 
-  /** 免费期满后申请续期（主理人邮件里点一次即续 3 个月） */
-  async function requestRenewal() {
-    if (renewState === 'sending') return;
-    setRenewState('sending');
-    try {
-      const res = await fetch('/api/phil-coach/guest/renew', { method: 'POST' });
-      if (!res.ok) throw new Error('failed');
-      setRenewState('sent');
-    } catch {
-      setRenewState('error');
-    }
-  }
+  // 重新发送的 60 秒倒计时（服务端也有同样的冷却）
+  useEffect(() => {
+    if (gateCooldown <= 0) return;
+    const id = setTimeout(() => setGateCooldown(c => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [gateCooldown]);
 
   function pathsDone(): number {
     try {
@@ -595,7 +591,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     liveVoice.cancel();
     voiceIn.cancel();
     // 方案A：走完第一条小径后，未登录且（未登记或未获通过）→ 先走登记/等待流程
-    if (!loggedIn && !(guestKnown && guestApproved) && pathsDone() >= 1) {
+    if (!loggedIn && !legacyGuestOk && pathsDone() >= 1) {
       setPendingPathId(p.id);
       setShowGate(true);
       return;
@@ -667,14 +663,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       }),
     });
     const json = await res.json().catch(() => ({}));
-    if (
-      res.status === 403 &&
-      (json.error === 'guest-required' || json.error === 'guest-pending' || json.error === 'guest-expired')
-    ) {
-      if (json.error === 'guest-expired') {
-        setGuestExpired(true);
-        setGuestApproved(false);
-      }
+    if (res.status === 403 && json.error === 'member-required') {
       return 'gate';
     }
     if (!res.ok || typeof json.reply !== 'string') {
@@ -751,27 +740,59 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
 
 
 
-  /** 轻登记：留下称呼+微信 → 进入「等待开通」状态（主理人邮件里点击通过后放行） */
-  async function registerGuest() {
-    if (!gateName.trim() || !gateContact.trim() || gateState === 'sending') return;
-    setGateState('sending');
+  /** 第一步：把验证码发到这个邮箱。已经是成员的人填同一个邮箱就是登录。 */
+  async function sendGateCode() {
+    const email = gateEmail.trim();
+    if (!gateName.trim() || !/^.+@.+\..+$/.test(email) || gateBusy || gateCooldown > 0) return;
+    setGateBusy(true);
+    setGateError('');
     try {
-      let from = '';
-      try {
-        from = new URLSearchParams(window.location.search).get('from') || '';
-      } catch {
-        /* ignore */
-      }
-      const res = await fetch('/api/phil-coach/guest', {
+      const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: gateName.trim(), contact: gateContact.trim(), from }),
+        body: JSON.stringify({ email }),
       });
       if (!res.ok) throw new Error('failed');
-      setGuestKnown(true); // 进入等待卡；pendingPathId / pendingRetry 保留，通过后自动续上
-      setGateState('idle');
+      // 服务端一律回 ok（不暴露这个邮箱注册过没有），所以无条件进第二步
+      setGateStep('code');
+      setGateCode('');
+      setGateCooldown(60);
     } catch {
-      setGateState('error');
+      setGateError(t.gate.error.send);
+    } finally {
+      setGateBusy(false);
+    }
+  }
+
+  /**
+   * 第二步：填码。对上了就登录——已经是成员的直接进，还不是的当场开一张节点卡。
+   * 全程不离开这一页：对话存在 sessionStorage 里，跳走一次就没了。
+   */
+  async function verifyGateCode() {
+    const code = gateCode.replace(/\s+/g, '');
+    if (code.length !== 6 || gateBusy) return;
+    setGateBusy(true);
+    setGateError('');
+    try {
+      const res = await fetch('/api/login/code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: gateEmail.trim(), code, name: gateName.trim() }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.memberId) {
+        setLoggedIn(true);
+        setShowGate(false);
+        setGateStep('form');
+        setGateCode('');
+        await resumePending();
+        return;
+      }
+      setGateError(res.status === 429 ? t.gate.error.tooMany : t.gate.error.code);
+    } catch {
+      setGateError(t.gate.error.network);
+    } finally {
+      setGateBusy(false);
     }
   }
 
@@ -807,28 +828,6 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     }
   }
 
-  /** 等待卡上的「看看开通了吗」 */
-  async function checkApproval() {
-    if (checkState === 'checking') return;
-    setCheckState('checking');
-    try {
-      const res = await fetch('/api/phil-coach/guest');
-      const json = await res.json().catch(() => ({}));
-      if (json?.approved) {
-        setGuestApproved(true);
-        setGuestExpired(false);
-        setRenewState('idle');
-        setShowGate(false);
-        setCheckState('idle');
-        await resumePending();
-      } else {
-        setGuestExpired(Boolean(json?.expired));
-        setCheckState('still-pending');
-      }
-    } catch {
-      setCheckState('still-pending');
-    }
-  }
 
   async function copyThread() {
     if (!session) return;
@@ -844,8 +843,12 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     }
   }
 
-  // 登记/等待卡：悬浮在当前视图之上——对话记录保持可见可回看，可点 × 关闭；
-  // 关闭后仍可浏览记录，只是发送会被服务端拦下并重新弹出这张卡。
+  /**
+   * 闸门浮层：悬浮在对话之上，对话记录保持可见可回看，可点 × 关掉。
+   *
+   * 两步都在这一页完成，绝不跳走——对话存在 sessionStorage 里，
+   * 跳一次页就没了。这也是为什么登录用验证码而不是邮件链接。
+   */
   const gateOverlay = showGate ? (
     <div className="fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto bg-black/55 p-4 backdrop-blur-sm">
       <div className="relative w-full max-w-[560px] rounded-2xl border border-coral-soft/25 bg-[#131a15] p-8 shadow-[0_24px_80px_rgba(0,0,0,0.55)] max-md:p-6">
@@ -857,140 +860,104 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
         >
           ×
         </button>
-        {guestKnown && guestExpired && !guestApproved ? (
+
+        <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
+          {t.gate.eyebrow}
+        </div>
+        <h3 className="text-xl font-semibold">{t.gate.title}</h3>
+
+        {gateStep === 'form' ? (
           <>
-            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
-              {t.gate.expired.eyebrow}
-            </div>
-            <h3 className="text-xl font-semibold">{t.gate.expired.title}</h3>
-            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">
-              {t.gate.expired.bodyBefore}<span className="text-white/80">{t.gate.expired.bodyAccent}</span>{t.gate.expired.bodyAfter}
-            </p>
-            <div className="mt-5 flex flex-wrap items-center gap-4">
-              {renewState !== 'sent' ? (
-                <button
-                  onClick={requestRenewal}
-                  disabled={renewState === 'sending'}
-                  type="button"
-                  className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-50"
-                >
-                  {renewState === 'sending' ? t.gate.expired.sending : t.gate.expired.cta}
-                </button>
-              ) : (
-                <button
-                  onClick={checkApproval}
-                  disabled={checkState === 'checking'}
-                  type="button"
-                  className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-50"
-                >
-                  {checkState === 'checking' ? t.gate.checking : t.gate.expired.check}
-                </button>
-              )}
-              {renewState === 'sent' && checkState !== 'still-pending' && (
-                <span className="text-[13px] text-white/40">{t.gate.expired.sent}</span>
-              )}
-              {checkState === 'still-pending' && (
-                <span className="text-[13px] text-white/40">{t.gate.stillPending}</span>
-              )}
-              {renewState === 'error' && (
-                <span className="text-[13px] text-coral-soft">{t.gate.failed}</span>
-              )}
-            </div>
-            <p className="mt-5 text-[12px] leading-relaxed text-white/32">
-              {t.gate.loginPrompt}
-              <Link
-                href="/login"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-1 text-white/50 underline underline-offset-2 hover:text-white"
-              >
-                {t.gate.loginLink}
-              </Link>
-            </p>
-          </>
-        ) : guestKnown && !guestApproved ? (
-          <>
-            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
-              {t.gate.waiting.eyebrow}
-            </div>
-            <h3 className="text-xl font-semibold">{t.gate.waiting.title}</h3>
-            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">
-              {t.gate.waiting.bodyBefore}<span className="text-white/80">{t.gate.waiting.bodyAccent}</span>{t.gate.waiting.bodyAfter}
-            </p>
-            <div className="mt-5 flex flex-wrap items-center gap-4">
-              <button
-                onClick={checkApproval}
-                disabled={checkState === 'checking'}
-                type="button"
-                className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-50"
-              >
-                {checkState === 'checking' ? t.gate.checking : t.gate.waiting.check}
-              </button>
-              {checkState === 'still-pending' && (
-                <span className="text-[13px] text-white/40">{t.gate.stillPending}</span>
-              )}
-            </div>
-            <p className="mt-5 text-[12px] leading-relaxed text-white/32">
-              {t.gate.loginPrompt}
-              <Link
-                href="/login"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-1 text-white/50 underline underline-offset-2 hover:text-white"
-              >
-                {t.gate.loginLink}
-              </Link>
-            </p>
-          </>
-        ) : (
-          <>
-            <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
-              {t.gate.register.eyebrow}
-            </div>
-            <h3 className="text-xl font-semibold">{t.gate.register.title}</h3>
-            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">
-              {t.gate.register.bodyBefore}<span className="text-white/80">{t.gate.register.bodyAccent}</span>{t.gate.register.bodyMiddle}<span className="text-white/80">{t.gate.register.bodyAccent2}</span>{t.gate.register.bodyAfter}
-            </p>
+            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">{t.gate.body}</p>
             <div className="mt-6 grid gap-3">
               <input
                 value={gateName}
                 onChange={e => setGateName(e.target.value)}
                 maxLength={60}
-                placeholder={t.gate.register.namePlaceholder}
+                placeholder={t.gate.namePlaceholder}
                 className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
               />
               <input
-                value={gateContact}
-                onChange={e => setGateContact(e.target.value)}
+                value={gateEmail}
+                onChange={e => setGateEmail(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') void sendGateCode();
+                }}
+                type="email"
+                autoComplete="email"
                 maxLength={120}
-                placeholder={t.gate.register.contactPlaceholder}
+                placeholder={t.gate.emailPlaceholder}
                 className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
               />
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-4">
               <button
-                onClick={registerGuest}
-                disabled={!gateName.trim() || !gateContact.trim() || gateState === 'sending'}
+                onClick={sendGateCode}
+                disabled={!gateName.trim() || !gateEmail.trim() || gateBusy}
                 type="button"
                 className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-40"
               >
-                {gateState === 'sending' ? t.gate.register.sending : t.gate.register.cta}
+                {gateBusy ? t.gate.sending : t.gate.cta}
               </button>
-              {gateState === 'error' && (
-                <span className="text-[13px] text-coral-soft">{t.gate.registerFailed}</span>
-              )}
+              {gateError && <span className="text-[13px] text-coral-soft">{gateError}</span>}
             </div>
-            <p className="mt-5 text-[12px] leading-relaxed text-white/32">
-              {t.gate.register.privacy}{t.gate.loginPrompt}
-              <Link
-                href="/login"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-1 text-white/50 underline underline-offset-2 hover:text-white"
-              >
-                {t.gate.loginLink}
-              </Link>
+            <p className="mt-5 text-[12px] leading-relaxed text-white/32">{t.gate.privacy}</p>
+            <p className="mt-1.5 text-[12px] leading-relaxed text-white/32">{t.gate.alreadyMember}</p>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">
+              {t.gate.codeSentTo(gateEmail.trim())}
+              <br />
+              <span className="text-white/35">{t.gate.codeHint}</span>
             </p>
+            <input
+              value={gateCode}
+              onChange={e => setGateCode(e.target.value.replace(/[^\d\s]/g, '').slice(0, 8))}
+              onKeyDown={e => {
+                if (e.key === 'Enter') void verifyGateCode();
+              }}
+              // 手机上弹数字键盘；one-time-code 让系统能从邮件通知里一键填充，
+              // 人不用切出去再回来——切出去这个标签页就可能被系统回收
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={8}
+              autoFocus
+              placeholder={t.gate.codePlaceholder}
+              className="mt-5 w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-center font-mono text-[20px] tracking-[0.4em] text-white placeholder:tracking-normal placeholder:font-sans placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
+            />
+            <div className="mt-4 flex flex-wrap items-center gap-4">
+              <button
+                onClick={verifyGateCode}
+                disabled={gateCode.replace(/\s+/g, '').length !== 6 || gateBusy}
+                type="button"
+                className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-40"
+              >
+                {gateBusy ? t.gate.verifying : t.gate.codeCta}
+              </button>
+              {gateError && <span className="text-[13px] text-coral-soft">{gateError}</span>}
+            </div>
+            <div className="mt-5 flex items-center justify-between text-[12px] text-white/32">
+              <button
+                onClick={() => {
+                  setGateStep('form');
+                  setGateCode('');
+                  setGateError('');
+                }}
+                type="button"
+                className="underline-offset-4 transition-colors hover:text-white hover:underline"
+              >
+                {t.gate.changeEmail}
+              </button>
+              <button
+                onClick={sendGateCode}
+                disabled={gateCooldown > 0 || gateBusy}
+                type="button"
+                className="underline-offset-4 transition-colors hover:text-white hover:underline disabled:no-underline disabled:hover:text-white/32"
+              >
+                {gateCooldown > 0 ? t.gate.resendIn(gateCooldown) : t.gate.resend}
+              </button>
+            </div>
           </>
         )}
       </div>

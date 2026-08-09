@@ -349,6 +349,23 @@ export const home = {
         badImage: '请上传 JPG / PNG / WebP / HEIC 图片',
         imageTooLarge: '图片过大，请压缩到 5MB 以内',
       },
+
+      /** 走完七步之后的验证：确认这个邮箱确实是本人的，验过了才建号 */
+      verify: {
+        title: '最后一步：确认邮箱',
+        sentTo: (email: string) => `验证码已发到 ${email}`,
+        hint: '10 分钟内有效。没收到就看看垃圾邮件夹。',
+        placeholder: '六位验证码',
+        cta: '🌱 种下我的种子',
+        verifying: '正在种下…',
+        resend: '重新发送',
+        resendIn: (seconds: number) => `${seconds} 秒后可重新发送`,
+        back: '改一下邮箱',
+        error: {
+          code: '验证码不对，或者已经过期了。可以重新发送一个。',
+          send: '没发出去，稍后再试一次。',
+        },
+      },
     },
   },
 

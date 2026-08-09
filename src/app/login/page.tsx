@@ -50,9 +50,7 @@ export default async function LoginPage({ searchParams }: Props) {
             {t.title}
           </h1>
           <p className="text-[14px] leading-relaxed text-text-secondary mb-6">
-            {t.lede1}
-            <br />
-            {t.lede2}
+            {t.lede}
           </p>
 
           {errMsg && (

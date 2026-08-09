@@ -37,6 +37,8 @@ export type NodeCard = {
   /** AI 推荐生成时间（ISO） — 让用户知道现在看到的是什么时候的快照 */
   ai_recommendations_at?: string;
   created_at?: string;
+  /** 走验证码登录成功时盖上——「这个邮箱确实是本人的」的唯一凭据 */
+  email_verified_at?: string | null;
 };
 
 /**

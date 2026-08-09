@@ -6,8 +6,7 @@ export const login: typeof zhLogin = {
 
   eyebrow: 'Login',
   title: 'Log in to your node',
-  lede1: 'Enter the email you signed up with, and we’ll send you a code.',
-  lede2: 'Type the code back here to log in — in whichever browser you’re using.',
+  lede: 'Enter the email you signed up with, then type the code to log in.',
 
   emailPlaceholder: 'The email you signed up with',
   submit: 'Send code',

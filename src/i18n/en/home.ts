@@ -341,6 +341,22 @@ export const home: typeof zhHome = {
         badImage: 'Please upload a JPG / PNG / WebP / HEIC image',
         imageTooLarge: 'That image is too large—please compress it to under 5MB',
       },
+
+      verify: {
+        title: 'Last step: confirm your email',
+        sentTo: (email: string) => `We sent a code to ${email}`,
+        hint: 'Valid for 10 minutes. If it hasn’t arrived, check your spam folder.',
+        placeholder: '6-digit code',
+        cta: '🌱 Plant my seed',
+        verifying: 'Planting…',
+        resend: 'Send again',
+        resendIn: (seconds: number) => `You can send again in ${seconds}s`,
+        back: 'Change the email',
+        error: {
+          code: 'That code isn’t right, or it has expired. You can send a new one.',
+          send: 'That didn’t send. Try again in a moment.',
+        },
+      },
     },
   },
 

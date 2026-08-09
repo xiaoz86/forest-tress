@@ -225,49 +225,32 @@ export const philCoach: typeof zhPhilCoach = {
 
     gate: {
       close: 'Close for now, back to the conversation',
-      loginPrompt: 'Already a tree in the forest?',
-      loginLink: 'Log in (new window, won’t affect this conversation)',
 
-      expired: {
-        eyebrow: 'One journey done',
-        title: 'Your free 3 months are up',
-        bodyBefore: 'Your free period has ended. To keep going, ask for an extension below—once we confirm, we’ll open',
-        bodyAccent: 'another 3 free months of phil-coach and support',
-        bodyAfter: ' (usually quickly). Your conversation is still below, there to read any time.',
-        cta: 'Ask for an extension',
-        sending: 'Sending…',
-        sent: 'Your request is in. Once we confirm, you can carry on.',
-        check: 'Check if it’s renewed',
+      eyebrow: 'Before you carry on',
+      title: 'Leave a name, and we can keep going',
+      body: 'You’ve walked the first stretch. Leave a name and an email and we can carry on — you’ll also become a tree in the forest, with three months of phil-coach free.',
+      namePlaceholder: 'What should we call you',
+      emailPlaceholder: 'Your email',
+      cta: 'Continue',
+      sending: 'Sending…',
+      privacy: 'We only use this to get to know you and reach you — nothing else.',
+      alreadyMember: 'Already a tree in the forest? Just use the same email — I’ll recognise you.',
+
+      codeSentTo: (email: string) => `We sent a code to ${email}`,
+      codeHint: 'Valid for 10 minutes. If it hasn’t arrived, check your spam folder.',
+      codePlaceholder: '6-digit code',
+      codeCta: 'Done',
+      verifying: 'Checking…',
+      resend: 'Send again',
+      resendIn: (seconds: number) => `You can send again in ${seconds}s`,
+      changeEmail: 'Change the email',
+
+      error: {
+        code: 'That code isn’t right, or it has expired. You can send a new one.',
+        tooMany: 'That’s a lot of tries. Give it a few minutes.',
+        send: 'That didn’t send. Try again in a moment.',
+        network: 'Network trouble. Please try again shortly.',
       },
-
-      waiting: {
-        eyebrow: 'Almost there',
-        title: 'Got it—we’re setting you up',
-        bodyBefore: 'We’ve received your details and we’re opening up',
-        bodyAccent: '3 free months of phil-coach and support',
-        bodyAfter: ' (usually quickly). Once you’re through, we’ll also add you on WeChat and invite you into the Nearby Forest group. Your conversation is still below—just carry on once it’s open.',
-        check: 'Check if it’s open',
-      },
-
-      register: {
-        eyebrow: 'Before you carry on',
-        title: 'Leave a name, keep using it free',
-        bodyBefore: 'You’ve walked the first stretch. Leave a name and a WeChat ID, and once we confirm, Nearby Forest will keep',
-        bodyAccent: '3 free months of phil-coach and support',
-        bodyMiddle: ' open for you (usually quickly). We’ll add you on WeChat and invite you into the group—where you can share feedback, and where there are also',
-        bodyAccent2: 'real coaches on hand',
-        bodyAfter: '. Your conversation below stays put, there to read any time.',
-        namePlaceholder: 'What should we call you',
-        contactPlaceholder: 'WeChat ID (or email)',
-        cta: 'Submit',
-        sending: 'Sending…',
-        privacy: 'We only use this to get to know you and reach you—nothing else.',
-      },
-
-      checking: 'Checking…',
-      stillPending: 'Still on its way—try again in a little while.',
-      failed: 'That didn’t send. Try again in a moment.',
-      registerFailed: 'That didn’t work. Try again in a moment.',
     },
   },
 
