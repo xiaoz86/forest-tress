@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { normalizeCodeInput } from '@/lib/loginCode';
+import { toPublicNodes } from '@/lib/publicNode';
 import { consumeCode, issueCode } from '@/lib/loginCodeStore';
 import { notifyLoginCode } from '@/lib/notify';
 import { matchNodesAI, type MatchedNode } from '@/lib/match';
@@ -267,7 +268,8 @@ export async function POST(request: NextRequest) {
     const res = NextResponse.json({
       success: true,
       data,
-      matches,
+      // 别人的卡不带联系方式出门
+      matches: toPublicNodes(matches),
       memberId: newNode?.id,
       welcomeEmailSent,
     });

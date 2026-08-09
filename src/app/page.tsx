@@ -14,6 +14,7 @@ import StorySection from '@/components/home/StorySection';
 import ValueSection from '@/components/home/ValueSection';
 import { dict } from '@/i18n';
 import { getLocale } from '@/lib/locale';
+import { toPublicGraph } from '@/lib/publicNode';
 import { buildRelationGraph } from '@/lib/network';
 import type { NodeCard } from '@/lib/supabase';
 
@@ -204,7 +205,7 @@ export default async function Home() {
             </div>
 
             <div className="px-2 max-md:px-0">
-              <RelationNetwork graph={showcaseGraph} isMember={false} animate locale={locale} />
+              <RelationNetwork graph={toPublicGraph(showcaseGraph)} isMember={false} animate locale={locale} />
             </div>
 
             <p className="mx-auto mt-6 max-w-[520px] text-center text-[13px] leading-[1.9] text-text-light">

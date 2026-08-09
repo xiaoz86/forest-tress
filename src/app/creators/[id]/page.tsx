@@ -14,6 +14,7 @@ import { buildRelationGraph } from '@/lib/network';
 import { isAdminId } from '@/lib/admin';
 import { getAuthenticatedMemberId } from '@/lib/session';
 import { canSeeContacts } from '@/lib/memberTrust';
+import { toPublicGraph } from '@/lib/publicNode';
 import { dict } from '@/i18n';
 import { getLocale, type Locale } from '@/lib/locale';
 import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
@@ -251,7 +252,7 @@ export default async function CreatorDetail({ params }: Props) {
             </p>
           ) : (
             <div className="bg-white rounded-2xl border border-black/[0.06] p-6 shadow-[0_2px_20px_rgba(0,0,0,0.04)] max-md:p-3">
-              <RelationNetwork locale={locale} graph={graph} isMember={isMember} />
+              <RelationNetwork locale={locale} graph={toPublicGraph(graph)} isMember={isMember} />
             </div>
           )}
         </div>
