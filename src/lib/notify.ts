@@ -1,6 +1,11 @@
 import type { NodeCard } from './supabase';
 import { dict } from '@/i18n';
 import type { Locale } from '@/lib/locale';
+import {
+  buildOnboardingHtml,
+  buildOnboardingText,
+  onboardingSubject,
+} from '@/lib/onboardingEmail';
 import type { ShareEntry } from './shares';
 
 // 默认收件人：两位主理人。可通过 NOTIFY_EMAILS 环境变量覆盖，逗号分隔支持多个。
@@ -252,68 +257,6 @@ export async function notifyNewNode(node: NodeCard): Promise<EmailSendResult> {
   );
 }
 
-// ──────────────────────────────────────────────────────────────────
-// 给新成员本人发的「欢迎 + 登录入口」邮件
-// ──────────────────────────────────────────────────────────────────
-
-function buildWelcomeHtml(
-  node: NodeCard,
-  profileUrl: string,
-  magicLink: string,
-  locale: Locale,
-): string {
-  const t = dict(locale).email.welcome;
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>${escape(t.subject)}</title></head>
-<body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(26,46,26,0.08);">
-    <div style="padding:32px 32px 20px;background:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#fff;">
-      <div style="font-size:13px;opacity:0.75;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">${escape(t.eyebrow)}</div>
-      <h1 style="margin:0;font-size:22px;font-weight:700;">${escape(t.heading(node.name || ''))}</h1>
-    </div>
-    <div style="padding:24px 32px 8px;color:#2a2a2a;font-size:14px;line-height:1.8;">
-      <p style="margin:0 0 12px;">${escape(t.profileLead)}</p>
-      <p style="margin:0 0 18px;"><a href="${profileUrl}" style="color:#2d4a2d;font-weight:600;text-decoration:underline;">${profileUrl}</a></p>
-      <p style="margin:0 0 12px;">${escape(t.linkLead)}</p>
-      <p style="margin:18px 0;text-align:center;">
-        <a href="${magicLink}"
-           style="display:inline-block;padding:12px 28px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">
-          ${escape(t.cta)}
-        </a>
-      </p>
-      <p style="margin:0 0 6px;font-size:12px;color:#8a8a8a;">${escape(t.expiry)}</p>
-    </div>
-    <div style="padding:18px 32px 24px;background:#faf8f2;font-size:12px;color:#8a8a8a;text-align:center;">
-      ${escape(t.footer)}
-    </div>
-  </div>
-</body>
-</html>`;
-}
-
-function buildWelcomeText(
-  node: NodeCard,
-  profileUrl: string,
-  magicLink: string,
-  locale: Locale,
-): string {
-  const t = dict(locale).email.welcome;
-  return [
-    t.textGreeting(node.name || ''),
-    `─────────────────────`,
-    t.textProfile(profileUrl),
-    t.textLink(magicLink),
-    ``,
-    t.textBody,
-    t.textExpiry,
-  ].join('\n');
-}
-
-/**
- * 给新成员本人发欢迎邮件 + 登录链接（magic link）。
- * 返回 Resend 是否接受请求。
- */
 export async function notifyWelcome(
   node: NodeCard,
   magicLink: string,
@@ -328,8 +271,8 @@ export async function notifyWelcome(
   if (!node.id) return { ok: false, reason: 'skipped' };
 
   const from = process.env.NOTIFY_FROM?.trim() || '';
-  const profileUrl = `${getSiteOrigin()}/creators/${node.id}`;
-  const subject = dict(locale).email.welcome.subject;
+  // 中英文都走主理人手写的那封长信
+  const subject = onboardingSubject(locale);
 
   return sendCriticalEmail(
     'welcome',
@@ -337,8 +280,10 @@ export async function notifyWelcome(
       from,
       to: [to],
       subject,
-      html: buildWelcomeHtml(node, profileUrl, magicLink, locale),
-      text: buildWelcomeText(node, profileUrl, magicLink, locale),
+      // 中英文各有一版主理人手写的长信（不是互译）。登录按钮在第一屏，
+      // 功能没被埋在长文下面。
+      html: buildOnboardingHtml(node.name || '', locale, magicLink),
+      text: buildOnboardingText(node.name || '', locale, magicLink),
     },
     `welcome/${node.id}`,
   );
