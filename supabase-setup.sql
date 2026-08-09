@@ -414,3 +414,34 @@ create index if not exists idx_meditation_notes_member
 -- 浏览器直连的话，匿名那层就等于没有——谁都能查出 author_name。
 alter table meditation_notes enable row level security;
 
+
+-- ============================================================
+-- 2026-08-09 邮箱验证码登录（需在 SQL Editor 执行）
+--
+-- 原来只有 magic link，必须在收信那个客户端里点开。手机上收信在邮件 App，
+-- 点开进的是 App 内置浏览器，和 Safari / Chrome 不共享 cookie——人想在
+-- 浏览器里登录就没辙。验证码把「在哪收信」和「在哪登录」解耦。
+--
+-- 不存明文码，存 HMAC(邮箱 + 码)：库被读走也换不出能用的码。
+create table if not exists login_codes (
+  id uuid default gen_random_uuid() primary key,
+  email text not null,                       -- 一律小写规范化后再存
+  node_id uuid references node_cards(id) on delete cascade,
+  code_hash text not null,                   -- HMAC-SHA256(email:code, AUTH_SECRET)
+  expires_at timestamptz not null,           -- 签发后 10 分钟
+  attempts int not null default 0,           -- 错误次数，到 5 即作废
+  consumed_at timestamptz,                   -- 用过就不能再用，防重放
+  created_at timestamptz default now()
+);
+
+-- 校验时按邮箱取最新那条，这个索引撑住它
+create index if not exists idx_login_codes_email
+  on login_codes(email, created_at desc);
+
+-- 和 program_orders 一样：开 RLS 不加 policy = 只有服务端能读写。
+-- 这张表要是能被浏览器直连读到，等于把所有人的登录码摆在外面。
+alter table login_codes enable row level security;
+
+-- 邮箱是否验证过。验证码登录成功即盖章——它本身就证明了这个人能收到这个邮箱。
+-- 注册时不验证邮箱，所以这一列是「这个人真的拥有这个邮箱」的唯一凭据。
+alter table node_cards add column if not exists email_verified_at timestamptz;

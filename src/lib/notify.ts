@@ -30,7 +30,7 @@ export type EmailSendResult =
       status?: number;
     };
 
-type CriticalEmailKind = 'new-node' | 'welcome' | 'login-link' | 'program-claim';
+type CriticalEmailKind = 'new-node' | 'welcome' | 'login-link' | 'login-code' | 'program-claim';
 
 type ResendMessage = {
   from: string;
@@ -290,50 +290,39 @@ export async function notifyWelcome(
 }
 
 /**
- * 用户在 /login 页面输入邮箱重新申请登录链接时调用。
- * `node` 是按邮箱查到的成员节点。
+ * 邮箱验证码。
+ *
+ * 幂等键带上码本身：同一个人连点两次「重新发送」会拿到两个不同的码、
+ * 两封信——这是对的，因为服务端只认最新那个码，旧的已经作废。
+ * 如果按邮箱做幂等，第二次就发不出去，人会以为没收到而一直等。
  */
-export async function notifyLoginLink(
-  node: NodeCard,
-  magicLink: string,
-  /** 申请登录链接那一刻的语言 */
+export async function notifyLoginCode(
+  to: string,
+  code: string,
   locale: Locale,
 ): Promise<EmailSendResult> {
-  const to = (node.email || '').trim();
-  if (!to) return { ok: false, reason: 'skipped' };
-  if (!node.id) return { ok: false, reason: 'skipped' };
-
   const from = process.env.NOTIFY_FROM?.trim() || '';
-  const profileUrl = `${getSiteOrigin()}/creators/${node.id}`;
-  const t = dict(locale).email.loginLink;
-  const subject = t.subject;
+  const t = dict(locale).email.loginCode;
 
   const html = `<!DOCTYPE html>
-<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
-  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:28px 32px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
+<html lang="${locale === 'en' ? 'en' : 'zh-CN'}"><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
+  <div style="max-width:480px;margin:0 auto;background:#fff;border-radius:16px;padding:28px 32px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
     <h2 style="margin:0 0 12px;font-size:18px;color:#2d4a2d;">${escape(t.heading)}</h2>
-    <p style="font-size:14px;color:#2a2a2a;line-height:1.8;margin:0 0 18px;">${escape(t.body(node.name || ''))}</p>
-    <p style="text-align:center;margin:18px 0;">
-      <a href="${magicLink}" style="display:inline-block;padding:12px 28px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">${escape(t.cta)}</a>
-    </p>
+    <p style="font-size:14px;color:#2a2a2a;line-height:1.8;margin:0 0 20px;">${escape(t.body)}</p>
+    <div style="text-align:center;margin:0 0 20px;">
+      <div style="display:inline-block;padding:14px 28px;background:#f7faf5;border:1px solid rgba(45,74,45,0.16);border-radius:12px;font-size:30px;font-weight:700;letter-spacing:8px;color:#2d4a2d;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">${escape(code)}</div>
+    </div>
     <p style="font-size:12px;color:#8a8a8a;margin:0 0 4px;">${escape(t.expiry)}</p>
-    <p style="font-size:12px;color:#8a8a8a;margin:0;">${escape(t.profileLabel)}<a href="${profileUrl}" style="color:#2d4a2d;">${profileUrl}</a></p>
+    <p style="font-size:12px;color:#8a8a8a;margin:0;">${escape(t.ignore)}</p>
   </div>
 </body></html>`;
 
-  const text = [
-    t.textTitle,
-    t.textLead,
-    magicLink,
-    ``,
-    t.textIgnore,
-    t.textProfile(profileUrl),
-  ].join('\n');
+  const text = [t.textTitle, '', t.textCode(code), t.textExpiry, '', t.textIgnore].join('\n');
 
   return sendCriticalEmail(
-    'login-link',
-    { from, to: [to], subject, html, text },
-    `login-link/${node.id}/${Math.floor(Date.now() / 60_000)}`,
+    'login-code',
+    { from, to: [to], subject: t.subject(code), html, text },
+    `login-code/${code}`,
   );
 }
 

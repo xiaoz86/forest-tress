@@ -4,16 +4,16 @@
 // 所以一条都不走 content-en.json 那张对照表。
 export const login = {
   metaTitle: '登录 · 附近森林',
-  metaDescription: '用注册邮箱接收登录链接',
+  metaDescription: '用注册邮箱接收登录验证码',
 
   eyebrow: 'Login · 登录',
   title: '登录到你的节点',
   /** 两句话中间要换行，所以拆成两条，不要在外面拼 */
-  lede1: '输入注册时填写的邮箱，我们会把登录链接发到你邮箱。',
-  lede2: '点击链接即可回到你的个人页。',
+  lede1: '输入注册时填写的邮箱，我们会把验证码发过去。',
+  lede2: '填回验证码就能登录——在哪个浏览器都行。',
 
   emailPlaceholder: '注册时填的邮箱',
-  submit: '发送登录链接',
+  submit: '发送验证码',
   sending: '发送中…',
 
   /**
@@ -37,4 +37,24 @@ export const login = {
   benefits: '登录用于已加入的成员：可编辑资料、查看同频伙伴 AI 推荐，并解锁个性化 phil-coach——记得你的专属虚拟陪伴教练，等更多服务。',
   /** 「先填一张节点卡加入森林」是个指向 /#join 的链接，所以句子拆成两截 */
   noAccount: { before: '还没有节点？', link: '先填一张节点卡加入森林' },
+
+  // ── 第二步：填验证码 ──
+  code: {
+    /** 邮箱不回显全称，只提示发到哪了 */
+    sentTo: (email: string) => `验证码已发到 ${email}`,
+    hint: '10 分钟内有效。没收到就看看垃圾邮件夹。',
+    placeholder: '六位验证码',
+    submit: '登录',
+    verifying: '登录中…',
+    resend: '重新发送',
+    /** 服务端有 60 秒冷却，界面上把剩余秒数显出来，别让人干等 */
+    resendIn: (seconds: number) => `${seconds} 秒后可重新发送`,
+    changeEmail: '换个邮箱',
+    error: {
+      /** 不区分「码错了」和「没有这个码」——区分就等于说出这个邮箱注册过 */
+      invalid: '验证码不对，或者已经过期了。可以重新发送一个。',
+      tooMany: '试得有点多了，等几分钟再来。',
+      network: '网络不太顺，稍后再试。',
+    },
+  },
 };

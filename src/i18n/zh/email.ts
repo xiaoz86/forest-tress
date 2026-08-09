@@ -27,17 +27,19 @@ export const email = {
     textExpiry: '如链接过期，可在 nearby-forest.club/login 重新获取。',
   },
 
-  loginLink: {
-    subject: '🔐 你的附近森林登录链接',
-    heading: '登录到你的节点',
-    body: (name: string) => `点击下方按钮，即可登录到 ${name} 的个人页。`,
-    cta: '点击登录',
-    expiry: '链接 7 天内有效。如果不是你本人申请，请忽略。',
-    profileLabel: '个人页：',
 
-    textTitle: '登录到你的节点（附近森林）',
-    textLead: '点击下方链接即可登录（7 天内有效）：',
-    textIgnore: '如果不是你本人申请，请忽略此邮件。',
-    textProfile: (url: string) => `个人页：${url}`,
+  /** 邮箱验证码登录：把码发过去，人在自己的浏览器里填 */
+  loginCode: {
+    subject: (code: string) => `${code} 是你的附近森林登录验证码`,
+    heading: '你的登录验证码',
+    body: '把下面这六位数字填回刚才那个页面，就能登录。',
+    /** 码本身单独一行大字显示，不要和别的话挤在一起 */
+    expiry: '验证码 10 分钟内有效，只能用一次。',
+    ignore: '如果不是你本人在登录，忽略这封信就好——没有这串数字，别人进不去。',
+
+    textTitle: '你的附近森林登录验证码',
+    textCode: (code: string) => `验证码：${code}`,
+    textExpiry: '10 分钟内有效，只能用一次。',
+    textIgnore: '如果不是你本人在登录，忽略这封信即可。',
   },
 };
