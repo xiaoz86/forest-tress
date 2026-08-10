@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isProfileComplete } from '@/lib/memberTrust';
+import type { NodeCard } from '@/lib/supabase';
 import { getAuthenticatedMemberId } from '@/lib/session';
 import { createChatCompletion } from '@/lib/llm';
 import { PROFILE_PATH, normalizePhilProfileName } from '@/lib/philCoach';
@@ -29,12 +31,19 @@ export async function GET() {
       .eq('node_id', memberId)
       .order('created_at', { ascending: false })
       .limit(MAX_MEMORIES_PER_NODE),
-    sb.from('node_cards').select('name').eq('id', memberId).maybeSingle(),
+    sb.from('node_cards').select('name, doing, topics, email').eq('id', memberId).maybeSingle(),
   ]);
   if (error) return NextResponse.json({ error: 'query-failed' }, { status: 500 });
   const hasProfile = (data ?? []).some(memory => memory.path_id === PROFILE_PATH);
   const profileName = hasProfile ? normalizePhilProfileName(node?.name) : '';
-  return NextResponse.json({ memories: data ?? [], profileName });
+  // 卡片填完了没有：轻两步建出来的卡只有称呼和邮箱，对话界面据此决定
+  // 要不要在收尾处出那句「把节点卡填完」的邀请
+  return NextResponse.json({
+    memories: data ?? [],
+    profileName,
+    memberId,
+    profileComplete: isProfileComplete(node as NodeCard | null),
+  });
 }
 
 type SaveBody = {

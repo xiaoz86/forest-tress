@@ -177,6 +177,8 @@ export const philCoach: typeof zhPhilCoach = {
       failed: 'Didn’t save. Try again',
     },
 
+    inviteAfterClose: 'That went somewhere today. Shall we let PhilCoach know you from here on, and bring you closer to Nearby Forest?',
+    inviteAfterCloseCta: 'Complete my node card',
     againPath: 'Walk another path',
     join: 'Become a tree in the forest',
 
@@ -245,6 +247,13 @@ export const philCoach: typeof zhPhilCoach = {
       resendIn: (seconds: number) => `You can send again in ${seconds}s`,
       changeEmail: 'Change the email',
 
+      profile: {
+        eyebrow: 'Almost there',
+        title: 'Let your tree grow some leaves',
+        body: 'We’ve talked for a while now. Before we go further, please fill in your node card — what you’re working on, what you care about, who you’re looking for. Only then can the forest tell who to introduce you to.',
+        cta: 'Complete my card',
+        note: 'Edit it on your own page — a few minutes. Come back and we’ll carry on.',
+      },
       error: {
         code: 'That code isn’t right, or it has expired. You can send a new one.',
         tooMany: 'That’s a lot of tries. Give it a few minutes.',

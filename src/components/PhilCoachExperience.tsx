@@ -230,6 +230,16 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const [showGate, setShowGate] = useState(false);
   /** 浮层两步：留称呼和邮箱 → 填验证码。都在这一页完成，不跳走。 */
   const [gateStep, setGateStep] = useState<'form' | 'code'>('form');
+  /**
+   * 被哪一道闸拦下的。
+   *   member  —— 8 轮，还不是成员：走轻两步（称呼 + 邮箱 + 验证码）
+   *   profile —— 40 轮，是成员但卡片还薄：请他把节点卡填完
+   */
+  const [gateKind, setGateKind] = useState<'member' | 'profile'>('member');
+  /** 自己的节点 id，补卡片时跳过去用 */
+  const [myMemberId, setMyMemberId] = useState('');
+  /** 卡片填完了没有。薄卡片的人才会在收尾处看到那句邀请。 */
+  const [profileComplete, setProfileComplete] = useState(true);
   const [gateName, setGateName] = useState('');
   const [gateEmail, setGateEmail] = useState('');
   const [gateCode, setGateCode] = useState('');
@@ -509,6 +519,8 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
         }
         setLoggedIn(true);
         setProfileName(normalizePhilProfileName(json.profileName));
+        setProfileComplete(Boolean(json.profileComplete));
+        if (typeof json.memberId === 'string') setMyMemberId(json.memberId);
         const mems: { path_id?: string }[] = json.memories ?? [];
         setProfileKnown(mems.some(m => m.path_id === PROFILE_PATH));
         // 第一次：还没有任何记忆时，默认把注册资料导入为「关于我」种子
@@ -663,7 +675,9 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       }),
     });
     const json = await res.json().catch(() => ({}));
-    if (res.status === 403 && json.error === 'member-required') {
+    if (res.status === 403 && (json.error === 'member-required' || json.error === 'profile-required')) {
+      setGateKind(json.error === 'profile-required' ? 'profile' : 'member');
+      if (typeof json.memberId === 'string') setMyMemberId(json.memberId);
       return 'gate';
     }
     if (!res.ok || typeof json.reply !== 'string') {
@@ -862,11 +876,27 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
         </button>
 
         <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
-          {t.gate.eyebrow}
+          {gateKind === 'profile' ? t.gate.profile.eyebrow : t.gate.eyebrow}
         </div>
-        <h3 className="text-xl font-semibold">{t.gate.title}</h3>
+        <h3 className="text-xl font-semibold">
+          {gateKind === 'profile' ? t.gate.profile.title : t.gate.title}
+        </h3>
 
-        {gateStep === 'form' ? (
+        {gateKind === 'profile' ? (
+          <>
+            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">{t.gate.profile.body}</p>
+            <div className="mt-6">
+              {/* 引到本人节点页的编辑器，不是重新走注册——那条路会撞 email-taken */}
+              <Link
+                href={myMemberId ? `/creators/${myMemberId}` : '/login'}
+                className="inline-block rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] no-underline"
+              >
+                {t.gate.profile.cta}
+              </Link>
+            </div>
+            <p className="mt-5 text-[12px] leading-relaxed text-white/32">{t.gate.profile.note}</p>
+          </>
+        ) : gateStep === 'form' ? (
           <>
             <p className="mt-3 text-[14px] leading-[1.95] text-white/55">{t.gate.body}</p>
             <div className="mt-6 grid gap-3">
@@ -1388,15 +1418,34 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
         >
           {t.againPath}
         </button>
-        <Link
-          href="/#join"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-full bg-coral-soft px-5 py-2.5 text-[14px] font-medium text-[#20140f] no-underline transition-opacity hover:opacity-90"
-        >
-          {t.join}
-        </Link>
+        {!loggedIn && (
+          <Link
+            href="/#join"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-full bg-coral-soft px-5 py-2.5 text-[14px] font-medium text-[#20140f] no-underline transition-opacity hover:opacity-90"
+          >
+            {t.join}
+          </Link>
+        )}
       </div>
+
+      {/*
+        对话走到收尾之后的一句邀请。只对「已经是成员、但卡片还薄」的人出现，
+        而且刻意做成一行浅色小字 + 一个链接——不弹窗、不拦人、不预勾选，
+        可以完全忽略。刚聊完一场好对话的人答应的意愿，远高于在墙上被拦住的那一秒。
+      */}
+      {loggedIn && !profileComplete && (
+        <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4">
+          <p className="text-[13px] leading-[1.9] text-white/50">{t.inviteAfterClose}</p>
+          <Link
+            href={myMemberId ? `/creators/${myMemberId}` : '/login'}
+            className="mt-2 inline-block text-[13px] text-coral-soft no-underline underline-offset-4 hover:underline"
+          >
+            {t.inviteAfterCloseCta} →
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

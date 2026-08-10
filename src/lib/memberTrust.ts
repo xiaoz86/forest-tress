@@ -22,3 +22,25 @@ export function canSeeContacts(viewer: NodeCard | null | undefined): boolean {
   const created = viewer.created_at ? Date.parse(viewer.created_at) : NaN;
   return Number.isFinite(created) && created < GRANDFATHER_BEFORE;
 }
+
+/**
+ * 节点卡填完了没有。
+ *
+ * 判据取自七步向导里真正必填的那几项：称呼 + 正在做（第 1 步）、
+ * 至少一个关注议题（第 2 步）、邮箱（第 7 步）。改向导的必填项时，
+ * 这里要跟着改，否则会出现「向导过得了、这里判不过」的死循环。
+ *
+ * phil-coach 的闸门分两道：
+ *   8 轮   → 要求「是成员」（轻两步：称呼 + 邮箱 + 验证码）
+ *   40 轮  → 要求「卡片填完了」
+ * 轻两步建出来的卡只有称呼和邮箱，走到 40 轮就会撞上第二道。
+ */
+export function isProfileComplete(node: NodeCard | null | undefined): boolean {
+  if (!node) return false;
+  return Boolean(
+    node.name?.trim() &&
+      node.doing?.trim() &&
+      (node.topics?.length ?? 0) > 0 &&
+      node.email?.trim(),
+  );
+}

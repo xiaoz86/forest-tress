@@ -8,9 +8,20 @@ import { COACH_WISDOM } from '@/lib/philCoachWisdom';
 import { fetchRelevantKnowledge } from '@/lib/philCoachKnowledge';
 import { GUEST_COOKIE, fetchMemoryBlock, guestActive, memoryClient } from '@/lib/philCoachMemory';
 import { normalizeVoiceAnalysis } from '@/lib/philCoachVoice';
+import { isProfileComplete } from '@/lib/memberTrust';
+import type { NodeCard } from '@/lib/supabase';
 
-/** 无身份时单次对话的免费回复轮数（约一条小径的长度），超过需轻登记 */
+/** 没身份时的免费轮数（约一条小径的长度）。超过要走轻两步成为成员。 */
 const GUEST_FREE_TURNS = 8;
+
+/**
+ * 成员但卡片还没填完时的上限。超过要把节点卡补完才能继续。
+ *
+ * 轻两步（称呼 + 邮箱 + 验证码）建出来的卡是薄的——进不了撮合，
+ * 在 /creators 里也只是一棵没长叶子的树。40 轮是个足够长的坡：
+ * 真正在用的人会走到，顺路把自己补完整；只是来试一下的人碰不到。
+ */
+const THIN_PROFILE_TURNS = 40;
 
 export const runtime = 'nodejs';
 
@@ -201,6 +212,21 @@ export async function POST(request: Request) {
       }
     }
     // Supabase 不可用时放行——对话可用性优先于闸门严格性
+  }
+
+  // 第二道：是成员了，但卡片还是薄的，聊到 40 轮就该把自己填完整
+  if (memberIdRaw && assistantTurns >= THIN_PROFILE_TURNS) {
+    const sb = memoryClient();
+    if (sb) {
+      const { data: me } = await sb
+        .from('node_cards')
+        .select('name, doing, topics, email')
+        .eq('id', memberIdRaw)
+        .maybeSingle();
+      if (me && !isProfileComplete(me as NodeCard)) {
+        return NextResponse.json({ error: 'profile-required', memberId: memberIdRaw }, { status: 403 });
+      }
+    }
   }
 
   // 从 Supabase 知识库取与近两条用户消息相关的深度材料（失败静默降级）
