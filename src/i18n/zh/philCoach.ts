@@ -175,7 +175,7 @@ export const philCoach = {
      * 答应的意愿远高于在墙上被拦住的那一秒。
      */
     inviteAfterClose: '今天这段挺深的。要不要也让 PhilCoach 以后都认识你，并走近附近森林？',
-    inviteAfterCloseCta: '把我的节点卡填完',
+    inviteAfterCloseCta: '填写完个人信息',
     againPath: '再走一条小径',
     join: '成为森林里的一棵树',
 

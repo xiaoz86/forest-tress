@@ -42,6 +42,15 @@ type Session = {
 const OPENING_INDEX_KEY = 'nf_phil_opening_index';
 /** 当前这段对话的暂存键：登录/注册跳走再回来，对话还在（只在本次浏览会话内，关掉标签页即散） */
 const DRAFT_SESSION_KEY = 'nf_phil_session';
+
+/**
+ * 聊满几轮才出那句「填写完个人信息」的邀请。
+ *
+ * 数的是 coach 说过几句，和服务端闸门那边口径一致——注意开场白也算一句，
+ * 所以 9 实际是「开场白 + 8 次真实回应」。短对话不打扰，
+ * 真聊进去的人才会看到。
+ */
+const INVITE_AFTER_TURNS = 9;
 /** 给浏览器听写多久证明它真的在工作；到点没出字就退回服务端分段转写 */
 const CAPTION_WATCHDOG_MS = 2500;
 const MIC_STARVE_CHECK_MS = 1200;   // 浏览器听写出第一个字之后，给自己的采音这么久证明它也活着
@@ -863,6 +872,9 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
    * 两步都在这一页完成，绝不跳走——对话存在 sessionStorage 里，
    * 跳一次页就没了。这也是为什么登录用验证码而不是邮件链接。
    */
+  // coach 说过几句（含开场白）——决定那句邀请出不出
+  const coachTurns = session ? session.thread.filter(item => item.kind === 'coach').length : 0;
+
   const gateOverlay = showGate ? (
     <div className="fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto bg-black/55 p-4 backdrop-blur-sm">
       <div className="relative w-full max-w-[560px] rounded-2xl border border-coral-soft/25 bg-[#131a15] p-8 shadow-[0_24px_80px_rgba(0,0,0,0.55)] max-md:p-6">
@@ -1431,11 +1443,13 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       </div>
 
       {/*
-        对话走到收尾之后的一句邀请。只对「已经是成员、但卡片还薄」的人出现，
+        对话走到收尾之后的一句邀请。聊满 INVITE_AFTER_TURNS 轮才出现——
+        短对话不打扰，只有真聊进去的人才会看到。
+        只对「已经是成员、但卡片还薄」的人出现，
         而且刻意做成一行浅色小字 + 一个链接——不弹窗、不拦人、不预勾选，
         可以完全忽略。刚聊完一场好对话的人答应的意愿，远高于在墙上被拦住的那一秒。
       */}
-      {loggedIn && !profileComplete && (
+      {loggedIn && !profileComplete && coachTurns >= INVITE_AFTER_TURNS && (
         <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4">
           <p className="text-[13px] leading-[1.9] text-white/50">{t.inviteAfterClose}</p>
           <Link

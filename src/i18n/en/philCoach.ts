@@ -178,7 +178,7 @@ export const philCoach: typeof zhPhilCoach = {
     },
 
     inviteAfterClose: 'That went somewhere today. Shall we let PhilCoach know you from here on, and bring you closer to Nearby Forest?',
-    inviteAfterCloseCta: 'Complete my node card',
+    inviteAfterCloseCta: 'Complete my profile',
     againPath: 'Walk another path',
     join: 'Become a tree in the forest',
 
