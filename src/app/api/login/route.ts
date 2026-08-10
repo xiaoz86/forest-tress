@@ -111,7 +111,8 @@ export async function POST(request: NextRequest) {
         console.error('[api/login] cannot issue code', issued.reason);
         return;
       }
-      const delivery = await notifyLoginCode(normalized, issued.code, locale);
+      // 这个邮箱已经是成员 = 登录；不是 = 正在开号（phil-coach 闸门那条路）
+      const delivery = await notifyLoginCode(normalized, issued.code, locale, node ? 'login' : 'signup');
       if (!delivery.ok) {
         console.error('[api/login] login code email not accepted', {
           reason: delivery.reason,

@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
           console.error('[api/join] cannot issue code', issued.reason);
           return;
         }
-        const delivery = await notifyLoginCode(email, issued.code, locale);
+        const delivery = await notifyLoginCode(email, issued.code, locale, 'signup');
         if (!delivery.ok) {
           console.error('[api/join] code email not accepted', delivery.reason);
         }
