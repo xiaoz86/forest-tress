@@ -28,7 +28,7 @@ export default async function OrdersPage() {
               「没登录」和「登录了但不是主理人」要分开说：
               对后者再喊一句「去登录」是死循环——他刚登录完。
             */}
-            <h1 className="text-2xl font-light">
+            <h1 className="text-2xl font-medium">
               {memberId ? '这一页只有主理人能看' : '需要先登录'}
             </h1>
             <p className="mt-4 text-sm leading-relaxed text-white/52">
@@ -38,7 +38,7 @@ export default async function OrdersPage() {
             </p>
             <Link
               href={memberId ? '/meditations' : '/login'}
-              className="mt-6 inline-flex rounded-full bg-white px-5 py-2 text-sm font-semibold text-[#111512] no-underline"
+              className="mt-6 inline-flex rounded-full bg-white px-5 py-2 text-sm font-medium text-[#111512] no-underline"
             >
               {memberId ? '回到声音林' : '去登录'}
             </Link>

@@ -26,13 +26,13 @@ export default async function MeditationAdminPage() {
             <div className="mb-4 text-[11px] font-medium tracking-[0.18em] text-coral-soft uppercase">
               Admin
             </div>
-            <h1 className="text-2xl font-light">需要管理员权限</h1>
+            <h1 className="text-2xl font-medium">需要管理员权限</h1>
             <p className="mt-4 text-sm leading-relaxed text-white/52">
               登录管理员节点后，可以编辑首页冥想区、分类菜单，并上传具体音频。
             </p>
             <Link
               href="/login"
-              className="mt-6 inline-flex rounded-full bg-white px-5 py-2 text-sm font-semibold text-[#111512] no-underline"
+              className="mt-6 inline-flex rounded-full bg-white px-5 py-2 text-sm font-medium text-[#111512] no-underline"
             >
               去登录
             </Link>

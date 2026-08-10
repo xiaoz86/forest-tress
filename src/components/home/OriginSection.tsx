@@ -52,10 +52,10 @@ export default function OriginSection({
           >
             {t.heading}
           </h2>
-          <p className="font-normal mt-6 text-[16px] leading-[1.85] text-ink-soft">{t.body}</p>
+          <p className="mt-6 text-[16px] leading-[1.85] text-ink-soft">{t.body}</p>
 
           <blockquote
-            className="mt-9 border-l border-forest pl-[22px] text-[clamp(1.15rem,2.2vw,1.375rem)] leading-[1.65] text-forest"
+            className="mt-9 border-l border-forest pl-[22px] text-[clamp(1.15rem,2.2vw,1.375rem)] font-normal leading-[1.65] text-forest"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
             {t.quoteTop}

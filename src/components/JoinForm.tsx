@@ -362,7 +362,7 @@ export default function JoinForm({ locale }: { locale: Locale }) {
               type="button"
               onClick={submit}
               disabled={code.length !== 6}
-              className="rounded-full bg-forest-deep px-6 py-3 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+              className="rounded-full bg-forest-deep px-6 py-3 text-sm font-medium text-white transition-opacity disabled:opacity-50"
             >
               {t.verify.cta}
             </button>
@@ -800,7 +800,7 @@ export default function JoinForm({ locale }: { locale: Locale }) {
               type="button"
               onClick={submit}
               disabled={!canNext || status === 'submitting'}
-              className={`px-7 py-3 rounded-full font-bold text-[14px] transition-all cursor-pointer ${
+              className={`px-7 py-3 rounded-full font-medium text-[14px] transition-all cursor-pointer ${
                 canNext && status !== 'submitting'
                   ? 'bg-gradient-to-br from-coral-soft to-warmth text-forest-deep hover:-translate-y-0.5 shadow-[0_4px_20px_rgba(212,160,160,0.3)]'
                   : 'bg-mist text-text-light/60 cursor-not-allowed'

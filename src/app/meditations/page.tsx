@@ -410,9 +410,9 @@ function CategoryHero({
         className="pointer-events-none absolute -top-40 right-[-12%] h-[420px] w-[620px] rounded-full blur-[110px] max-md:hidden"
         style={{ background: `radial-gradient(circle, ${aura}, transparent 70%)` }}
       />
-      <div className="font-normal relative max-w-[720px]">
+      <div className="relative max-w-[720px]">
         <div
-          className="text-[1.7rem]"
+          className="text-[1.7rem] font-normal"
           style={{
             fontFamily: 'var(--font-serif)',
             color: MOOD_GLYPH_INK[category.mood || 'forest'],

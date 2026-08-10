@@ -125,7 +125,7 @@ export default async function CreatorsPage() {
               </p>
               <Link
                 href="/#join"
-                className="inline-block px-8 py-3.5 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-bold rounded-full no-underline shadow-[0_4px_24px_rgba(212,160,160,0.3)] hover:-translate-y-0.5 transition-transform"
+                className="inline-block px-8 py-3.5 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-medium rounded-full no-underline shadow-[0_4px_24px_rgba(212,160,160,0.3)] hover:-translate-y-0.5 transition-transform"
               >
                 {t.empty.cta}
               </Link>
@@ -163,7 +163,7 @@ export default async function CreatorsPage() {
         </p>
         <Link
           href="/#join"
-          className="inline-block px-9 py-4 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-bold rounded-full no-underline shadow-[0_4px_24px_rgba(212,160,160,0.3)] hover:-translate-y-0.5 transition-transform"
+          className="inline-block px-9 py-4 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-medium rounded-full no-underline shadow-[0_4px_24px_rgba(212,160,160,0.3)] hover:-translate-y-0.5 transition-transform"
         >
           {t.cta.button}
         </Link>

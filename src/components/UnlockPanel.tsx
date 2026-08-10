@@ -127,7 +127,7 @@ export default function UnlockPanel({programId, priceCents, lockedCount, loggedI
       <div id="unlock" className={shell}>
         <Head lockedCount={lockedCount} t={t} />
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <a href="/login" className="rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] no-underline">
+          <a href="/login" className="rounded-full bg-white px-5 py-2 text-[13px] font-medium text-[#111512] no-underline">
             {t.signUpCta}
           </a>
           <span className="text-[13px] font-bold tabular-nums text-white">¥{price}</span>
@@ -257,7 +257,7 @@ export default function UnlockPanel({programId, priceCents, lockedCount, loggedI
           type="button"
           onClick={request}
           disabled={busy}
-          className="mt-4 rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] disabled:opacity-40"
+          className="mt-4 rounded-full bg-white px-5 py-2 text-[13px] font-medium text-[#111512] disabled:opacity-40"
         >
           {busy ? t.busy : t.rejected.retry}
         </button>
@@ -274,7 +274,7 @@ export default function UnlockPanel({programId, priceCents, lockedCount, loggedI
           type="button"
           onClick={request}
           disabled={busy}
-          className="rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] disabled:opacity-40"
+          className="rounded-full bg-white px-5 py-2 text-[13px] font-medium text-[#111512] disabled:opacity-40"
         >
           {busy ? t.busy : t.requestCta}
         </button>

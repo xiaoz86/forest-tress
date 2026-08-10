@@ -32,7 +32,7 @@ export default function ShareSubmitForm({ isLoggedIn, locale }: Props) {
         </p>
         <a
           href="/login"
-          className="mt-6 inline-flex rounded-full bg-forest-deep px-5 py-2.5 text-sm font-semibold text-white no-underline"
+          className="mt-6 inline-flex rounded-full bg-forest-deep px-5 py-2.5 text-sm font-medium text-white no-underline"
         >
           {t.signInCta}
         </a>
@@ -107,7 +107,7 @@ export default function ShareSubmitForm({ isLoggedIn, locale }: Props) {
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-full bg-forest-deep px-6 py-3 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+          className="rounded-full bg-forest-deep px-6 py-3 text-sm font-medium text-white transition-opacity disabled:opacity-50"
         >
           {submitting ? t.submitting : t.submitCta}
         </button>

@@ -361,7 +361,7 @@ export default async function AboutPage() {
         <h2 className="font-serif text-[clamp(1.4rem,2.8vw,1.8rem)] font-normal text-white mb-6 leading-[1.4]">{tr('也想把自己这棵树，放进森林？', locale)}</h2>
         <Link
           href="/#join"
-          className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-bold text-[16px] rounded-full no-underline shadow-[0_4px_24px_rgba(212,160,160,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(212,160,160,0.45)] transition-all"
+          className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-medium text-[16px] rounded-full no-underline shadow-[0_4px_24px_rgba(212,160,160,0.3)] hover:-translate-y-0.5 hover:shadow-[0_8px_32px_rgba(212,160,160,0.45)] transition-all"
         >{tr('种下一棵树', locale)}</Link>
       </section>
 

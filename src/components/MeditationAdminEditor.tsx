@@ -182,7 +182,7 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
             type="button"
             onClick={save}
             disabled={saving}
-            className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-[#111512] transition-opacity disabled:opacity-50"
+            className="rounded-full bg-white px-5 py-2 text-sm font-medium text-[#111512] transition-opacity disabled:opacity-50"
           >
             {saving ? '保存中' : '保存'}
           </button>

@@ -170,7 +170,7 @@ export default function TrackNotes({trackId, loggedIn, dark = false, onCountChan
               type="button"
               onClick={submit}
               disabled={busy || !body.trim()}
-              className={`rounded-full ${tone.submit} px-4 py-1.5 text-[12.5px] font-semibold transition-opacity disabled:opacity-35`}
+              className={`rounded-full ${tone.submit} px-4 py-1.5 text-[12.5px] font-medium transition-opacity disabled:opacity-35`}
             >
               {busy ? t.publishing : t.publish}
             </button>

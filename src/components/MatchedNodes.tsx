@@ -78,7 +78,7 @@ function HostContactCard({ t }: { t: ReturnType<typeof dict>['creatorDetail'] })
           <button
             type="button"
             onClick={handleCopy}
-            className={`text-xs font-semibold rounded-full px-3 py-1 transition-all border cursor-pointer whitespace-nowrap flex-shrink-0 ${
+            className={`text-xs font-medium rounded-full px-3 py-1 transition-all border cursor-pointer whitespace-nowrap flex-shrink-0 ${
               copied
                 ? 'bg-leaf/20 text-forest-mid border-leaf/40'
                 : 'bg-coral-soft/20 text-coral border-coral-soft/40 hover:bg-coral-soft/30'
@@ -112,7 +112,7 @@ export default function MatchedNodes({ matches, locale }: Props) {
           </p>
           <Link
             href="/creators"
-            className="inline-block mt-5 px-6 py-2.5 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep text-sm font-semibold rounded-full no-underline hover:-translate-y-0.5 transition-transform"
+            className="inline-block mt-5 px-6 py-2.5 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep text-sm font-medium rounded-full no-underline hover:-translate-y-0.5 transition-transform"
           >
             {t.match.firstCta}
           </Link>
@@ -204,7 +204,7 @@ export default function MatchedNodes({ matches, locale }: Props) {
       <div className="text-center mt-8">
         <Link
           href="/creators"
-          className="inline-flex items-center gap-2 px-7 py-3 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-semibold rounded-full no-underline shadow-[0_4px_20px_rgba(212,160,160,0.25)] hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(212,160,160,0.35)] transition-all"
+          className="inline-flex items-center gap-2 px-7 py-3 bg-gradient-to-br from-coral-soft to-warmth text-forest-deep font-medium rounded-full no-underline shadow-[0_4px_20px_rgba(212,160,160,0.25)] hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(212,160,160,0.35)] transition-all"
         >
           {t.match.seeForest}
         </Link>

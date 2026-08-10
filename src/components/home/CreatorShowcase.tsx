@@ -171,7 +171,7 @@ export default function CreatorShowcase({ nodes, t }: { nodes: ShowcaseNode[]; t
               className="group grid animate-swap-in h-full grid-cols-[auto_1fr_auto] items-start gap-5 overflow-hidden rounded-[26px] max-lg:h-[184px] border border-forest-deep/[0.11] bg-[rgba(250,248,242,0.7)] p-7 no-underline transition-all hover:-translate-y-1 hover:bg-[rgba(250,248,242,0.95)] hover:shadow-[0_18px_44px_rgba(42,59,47,0.08)] max-md:p-6"
             >
               <Avatar name={node.name} url={node.avatarUrl} size={52} />
-              <div className="font-normal min-w-0 overflow-hidden">
+              <div className="min-w-0 overflow-hidden">
                 <h3
                   className="text-[clamp(1.25rem,2.4vw,1.6rem)] font-normal leading-tight text-forest-deep"
                   style={{ fontFamily: 'var(--font-serif)' }}

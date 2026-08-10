@@ -206,7 +206,7 @@ function PathCard({
       <div className={`flex h-full ${wide ? 'items-center gap-10 max-md:flex-col-reverse max-md:items-start max-md:gap-6' : 'flex-col'}`}>
         <div className="flex-1">
           <div
-            className="text-[1.6rem]"
+            className="text-[1.6rem] font-normal"
             style={{ fontFamily: 'var(--font-serif)', color: ink.text }}
             aria-hidden="true"
           >

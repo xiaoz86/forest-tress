@@ -329,7 +329,7 @@ export default function MeditationProgram({content, category, paid, claimPending
                 <span className="shrink-0 text-[13px] font-bold tabular-nums text-white">¥{price}</span>
                 <a
                   href="#unlock"
-                  className="shrink-0 rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-[#111512] no-underline"
+                  className="shrink-0 rounded-full bg-white px-5 py-2 text-[13px] font-medium text-[#111512] no-underline"
                 >
                   {t.dock.unlockCta}
                 </a>
