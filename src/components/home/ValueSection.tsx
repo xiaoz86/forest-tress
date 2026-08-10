@@ -15,7 +15,7 @@ export default function ValueSection({ t }: { t: Dictionary['home']['value'] }) 
             What Happens Here
           </p>
           <h2
-            className="mx-auto max-w-[680px] text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-ink"
+            className="mx-auto max-w-[680px] text-[clamp(2rem,4.2vw,3.2rem)] font-normal leading-[1.2] tracking-[-0.03em] text-ink"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
             {t.headingTop}
@@ -31,13 +31,12 @@ export default function ValueSection({ t }: { t: Dictionary['home']['value'] }) 
                 {v.index}
               </span>
               <div
-                className="mt-5 text-[1.6rem] text-forest-mid"
-                style={{ fontFamily: 'var(--font-serif)' }}
-                aria-hidden="true"
+                className="font-normal mt-5 text-[1.6rem] text-forest-mid"
+                                aria-hidden="true"
               >
                 {v.symbol}
               </div>
-              <h3 className="mt-4 text-[1.15rem] font-semibold text-forest-deep">{v.title}</h3>
+              <h3 className="mt-4 text-[1.15rem] font-medium text-forest-deep">{v.title}</h3>
               <p className="mt-3 text-[13.5px] leading-[1.85] text-ink-soft">{v.body}</p>
             </article>
           ))}

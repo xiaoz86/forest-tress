@@ -139,8 +139,7 @@ export default function MeditationTrackCard({
           <span>{[track.duration, track.stage].filter(Boolean).join(' · ')}</span>
         </div>
         <h3
-          className="mt-2 text-[clamp(1.05rem,2.2vw,1.3rem)] font-semibold leading-[1.45] text-forest-deep"
-          style={{ fontFamily: 'var(--font-serif)' }}
+          className="mt-2 text-[clamp(1.05rem,2.2vw,1.3rem)] font-normal leading-[1.45] text-forest-deep"
         >
           {track.title}
         </h3>

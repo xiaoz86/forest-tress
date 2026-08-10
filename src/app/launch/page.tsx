@@ -63,13 +63,13 @@ export default async function LaunchPage() {
               发布说明
             </div>
             <h1
-              className="text-[40px] leading-[1.2] font-semibold tracking-[-0.02em] text-forest-deep max-md:text-[28px]"
+              className="text-[40px] leading-[1.2] font-light tracking-[-0.02em] text-forest-deep max-md:text-[28px]"
               style={{ fontFamily: 'var(--font-display)' }}
             >
               {typeof data.title === 'string' ? data.title : '附近森林'}
             </h1>
             {typeof data.description === 'string' && (
-              <p className="mt-5 text-[16px] leading-relaxed text-text-secondary max-md:text-[14.5px]">
+              <p className="mt-5 text-[16px] leading-relaxed text-text-secondary max-md:text-[16px]">
                 {data.description}
               </p>
             )}
@@ -90,7 +90,7 @@ export default async function LaunchPage() {
         {/* 底部 CTA */}
         <section className="py-14 px-6 bg-[#fafaf7] text-center border-t border-black/[0.04]">
           <h2
-            className="text-[22px] font-semibold tracking-[-0.01em] text-forest-deep mb-4 max-md:text-[20px]"
+            className="text-[22px] font-normal tracking-[-0.01em] text-forest-deep mb-4 max-md:text-[20px]"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             来种一棵属于你的树吧

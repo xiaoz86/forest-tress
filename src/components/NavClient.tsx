@@ -166,7 +166,7 @@ export default function NavClient({ locale, t }: Props) {
       <nav className="flex h-[72px] items-center justify-between gap-5 pl-6 pr-3.5 max-md:h-[62px] max-md:pl-4">
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-2.5 font-serif text-[21px] font-bold text-forest-dark no-underline"
+          className="flex shrink-0 items-center gap-2.5 font-display text-[21px] font-light tracking-[0.18em] text-forest-dark no-underline"
         >
           <svg viewBox="0 0 28 28" fill="none" width="26" height="26" aria-hidden="true">
             <path
@@ -182,7 +182,7 @@ export default function NavClient({ locale, t }: Props) {
           {t.brand}
         </Link>
 
-        <div className="flex items-center gap-6 text-[17px] font-medium text-[#2f3d36] max-lg:hidden">
+        <div className="flex items-center gap-6 text-[16px] font-medium text-[#2f3d36] max-lg:hidden">
           {baseLinks.map(link => (
             <Link
               key={link.href}
@@ -194,7 +194,7 @@ export default function NavClient({ locale, t }: Props) {
           ))}
           <Link
             href={contactHref}
-            className="rounded-full border border-forest/20 px-4 py-1.5 text-[15px] no-underline transition-colors hover:border-forest/45 hover:text-forest"
+            className="rounded-full border border-forest/20 px-4 py-1.5 text-[16px] no-underline transition-colors hover:border-forest/45 hover:text-forest"
           >
             {t.links.contact}
           </Link>
@@ -229,7 +229,7 @@ export default function NavClient({ locale, t }: Props) {
           {!pending && !memberId && !session?.legacy && (
             <Link
               href="/login"
-              className="text-[16px] font-medium text-[#33403a]/85 no-underline transition-colors hover:text-forest max-md:hidden"
+              className="text-[15px] font-medium text-[#33403a]/85 no-underline transition-colors hover:text-forest max-md:hidden"
             >
               {t.login}
             </Link>
@@ -296,11 +296,10 @@ export default function NavClient({ locale, t }: Props) {
                 <span
                   aria-hidden="true"
                   className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-paper-soft text-[14px] text-forest"
-                  style={{ fontFamily: 'var(--font-serif)' }}
-                >
+                  >
                   {link.icon}
                 </span>
-                <span className="text-[15px] font-medium text-[#33403a]">{link.label}</span>
+                <span className="text-[16px] font-medium text-[#33403a]">{link.label}</span>
               </Link>
             ))}
           </div>

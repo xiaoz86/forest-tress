@@ -22,7 +22,7 @@ export default function CreatorSection({ nodes, t }: Props) {
               Creator Forest
             </p>
             <h2
-              className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.2] tracking-[-0.03em] text-ink"
+              className="text-[clamp(2rem,4.2vw,3.2rem)] font-normal leading-[1.2] tracking-[-0.03em] text-ink"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
               {t.headingTop}

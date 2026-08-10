@@ -133,7 +133,7 @@ export default function AIRecommendations({ nodeId, initial, generatedAt, mode, 
                 className="flex items-start gap-3 p-4 bg-white rounded-2xl border border-black/[0.06] shadow-[0_1px_8px_rgba(0,0,0,0.03)]"
               >
                 <div
-                  className={`flex-shrink-0 w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br ${grad} flex items-center justify-center text-white font-serif font-bold text-lg`}
+                  className={`flex-shrink-0 w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br ${grad} flex items-center justify-center text-white font-medium text-lg`}
                 >
                   {m.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -146,7 +146,7 @@ export default function AIRecommendations({ nodeId, initial, generatedAt, mode, 
                   <div className="flex items-center flex-wrap gap-2 mb-1">
                     <Link
                       href={m.id ? `/creators/${m.id}` : '#'}
-                      className="font-serif text-[16px] font-semibold text-forest-deep hover:underline underline-offset-2 no-underline"
+                      className="text-[16px] font-semibold text-forest-deep hover:underline underline-offset-2 no-underline"
                     >
                       {m.name}
                     </Link>

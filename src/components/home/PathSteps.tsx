@@ -108,7 +108,7 @@ export default function PathSteps({ steps, unfold, fold }: Props) {
               </span>
               <span aria-hidden="true" className="h-px flex-1 bg-white/12" />
             </div>
-            <h3 className="text-[1.05rem] font-semibold text-white">{s.title}</h3>
+            <h3 className="text-[1.05rem] font-medium text-white">{s.title}</h3>
             <p className="mt-3 text-[13px] leading-[1.85] text-white/55">{s.body}</p>
           </li>
         ))}

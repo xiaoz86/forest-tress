@@ -176,7 +176,7 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
             <div className="text-[11px] font-medium tracking-[0.18em] text-coral-soft uppercase">
               首页文案
             </div>
-            <h2 className="mt-2 text-xl font-semibold text-white">林间呼吸区域</h2>
+            <h2 className="mt-2 text-xl font-normal text-white">林间呼吸区域</h2>
           </div>
           <button
             type="button"
@@ -218,7 +218,7 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
             <div className="text-[11px] font-medium tracking-[0.18em] text-coral-soft uppercase">
               胶囊分类
             </div>
-            <h2 className="mt-2 text-xl font-semibold text-white">首页菜单与冥想页分类</h2>
+            <h2 className="mt-2 text-xl font-normal text-white">首页菜单与冥想页分类</h2>
           </div>
           <button type="button" onClick={addCategory} className={ghostBtnCls}>
             添加分类
@@ -308,7 +308,7 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
             <div className="text-[11px] font-medium tracking-[0.18em] text-coral-soft uppercase">
               音频内容
             </div>
-            <h2 className="mt-2 text-xl font-semibold text-white">分类页里的具体冥想</h2>
+            <h2 className="mt-2 text-xl font-normal text-white">分类页里的具体冥想</h2>
           </div>
           <button type="button" onClick={addTrack} className={ghostBtnCls}>
             添加音频
@@ -321,7 +321,7 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
                   <div className="text-[11px] text-white/32">{track.id}</div>
-                  <h3 className="mt-1 text-lg font-semibold text-white">{track.title}</h3>
+                  <h3 className="mt-1 text-lg font-medium text-white">{track.title}</h3>
                 </div>
                 <button
                   type="button"

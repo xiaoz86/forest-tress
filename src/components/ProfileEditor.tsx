@@ -164,7 +164,7 @@ export default function ProfileEditor({ node, mode, locale }: Props) {
   return (
     <div ref={formAnchor} className="rounded-2xl border border-black/[0.08] bg-white p-5 max-md:p-4 shadow-[0_2px_18px_rgba(0,0,0,0.04)]">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-[15px] font-semibold text-forest-deep">{t.title}</h3>
+        <h3 className="text-[16px] font-medium text-forest-deep">{t.title}</h3>
         <button
           type="button"
           onClick={cancel}

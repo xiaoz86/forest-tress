@@ -162,7 +162,7 @@ export default function UnlockPanel({programId, priceCents, lockedCount, loggedI
         >
           {openedNow ? t.badge.openedNow : claimed ? t.badge.proofReceived : t.badge.waiting}
         </div>
-        <h3 className="text-[15px] font-semibold text-white">
+        <h3 className="text-[16px] font-medium text-white">
           {openedNow
             ? t.title.openedNow
             : claimed
@@ -251,7 +251,7 @@ export default function UnlockPanel({programId, priceCents, lockedCount, loggedI
         <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-coral-soft">
           {t.rejected.badge}
         </div>
-        <h3 className="text-[15px] font-semibold text-white">{t.rejected.title}</h3>
+        <h3 className="text-[16px] font-medium text-white">{t.rejected.title}</h3>
         {order.note && <p className="mt-1.5 text-[12.5px] text-white/52">{order.note}</p>}
         <button
           type="button"
@@ -291,7 +291,7 @@ function Head({ lockedCount, t }: { lockedCount: number; t: ReturnType<typeof di
       <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-coral-soft">
         {t.lockedCount(lockedCount)}
       </div>
-      <h3 className="text-[15px] font-semibold text-white">{t.headline}</h3>
+      <h3 className="text-[16px] font-medium text-white">{t.headline}</h3>
     </>
   );
 }

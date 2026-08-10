@@ -26,7 +26,7 @@ export default function ShareSubmitForm({ isLoggedIn, locale }: Props) {
         <div className="mb-3 text-[11px] font-medium tracking-[0.18em] text-coral uppercase">
           {t.eyebrow}
         </div>
-        <h2 className="text-2xl font-semibold text-forest-deep">{t.signInTitle}</h2>
+        <h2 className="text-2xl font-normal text-forest-deep">{t.signInTitle}</h2>
         <p className="mt-4 text-sm leading-relaxed text-text-secondary">
           {t.signInBody}
         </p>
@@ -71,7 +71,7 @@ export default function ShareSubmitForm({ isLoggedIn, locale }: Props) {
       <div className="mb-3 text-[11px] font-medium tracking-[0.18em] text-coral uppercase">
         {t.eyebrow}
       </div>
-      <h2 className="text-2xl font-semibold text-forest-deep">{t.title}</h2>
+      <h2 className="text-2xl font-normal text-forest-deep">{t.title}</h2>
       <p className="mt-4 text-sm leading-relaxed text-text-secondary">
         {t.lede}
       </p>

@@ -337,7 +337,7 @@ export default function JoinForm({ locale }: { locale: Locale }) {
     return (
       <div className="max-w-[680px] mx-auto">
         <div className="bg-white rounded-3xl p-10 max-md:p-6 shadow-[0_8px_40px_rgba(26,46,26,0.06)] border border-moss/10">
-          <h3 className="font-serif text-2xl font-bold text-forest-deep mb-2">{t.verify.title}</h3>
+          <h3 className="text-2xl font-medium text-forest-deep mb-2">{t.verify.title}</h3>
           <p className="text-sm text-text-secondary leading-relaxed mb-1">
             {t.verify.sentTo(data.email.trim())}
           </p>
@@ -406,7 +406,7 @@ export default function JoinForm({ locale }: { locale: Locale }) {
         <div className="bg-white rounded-3xl p-10 max-md:p-6 shadow-[0_8px_40px_rgba(26,46,26,0.06)] border border-moss/10">
           <div className="text-center mb-2">
             <div className="text-5xl mb-3">🌱</div>
-            <h3 className="font-serif text-2xl font-bold text-forest-deep mb-2">
+            <h3 className="text-2xl font-medium text-forest-deep mb-2">
               {t.done.title}
             </h3>
             <p className="text-sm text-text-secondary leading-relaxed">
@@ -834,7 +834,7 @@ function StepBody({
 }) {
   return (
     <div>
-      <h3 className="font-serif text-[1.45rem] max-md:text-[1.25rem] font-bold text-forest-deep mb-2 leading-snug">
+      <h3 className="text-[1.45rem] max-md:text-[1.25rem] font-medium text-forest-deep mb-2 leading-snug">
         {title}
       </h3>
       {subtitle && (

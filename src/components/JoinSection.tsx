@@ -57,12 +57,12 @@ export default function JoinSection({ locale }: { locale: Locale }) {
     return (
       <div className="max-w-[560px] mx-auto text-center">
         <h2
-          className="font-serif text-[clamp(1.7rem,3.8vw,2.4rem)] font-semibold text-forest-deep leading-[1.45] tracking-[-0.005em]"
+          className="font-serif text-[clamp(1.7rem,3.8vw,2.4rem)] font-normal text-forest-deep leading-[1.45] tracking-[-0.005em]"
           style={{ fontFamily: 'var(--font-display)' }}
         >
           {t.heading}
         </h2>
-        <p className="mt-4 text-[14.5px] text-text-light leading-[1.85]">{t.lede}</p>
+        <p className="mt-4 text-[16px] text-text-light leading-[1.85]">{t.lede}</p>
         <p className="mt-3 text-[13px] text-text-light/80 leading-[1.9]">
           {t.benefitsLead}
           <span className="text-forest-deep font-medium">{t.benefitsAccent}</span>
@@ -71,11 +71,11 @@ export default function JoinSection({ locale }: { locale: Locale }) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="mt-9 inline-flex items-center gap-2 px-7 py-3 rounded-full border border-forest-deep/20 bg-white/60 backdrop-blur-sm text-[14.5px] font-medium text-forest-deep hover:bg-forest-deep hover:text-white hover:border-forest-deep transition-all shadow-[0_2px_14px_rgba(26,46,26,0.05)] cursor-pointer"
+          className="mt-9 inline-flex items-center gap-2 px-7 py-3 rounded-full border border-forest-deep/20 bg-white/60 backdrop-blur-sm text-[16px] font-medium text-forest-deep hover:bg-forest-deep hover:text-white hover:border-forest-deep transition-all shadow-[0_2px_14px_rgba(26,46,26,0.05)] cursor-pointer"
           aria-label={t.ctaAria}
         >
           {t.cta}
-          <span className="text-[15px] leading-none">↗</span>
+          <span className="text-[16px] leading-none">↗</span>
         </button>
         <p className="mt-5 text-[12px] text-text-light/70 leading-relaxed">
           {t.loginLead}

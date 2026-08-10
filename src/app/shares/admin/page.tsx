@@ -28,7 +28,7 @@ export default async function ShareAdminPage() {
             <div className="mb-4 text-[11px] font-medium tracking-[0.18em] text-coral-soft uppercase">
               Admin
             </div>
-            <h1 className="text-2xl font-semibold">需要管理员权限</h1>
+            <h1 className="text-2xl font-light">需要管理员权限</h1>
             <p className="mt-4 text-sm leading-relaxed text-white/52">
               登录管理员节点后，可以编辑林间分享，并上传视频、图片和海报。
             </p>
@@ -71,12 +71,12 @@ export default async function ShareAdminPage() {
               Share Admin
             </div>
             <h1
-              className="text-[clamp(2rem,4vw,3.4rem)] font-semibold leading-tight"
+              className="text-[clamp(2rem,4vw,3.4rem)] font-light leading-tight"
               style={{ fontFamily: 'var(--font-display)' }}
             >
               编辑林间分享
             </h1>
-            <p className="mt-5 text-[15px] leading-[2] text-white/52">
+            <p className="mt-5 text-[16px] leading-[2] text-white/52">
               首页展示一段真实分享，更多页承接其他超级个体的作品、产品、活动和体验。
             </p>
           </header>

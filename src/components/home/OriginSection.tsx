@@ -47,12 +47,12 @@ export default function OriginSection({
             Why Nearby Forest
           </p>
           <h2
-            className="text-[clamp(2.1rem,4.4vw,3.6rem)] font-medium leading-[1.2] tracking-[-0.035em] text-ink"
+            className="text-[clamp(2.1rem,4.4vw,3.6rem)] font-normal leading-[1.2] tracking-[-0.035em] text-ink"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
             {t.heading}
           </h2>
-          <p className="mt-6 text-[16px] leading-[1.85] text-ink-soft">{t.body}</p>
+          <p className="font-normal mt-6 text-[16px] leading-[1.85] text-ink-soft">{t.body}</p>
 
           <blockquote
             className="mt-9 border-l border-forest pl-[22px] text-[clamp(1.15rem,2.2vw,1.375rem)] leading-[1.65] text-forest"

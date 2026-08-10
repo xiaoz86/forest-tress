@@ -63,7 +63,7 @@ export default function HeroFilmPlayer({
           ref={triggerRef}
           type="button"
           onClick={openFilm}
-          className="inline-flex items-center gap-3.5 rounded-full border border-white/45 bg-white/[0.14] py-2.5 pl-2.5 pr-6 text-[14.5px] font-medium text-white backdrop-blur-[12px] transition-all hover:-translate-y-0.5 hover:bg-white/25"
+          className="inline-flex items-center gap-3.5 rounded-full border border-white/45 bg-white/[0.14] py-2.5 pl-2.5 pr-6 text-[16px] font-medium text-white backdrop-blur-[12px] transition-all hover:-translate-y-0.5 hover:bg-white/25"
           aria-label={t.ariaOpen}
         >
           <span
@@ -81,8 +81,8 @@ export default function HeroFilmPlayer({
           onClick={openFilm}
           className={
             variant === 'paper'
-              ? 'inline-flex min-h-[48px] items-center gap-3 rounded-full border border-forest/15 bg-paper-soft/70 px-6 text-[14.5px] font-medium text-forest transition-all hover:-translate-y-0.5 hover:bg-paper-soft'
-              : 'inline-flex items-center gap-3 rounded-full border border-white/30 bg-black/10 px-6 py-3.5 text-[15px] font-medium text-white/86 backdrop-blur-sm transition-colors hover:border-white/55 hover:bg-white/10 hover:text-white'
+              ? 'inline-flex min-h-[48px] items-center gap-3 rounded-full border border-forest/15 bg-paper-soft/70 px-6 text-[16px] font-medium text-forest transition-all hover:-translate-y-0.5 hover:bg-paper-soft'
+              : 'inline-flex items-center gap-3 rounded-full border border-white/30 bg-black/10 px-6 py-3.5 text-[16px] font-medium text-white/86 backdrop-blur-sm transition-colors hover:border-white/55 hover:bg-white/10 hover:text-white'
           }
           aria-label={t.ariaOpen}
         >
@@ -116,7 +116,7 @@ export default function HeroFilmPlayer({
                 <div className="text-[10px] font-medium uppercase tracking-[0.32em] text-coral-soft">
                   {t.brand}
                 </div>
-                <h2 id="hero-film-title" className="mt-2 text-xl font-semibold text-white">
+                <h2 id="hero-film-title" className="mt-2 text-xl font-normal text-white">
                   {t.subtitle}
                 </h2>
               </div>

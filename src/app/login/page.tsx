@@ -44,7 +44,7 @@ export default async function LoginPage({ searchParams }: Props) {
             {t.eyebrow}
           </div>
           <h1
-            className="text-[26px] font-semibold tracking-[-0.01em] text-forest-deep mb-3"
+            className="text-[26px] font-light tracking-[-0.01em] text-forest-deep mb-3"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             {t.title}

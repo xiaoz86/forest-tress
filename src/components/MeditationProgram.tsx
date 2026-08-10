@@ -128,14 +128,14 @@ export default function MeditationProgram({content, category, paid, claimPending
           </div>
           {category.highlight && (
             <h1
-              className="text-[clamp(1.35rem,3.4vw,2.1rem)] font-semibold leading-[1.35] tracking-[-0.01em] text-white text-balance"
+              className="text-[clamp(1.35rem,3.4vw,2.1rem)] font-light leading-[1.35] tracking-[-0.01em] text-white text-balance"
               style={{ fontFamily: 'var(--font-display)' }}
             >
               {category.highlight}
             </h1>
           )}
           <div className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t border-white/10 pt-4">
-            <span className="text-[15px] font-semibold text-white">{category.heroTitle || category.label}</span>
+            <span className="text-[16px] font-semibold text-white">{category.heroTitle || category.label}</span>
             {category.subtitle && (
               <span className="text-[13px] text-white/45">{category.subtitle}</span>
             )}

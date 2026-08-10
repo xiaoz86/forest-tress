@@ -112,7 +112,7 @@ export default function MeditationAmbient({content, category, noteCounts, logged
                 </button>
 
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[14.5px] font-medium text-forest-deep">{track.title}</div>
+                  <div className="truncate text-[16px] font-medium text-forest-deep">{track.title}</div>
                   {track.intention && (
                     <div className="mt-0.5 truncate text-[12px] text-ink-soft">{track.intention}</div>
                   )}

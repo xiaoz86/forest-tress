@@ -239,7 +239,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
                 {t.category.listenEyebrow}
               </p>
               <h2
-                className="text-[1.5rem] font-semibold tracking-[-0.02em] text-ink"
+                className="text-[1.5rem] font-normal tracking-[-0.02em] text-ink"
                 style={{ fontFamily: 'var(--font-serif)' }}
               >
                 {t.category.listenTitle}
@@ -410,7 +410,7 @@ function CategoryHero({
         className="pointer-events-none absolute -top-40 right-[-12%] h-[420px] w-[620px] rounded-full blur-[110px] max-md:hidden"
         style={{ background: `radial-gradient(circle, ${aura}, transparent 70%)` }}
       />
-      <div className="relative max-w-[720px]">
+      <div className="font-normal relative max-w-[720px]">
         <div
           className="text-[1.7rem]"
           style={{
@@ -422,12 +422,12 @@ function CategoryHero({
           {CATEGORY_GLYPH[category.id] || '声'}
         </div>
         <h1
-          className="mt-5 text-[clamp(2rem,4.4vw,3.1rem)] font-medium leading-[1.2] tracking-[-0.03em] text-ink"
+          className="mt-5 text-[clamp(2rem,4.4vw,3.1rem)] font-normal leading-[1.2] tracking-[-0.03em] text-ink"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
           {category.heroTitle || category.label}
         </h1>
-        <p className="mt-6 max-w-[560px] text-[15px] leading-[2] text-ink-soft">
+        <p className="mt-6 max-w-[560px] text-[16px] leading-[2] text-ink-soft">
           {category.heroSubtitle || category.description}
         </p>
         <div className="mt-8 flex items-center gap-4 text-[12.5px] text-ink-soft">

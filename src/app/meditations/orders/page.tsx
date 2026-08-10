@@ -28,7 +28,7 @@ export default async function OrdersPage() {
               「没登录」和「登录了但不是主理人」要分开说：
               对后者再喊一句「去登录」是死循环——他刚登录完。
             */}
-            <h1 className="text-2xl font-semibold">
+            <h1 className="text-2xl font-light">
               {memberId ? '这一页只有主理人能看' : '需要先登录'}
             </h1>
             <p className="mt-4 text-sm leading-relaxed text-white/52">
@@ -73,7 +73,7 @@ export default async function OrdersPage() {
               Unlock Requests
             </p>
             <h1
-              className="text-[clamp(1.7rem,3.4vw,2.4rem)] font-medium leading-[1.25] tracking-[-0.02em]"
+              className="text-[clamp(1.7rem,3.4vw,2.4rem)] font-normal leading-[1.25] tracking-[-0.02em]"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
               开通确认

@@ -20,7 +20,7 @@ export default function PathSection({ t }: { t: Dictionary['home']['paths'] }) {
             How Connection Grows
           </p>
           <h2
-            className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.25] tracking-[-0.03em] text-white"
+            className="text-[clamp(2rem,4.2vw,3.2rem)] font-normal leading-[1.25] tracking-[-0.03em] text-white"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
             {t.headingTop}

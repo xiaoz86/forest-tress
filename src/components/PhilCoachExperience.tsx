@@ -890,7 +890,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
         <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
           {gateKind === 'profile' ? t.gate.profile.eyebrow : t.gate.eyebrow}
         </div>
-        <h3 className="text-xl font-semibold">
+        <h3 className="text-xl font-medium">
           {gateKind === 'profile' ? t.gate.profile.title : t.gate.title}
         </h3>
 
@@ -1045,7 +1045,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
               <div className="relative">
                 <div className="mb-4 h-px w-10 bg-white/50" />
                 <h3
-                  className="text-[1.5rem] font-semibold leading-snug text-white"
+                  className="text-[1.5rem] font-medium leading-snug text-white"
                   style={{ fontFamily: 'var(--font-display)' }}
                 >
                   {t.paths[p.id as PathId].label}
@@ -1089,7 +1089,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                 <div className="mb-1 text-[10px] tracking-[0.2em] text-white/28">
                   phil-coach
                 </div>
-                <div className="rounded-2xl rounded-tl-sm border border-white/10 bg-white/[0.06] px-5 py-3.5 text-[15px] leading-[1.9] text-white/82">
+                <div className="rounded-2xl rounded-tl-sm border border-white/10 bg-white/[0.06] px-5 py-3.5 text-[16px] leading-[1.9] text-white/82">
                   {item.text}
                 </div>
               </div>
@@ -1098,7 +1098,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                 <div className="mb-1 text-right text-[10px] uppercase tracking-[0.2em] text-white/28">
                   {t.me}
                 </div>
-                <div className="whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-coral-soft/85 px-5 py-3.5 text-[15px] leading-[1.9] text-[#20140f]">
+                <div className="whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-coral-soft/85 px-5 py-3.5 text-[16px] leading-[1.9] text-[#20140f]">
                   {item.text}
                 </div>
               </div>
@@ -1110,7 +1110,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
               <div className="mb-1 text-right text-[10px] uppercase tracking-[0.2em] text-white/28">
                 {t.me}
               </div>
-              <div className="animate-pulse whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-coral-soft/45 px-5 py-3.5 text-[15px] leading-[1.9] text-[#20140f]/75">
+              <div className="animate-pulse whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-coral-soft/45 px-5 py-3.5 text-[16px] leading-[1.9] text-[#20140f]/75">
                 {liveCaption || t.transcribing}
               </div>
             </div>
@@ -1120,7 +1120,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
               <div className="mb-1 text-[10px] tracking-[0.2em] text-white/28">
                 phil-coach
               </div>
-              <div className="rounded-2xl rounded-tl-sm border border-white/10 bg-white/[0.06] px-5 py-3.5 text-[15px] leading-[1.9] text-white/48">
+              <div className="rounded-2xl rounded-tl-sm border border-white/10 bg-white/[0.06] px-5 py-3.5 text-[16px] leading-[1.9] text-white/48">
                 {t.thinking}
               </div>
             </div>
@@ -1222,7 +1222,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                     </span>
                   </span>
                   <span className="text-center">
-                    <span className="block text-[14.5px] text-white/80">
+                    <span className="block text-[16px] text-white/80">
                       {voiceIn.requesting
                         ? t.voice.opening
                         : t.voice.listening(formatSeconds(voiceIn.elapsed))}
@@ -1258,7 +1258,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                   rows={3}
                   maxLength={1200}
                   placeholder={dictating ? t.voice.dictatingPlaceholder : t.voice.draftPlaceholder}
-                  className="w-full resize-none rounded-2xl border-0 bg-transparent px-4 pb-1 pt-3.5 text-[15px] leading-relaxed text-white placeholder:text-white/28 focus:outline-none disabled:opacity-55"
+                  className="w-full resize-none rounded-2xl border-0 bg-transparent px-4 pb-1 pt-3.5 text-[16px] leading-relaxed text-white placeholder:text-white/28 focus:outline-none disabled:opacity-55"
                 />
                 {dictating ? (
                   /* 听写中：按钮行原地变一条紧凑控制条——输入框不让位，字在上面实时出现 */

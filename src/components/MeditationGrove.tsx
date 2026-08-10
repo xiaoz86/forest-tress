@@ -84,12 +84,12 @@ export default function MeditationGrove({ content, counts, t }: Props) {
           {t.grove.eyebrow}
         </p>
         <h1
-          className="text-[clamp(2rem,4.2vw,3.2rem)] font-medium leading-[1.22] tracking-[-0.03em] text-ink"
+          className="text-[clamp(2rem,4.2vw,3.2rem)] font-normal leading-[1.22] tracking-[-0.03em] text-ink"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
           {content.title.replace(/\n/g, '')}
         </h1>
-        <p className="mt-7 max-w-[560px] text-[15px] leading-[2] text-ink-soft">
+        <p className="mt-7 max-w-[560px] text-[16px] leading-[2] text-ink-soft">
           {content.description}
         </p>
       </header>
@@ -105,7 +105,7 @@ export default function MeditationGrove({ content, counts, t }: Props) {
                 <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-forest">
                   {group.eyebrow}
                 </p>
-                <h2 className="text-[1.15rem] font-semibold text-ink">{group.title}</h2>
+                <h2 className="text-[1.15rem] font-normal text-ink">{group.title}</h2>
                 <p className="ml-auto text-[12.5px] text-ink-soft max-md:hidden">{group.note}</p>
               </div>
 
@@ -214,7 +214,7 @@ function PathCard({
           </div>
 
           <h3
-            className={`mt-4 font-semibold tracking-[-0.02em] text-forest-deep ${
+            className={`mt-4 font-normal tracking-[-0.02em] text-forest-deep ${
               wide ? 'text-[clamp(1.5rem,2.6vw,2rem)]' : 'text-[1.25rem]'
             }`}
             style={{ fontFamily: 'var(--font-serif)' }}
@@ -224,7 +224,7 @@ function PathCard({
 
           {/* 陪伴营把金句露出来——那是它最该被看见的一句 */}
           {wide && category.highlight && (
-            <p className="mt-3 max-w-[560px] text-[15px] font-medium leading-[1.75] text-forest">
+            <p className="mt-3 max-w-[560px] text-[16px] font-medium leading-[1.75] text-forest">
               {category.highlight}
             </p>
           )}

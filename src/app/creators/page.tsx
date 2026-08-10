@@ -54,7 +54,7 @@ export default async function CreatorsPage() {
           <div className="inline-block text-xs tracking-[3px] text-sage uppercase mb-4 font-medium">
             {tr(String(frontmatter.label || '创造者'), locale)}
           </div>
-          <h1 className="font-serif text-[clamp(2.2rem,5vw,3.4rem)] font-bold text-white leading-[1.2] mb-5">
+          <h1 className="font-serif text-[clamp(2.2rem,5vw,3.4rem)] font-light text-white leading-[1.2] mb-5">
             {tr(String(frontmatter.title || '创造者森林'), locale)}
           </h1>
           <p className="text-base text-white/70 leading-[1.9] max-md:text-sm">
@@ -93,7 +93,7 @@ export default async function CreatorsPage() {
                     {t.shelf.eyebrow}
                   </div>
                   <h3
-                    className="text-[20px] font-semibold tracking-[-0.005em] text-forest-deep mb-1.5 max-md:text-[18px]"
+                    className="text-[20px] font-medium tracking-[-0.005em] text-forest-deep mb-1.5 max-md:text-[18px]"
                     style={{ fontFamily: 'var(--font-display)' }}
                   >
                     {t.shelf.title}
@@ -115,7 +115,7 @@ export default async function CreatorsPage() {
               <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-leaf/25 bg-leaf/15">
                 <span className="h-2.5 w-2.5 rounded-full bg-leaf" />
               </div>
-              <h2 className="font-serif text-2xl font-bold text-forest-deep mb-3">
+              <h2 className="font-serif text-2xl font-normal text-forest-deep mb-3">
                 {t.empty.title}
               </h2>
               <p className="text-text-secondary mb-8 max-w-md mx-auto leading-relaxed">
@@ -155,7 +155,7 @@ export default async function CreatorsPage() {
 
       {/* CTA */}
       <section className="py-16 px-10 bg-forest-deep text-center max-md:py-12 max-md:px-7">
-        <h2 className="font-serif text-[clamp(1.5rem,3vw,2rem)] font-bold text-white mb-4">
+        <h2 className="font-serif text-[clamp(1.5rem,3vw,2rem)] font-normal text-white mb-4">
           {t.cta.title}
         </h2>
         <p className="text-white/60 mb-8 text-sm">

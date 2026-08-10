@@ -126,13 +126,13 @@ export default function CreatorShowcase({ nodes, t }: { nodes: ShowcaseNode[]; t
                 {featured.topics.slice(0, 2).join(' · ') || t.topicFallback}
               </p>
               <h3
-                className="mt-2 text-[clamp(1.7rem,3.4vw,2.3rem)] font-medium leading-[1.3] text-white"
+                className="mt-2 text-[clamp(1.7rem,3.4vw,2.3rem)] font-normal leading-[1.3] text-white"
                 style={{ fontFamily: 'var(--font-serif)' }}
               >
                 {featured.name}
               </h3>
               {featured.doing && (
-                <p className="mt-4 line-clamp-3 max-w-[440px] text-[14.5px] leading-[1.9] text-white/78">
+                <p className="mt-4 line-clamp-3 max-w-[440px] text-[16px] leading-[1.9] text-white/78">
                   {featured.doing}
                 </p>
               )}
@@ -171,9 +171,9 @@ export default function CreatorShowcase({ nodes, t }: { nodes: ShowcaseNode[]; t
               className="group grid animate-swap-in h-full grid-cols-[auto_1fr_auto] items-start gap-5 overflow-hidden rounded-[26px] max-lg:h-[184px] border border-forest-deep/[0.11] bg-[rgba(250,248,242,0.7)] p-7 no-underline transition-all hover:-translate-y-1 hover:bg-[rgba(250,248,242,0.95)] hover:shadow-[0_18px_44px_rgba(42,59,47,0.08)] max-md:p-6"
             >
               <Avatar name={node.name} url={node.avatarUrl} size={52} />
-              <div className="min-w-0 overflow-hidden">
+              <div className="font-normal min-w-0 overflow-hidden">
                 <h3
-                  className="text-[clamp(1.25rem,2.4vw,1.6rem)] font-medium leading-tight text-forest-deep"
+                  className="text-[clamp(1.25rem,2.4vw,1.6rem)] font-normal leading-tight text-forest-deep"
                   style={{ fontFamily: 'var(--font-serif)' }}
                 >
                   {node.name}
@@ -194,7 +194,7 @@ export default function CreatorShowcase({ nodes, t }: { nodes: ShowcaseNode[]; t
               </div>
               <span
                 aria-hidden="true"
-                className="text-[15px] text-forest-deep/30 transition-transform group-hover:-translate-y-0.5 group-hover:text-forest-deep/60"
+                className="text-[16px] text-forest-deep/30 transition-transform group-hover:-translate-y-0.5 group-hover:text-forest-deep/60"
               >
                 ↗
               </span>

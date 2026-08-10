@@ -64,7 +64,7 @@ function HostContactCard({ t }: { t: ReturnType<typeof dict>['creatorDetail'] })
   return (
     <div className="mt-8 p-7 bg-gradient-to-br from-leaf/8 via-sage/8 to-warmth/8 rounded-2xl border border-moss/20 text-center">
       <div className="text-3xl mb-2">🤝</div>
-      <h4 className="font-serif text-lg font-bold text-forest-deep mb-1.5">
+      <h4 className="text-lg font-bold text-forest-deep mb-1.5">
         {t.match.hostTitle(HOST_NAME)}
       </h4>
       <p className="text-sm text-text-secondary leading-relaxed mb-5 max-w-md mx-auto">
@@ -102,7 +102,7 @@ export default function MatchedNodes({ matches, locale }: Props) {
       <>
         <div className="mt-8 text-center py-10 px-6 bg-gradient-to-br from-love-pink/8 to-warmth/8 rounded-2xl border border-coral-soft/20">
           <div className="text-4xl mb-3">🌱</div>
-          <h3 className="font-serif text-xl font-bold text-forest-deep mb-2">
+          <h3 className="font-serif text-xl font-normal text-forest-deep mb-2">
             {t.match.firstTitle}
           </h3>
           <p className="text-sm text-text-secondary leading-relaxed max-w-md mx-auto">
@@ -125,7 +125,7 @@ export default function MatchedNodes({ matches, locale }: Props) {
   return (
     <div className="mt-10">
       <div className="text-center mb-6">
-        <h3 className="font-serif text-2xl font-bold text-forest-deep mb-2">
+        <h3 className="font-serif text-2xl font-normal text-forest-deep mb-2">
           {t.match.found(matches.length)}
         </h3>
         <p className="text-sm text-text-light">
@@ -143,13 +143,13 @@ export default function MatchedNodes({ matches, locale }: Props) {
               className="flex items-start gap-4 p-5 bg-warm-cream rounded-2xl border border-moss/15 hover:border-moss/30 transition-colors"
             >
               <div
-                className={`flex-shrink-0 w-14 h-14 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-serif font-bold text-xl shadow-[0_3px_12px_rgba(26,46,26,0.15)]`}
+                className={`flex-shrink-0 w-14 h-14 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-medium text-xl shadow-[0_3px_12px_rgba(26,46,26,0.15)]`}
               >
                 {initial}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center flex-wrap gap-2 mb-1.5">
-                  <h4 className="font-serif text-lg font-bold text-forest-deep">{m.name}</h4>
+                  <h4 className="text-lg font-bold text-forest-deep">{m.name}</h4>
                   {m.city && <span className="text-xs text-text-light">· {m.city}</span>}
                   <span
                     className={`ml-auto inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${matchTypeStyle[m.matchType]}`}

@@ -82,12 +82,12 @@ export default async function PhilCoachPage() {
               {t.hero.eyebrow}
             </div>
             <h1
-              className="text-[clamp(2.35rem,5.2vw,4rem)] font-semibold leading-[1.18]"
+              className="text-[clamp(2.35rem,5.2vw,4rem)] font-light leading-[1.18]"
               style={{ fontFamily: 'var(--font-display)' }}
             >
               {t.hero.title}
             </h1>
-            <p className="mt-7 text-[15px] leading-[2] text-white/56">{t.hero.lede}</p>
+            <p className="mt-7 text-[16px] leading-[2] text-white/56">{t.hero.lede}</p>
             <div className="mt-8 flex items-center gap-4 text-[12px] text-white/36">
               <span className="h-px w-10 bg-white/20" />
               <span>{t.hero.footnote}</span>
@@ -99,7 +99,7 @@ export default async function PhilCoachPage() {
             <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.2em] text-white/32">
               {t.intro.eyebrow}
             </div>
-            <h2 className="text-2xl font-semibold">{t.intro.title}</h2>
+            <h2 className="text-2xl font-normal">{t.intro.title}</h2>
             <div className="mt-7 grid grid-cols-2 gap-10 max-md:grid-cols-1">
               <div className="text-[14px] leading-[2.05] text-white/56">
                 <p>{t.intro.origin}</p>
@@ -123,7 +123,7 @@ export default async function PhilCoachPage() {
           {/* 四重身份 */}
           <section className="mt-16 border-y border-white/10 py-10">
             <div className="mb-8 flex items-end justify-between gap-6 max-md:block">
-              <h2 className="text-2xl font-semibold">{t.roles.title}</h2>
+              <h2 className="text-2xl font-normal">{t.roles.title}</h2>
               <p className="max-w-[440px] text-sm leading-relaxed text-white/42 max-md:mt-3">
                 {t.roles.note}
               </p>
@@ -138,7 +138,7 @@ export default async function PhilCoachPage() {
                     key={role.id}
                     className="rounded-lg border border-white/10 bg-white/[0.035] p-6 transition-colors hover:bg-white/[0.06]"
                   >
-                    <h3 className="text-lg font-semibold text-white">{copy.name}</h3>
+                    <h3 className="text-lg font-medium text-white">{copy.name}</h3>
                     <p className="mt-4 text-[13px] leading-[1.95] text-white/62">
                       {copy.when}
                       {t.roles.sentenceEnd}
@@ -176,7 +176,7 @@ export default async function PhilCoachPage() {
               {t.faq.eyebrow}
             </div>
             <div className="flex items-end justify-between gap-8 max-md:block">
-              <h2 className="text-2xl font-semibold">{t.faq.title}</h2>
+              <h2 className="text-2xl font-normal">{t.faq.title}</h2>
               <p className="max-w-[420px] text-[13px] leading-[1.8] text-white/52 max-md:mt-3">
                 {t.faq.note}
               </p>
@@ -184,7 +184,7 @@ export default async function PhilCoachPage() {
             <div className="mt-7 divide-y divide-white/10 border-y border-white/10">
               {faqItems.map(item => (
                 <details key={item.question} className="group">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[15px] font-medium text-white/82 transition-colors hover:text-white [&::-webkit-details-marker]:hidden">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[16px] font-medium text-white/82 transition-colors hover:text-white [&::-webkit-details-marker]:hidden">
                     <span>{item.question}</span>
                     <span
                       aria-hidden="true"
@@ -207,7 +207,7 @@ export default async function PhilCoachPage() {
               <div className="mb-3 text-[11px] font-medium uppercase tracking-[0.2em] text-white/32">
                 {t.experience.eyebrow}
               </div>
-              <h2 className="text-2xl font-semibold">{t.experience.title}</h2>
+              <h2 className="text-2xl font-normal">{t.experience.title}</h2>
             </div>
 
             <PhilCoachExperience locale={locale} />
@@ -219,7 +219,7 @@ export default async function PhilCoachPage() {
           {/* 尾部 */}
           <section className="mt-20 rounded-2xl border border-white/10 bg-white/[0.03] p-10 text-center max-md:p-6">
             <h2
-              className="text-[clamp(1.6rem,3.4vw,2.2rem)] font-semibold"
+              className="text-[clamp(1.6rem,3.4vw,2.2rem)] font-normal"
               style={{ fontFamily: 'var(--font-display)' }}
             >
               {t.outro.title}
@@ -230,13 +230,13 @@ export default async function PhilCoachPage() {
             <div className="mt-8 flex justify-center gap-4 max-md:flex-col max-md:items-stretch">
               <Link
                 href="/#join"
-                className="rounded-full bg-coral-soft px-7 py-3 text-[15px] font-medium text-[#20140f] no-underline transition-opacity hover:opacity-90"
+                className="rounded-full bg-coral-soft px-7 py-3 text-[16px] font-medium text-[#20140f] no-underline transition-opacity hover:opacity-90"
               >
                 {t.outro.ctaJoin}
               </Link>
               <Link
                 href="/meditations"
-                className="rounded-full border border-white/16 bg-white/[0.05] px-7 py-3 text-[15px] text-white/78 no-underline transition-colors hover:bg-white/12 hover:text-white"
+                className="rounded-full border border-white/16 bg-white/[0.05] px-7 py-3 text-[16px] text-white/78 no-underline transition-colors hover:bg-white/12 hover:text-white"
               >
                 {t.outro.ctaListen}
               </Link>

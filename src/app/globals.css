@@ -1,9 +1,38 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-serif: 'Noto Serif SC', ui-serif, Georgia, serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
-  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  /*
+    字体系统，三层：Logo（转曲 SVG）／网站主字体／人文内容。
+    只有两个 webfont 家族在跑，不要再往里加——字体一多品牌就碎了。
+
+    中文**不加载 webfont**：苹果设备落 PingFang SC，其它平台落各自的系统中文字体。
+    这样首屏不闪、移动端不用等几 MB 的 CJK 分片，代价只是不同平台字形略有差异——
+    而真正决定「附近森林」气质的是字号、字重、行距、字距和留白，不是字形本身。
+
+    只有拉丁走 webfont（Manrope）。浏览器的字体回退是**逐字符**的，所以
+    「连接万千有温度的超级创造者」这句里，万一混进拉丁字母会自动走 Manrope，
+    汉字掉到系统中文字体——一个栈同时管住中英，不需要给英文单开 class。
+    （分成 --font-cn / --font-en 两个变量看着清楚，实际要靠人记得在英文元素上
+    加 class，这个站有六十多处字体引用，总会有地方忘。）
+
+    一处刻意的取舍：不用 Avenir Next。它是苹果系统字体，买不到网页授权，
+    放进栈里等于苹果设备一套、其它平台另一套——品牌分裂成两个，
+    而且作者自己在 Mac 上永远看不到那一半。
+  */
+
+  /* 人文内容：宣言、理念、创造者故事、冥想文案。少量出现，不做骨架。 */
+  --font-serif: 'EB Garamond', 'Noto Serif SC', ui-serif, Georgia, serif;
+
+  /* 网站主字体：正文、UI、导航、按钮 */
+  --font-sans: 'Manrope', system-ui, -apple-system, BlinkMacSystemFont,
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+
+  /*
+    Logo 和一级大标题。目前和主字体同栈——差别只在字重和字距，不在家族。
+    单留一个变量是为了 Logo 换成转曲 SVG 时只动这一处。
+  */
+  --font-display: 'Manrope', system-ui, -apple-system, BlinkMacSystemFont,
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --color-forest-deep: #1a2e1a;
   --color-forest-mid: #2d4a2d;
   --color-forest-light: #4a7c4a;

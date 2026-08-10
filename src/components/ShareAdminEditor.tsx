@@ -145,7 +145,7 @@ export default function ShareAdminEditor({ initialContent }: Props) {
             <div className="text-[11px] font-medium tracking-[0.18em] text-coral-soft uppercase">
               首页分享区
             </div>
-            <h2 className="mt-2 text-xl font-semibold text-white">林间分享文案</h2>
+            <h2 className="mt-2 text-xl font-normal text-white">林间分享文案</h2>
           </div>
           <button
             type="button"
@@ -211,7 +211,7 @@ export default function ShareAdminEditor({ initialContent }: Props) {
             <div className="text-[11px] font-medium tracking-[0.18em] text-coral-soft uppercase">
               分享条目
             </div>
-            <h2 className="mt-2 text-xl font-semibold text-white">视频、图片、海报</h2>
+            <h2 className="mt-2 text-xl font-normal text-white">视频、图片、海报</h2>
           </div>
           <button type="button" onClick={addShare} className={ghostBtnCls}>
             添加分享
@@ -236,7 +236,7 @@ export default function ShareAdminEditor({ initialContent }: Props) {
                     </span>
                     {share.ownerId && <span>用户上传</span>}
                   </div>
-                  <h3 className="mt-1 text-lg font-semibold text-white">{share.title}</h3>
+                  <h3 className="mt-1 text-lg font-medium text-white">{share.title}</h3>
                 </div>
                 <button
                   type="button"

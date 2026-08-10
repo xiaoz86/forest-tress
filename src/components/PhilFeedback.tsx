@@ -41,7 +41,7 @@ export default function PhilFeedback({ locale }: { locale: Locale }) {
   if (state === 'done') {
     return (
       <section className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center max-md:p-6">
-        <p className="text-[15px] leading-[1.9] text-white/72">
+        <p className="text-[16px] leading-[1.9] text-white/72">
           {t.doneLead}
           {kind === 'coach-inquiry' ? t.doneCoach : t.doneFeedback}
         </p>
@@ -61,7 +61,7 @@ export default function PhilFeedback({ locale }: { locale: Locale }) {
       <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-white/32">
         {t.eyebrow}
       </div>
-      <h2 className="text-2xl font-semibold">{t.title}</h2>
+      <h2 className="text-2xl font-normal">{t.title}</h2>
       <p className="mt-3 text-[14px] leading-[1.9] text-white/52">
         {t.lede}
       </p>
@@ -98,7 +98,7 @@ export default function PhilFeedback({ locale }: { locale: Locale }) {
             ? t.placeholderCoach
             : t.placeholderFeedback
         }
-        className="mt-5 w-full resize-none rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[15px] leading-relaxed text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
+        className="mt-5 w-full resize-none rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[16px] leading-relaxed text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
       />
       <input
         value={contact}

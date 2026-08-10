@@ -138,7 +138,7 @@ export default async function CreatorDetail({ params }: Props) {
 
           {/* 姓名 — Apple 风 display */}
           <h1
-            className="mt-7 text-[44px] leading-[1.1] font-semibold tracking-[-0.02em] text-forest-deep max-md:text-[34px]"
+            className="mt-7 text-[44px] leading-[1.1] font-light tracking-[-0.02em] text-forest-deep max-md:text-[34px]"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             {me.name}
@@ -146,7 +146,7 @@ export default async function CreatorDetail({ params }: Props) {
 
           {/* 城市副标题 */}
           {me.city && (
-            <p className="mt-3 text-[15px] text-text-light tracking-wide">
+            <p className="mt-3 text-[16px] text-text-light tracking-wide">
               {me.city}
             </p>
           )}
@@ -234,7 +234,7 @@ export default async function CreatorDetail({ params }: Props) {
               Relation Network
             </div>
             <h2
-              className="text-[24px] font-semibold tracking-[-0.01em] text-forest-deep max-md:text-[20px]"
+              className="text-[24px] font-normal tracking-[-0.01em] text-forest-deep max-md:text-[20px]"
               style={{ fontFamily: 'var(--font-display)' }}
             >
               {t.network.title(me.name)}
@@ -262,7 +262,7 @@ export default async function CreatorDetail({ params }: Props) {
       {!isOwner && (
         <section className="py-14 px-6 bg-white text-center max-md:py-10 border-t border-black/[0.04]">
           <h2
-            className="text-[22px] font-semibold tracking-[-0.01em] text-forest-deep mb-3"
+            className="text-[22px] font-normal tracking-[-0.01em] text-forest-deep mb-3"
             style={{ fontFamily: 'var(--font-display)' }}
           >
             {t.joinCta.title}
@@ -304,7 +304,7 @@ function Section({
       <div className={`text-[11px] font-semibold tracking-[0.18em] uppercase mb-3 ${accent}`}>
         {label}
       </div>
-      <p className="text-[15.5px] leading-[1.85] text-text-secondary whitespace-pre-wrap">
+      <p className="text-[16px] leading-[1.85] text-text-secondary whitespace-pre-wrap">
         {body}
       </p>
     </section>
@@ -343,7 +343,7 @@ function WorksSection({
       {hasWorks ? (
         <WorksCarousel works={works} />
       ) : hasLegacy ? (
-        <p className="text-[15.5px] leading-[1.85] text-text-secondary whitespace-pre-wrap">
+        <p className="text-[16px] leading-[1.85] text-text-secondary whitespace-pre-wrap">
           {legacyText}
         </p>
       ) : canEdit ? (

@@ -109,7 +109,12 @@ export default async function Home() {
 
         <div className="relative z-[2] max-w-[1000px]">
           <h1
-            className="mb-6 animate-fade-in font-serif text-[clamp(2.2rem,5.8vw,4.3rem)] font-bold leading-[1.3] tracking-wide text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.42)]"
+            className={`mb-6 animate-fade-in text-[clamp(2.6rem,5.6vw,4.5rem)] font-light leading-[1.14] text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.42)] ${
+              // 负字距是拉丁排版的习惯：字母之间天然有空隙，收紧才紧凑。
+              // 汉字是全宽方块、本来就贴着，同样的 -0.02em 会把每个字压掉一点几个像素，
+              // 笔画密的字（森、灌）开始粘连。所以按语言分开给。
+              locale === 'en' ? 'tracking-[-0.02em]' : 'tracking-normal'
+            }`}
             style={{ fontFamily: 'var(--font-display)' }}
           >
             {/*
@@ -246,7 +251,7 @@ export default async function Home() {
       <footer className="bg-forest-deep px-8 py-14 text-white/55 max-md:px-7">
         <div className="mx-auto flex max-w-[860px] flex-col items-center gap-6 text-center">
           <div>
-            <div className="mb-2 flex items-center justify-center gap-2.5 font-serif text-lg font-bold text-white">
+            <div className="mb-2 flex items-center justify-center gap-2.5 font-display text-lg font-light tracking-[0.14em] text-white">
               <svg viewBox="0 0 28 28" fill="none" width="22" height="22">
                 <circle cx="14" cy="14" r="13" stroke="#a8c9a0" strokeWidth="1.5" />
                 <path

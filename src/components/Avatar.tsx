@@ -48,7 +48,7 @@ export default function Avatar({
         />
       ) : (
         <div
-          className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-serif font-bold`}
+          className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold`}
           style={{ fontSize: size * 0.42 }}
         >
           {initial}

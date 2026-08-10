@@ -29,8 +29,14 @@ export default async function RootLayout({
   return (
     <html lang={locale === "en" ? "en" : "zh-CN"}>
       <head>
+        {/*
+          Manrope 和 EB Garamond 是拉丁字体，整份也就几十 KB。
+          两个 Noto CJK 只作为兜底：中文栈里 PingFang / 微软雅黑排在它们前面，
+          绝大多数设备根本不会去下载那些分片（CJK webfont 按 unicode-range
+          切成几百片，用到哪片才拉哪片）。
+        */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Noto+Serif+SC:wght@300;400;600;700&display=swap"
           rel="stylesheet"
         />
       </head>

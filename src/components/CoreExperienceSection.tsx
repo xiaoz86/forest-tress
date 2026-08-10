@@ -23,14 +23,14 @@ export default function CoreExperienceSection({ content, isAdmin = false }: Prop
               {content.eyebrow}
             </div>
             <h2
-              className="whitespace-pre-line text-[clamp(2rem,4vw,3.1rem)] font-semibold text-forest-deep leading-[1.25] tracking-normal"
+              className="whitespace-pre-line text-[clamp(2rem,4vw,3.1rem)] font-normal text-forest-deep leading-[1.25] tracking-normal"
               style={{ fontFamily: 'var(--font-display)' }}
             >
               {content.title}
             </h2>
           </div>
           <div className="max-w-[520px] justify-self-end max-lg:mt-7 max-lg:justify-self-start">
-            <p className="text-[15px] text-text-secondary leading-[2]">
+            <p className="text-[16px] text-text-secondary leading-[2]">
               {content.intro}
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
@@ -61,7 +61,7 @@ export default function CoreExperienceSection({ content, isAdmin = false }: Prop
                   <span className="h-px w-8 bg-coral-soft/50" />
                   {featured.kicker}
                 </div>
-                <h3 className="text-[1.55rem] font-semibold leading-[1.45]">
+                <h3 className="text-[1.55rem] font-medium leading-[1.45]">
                   {featured.title}
                 </h3>
                 <p className="mt-4 text-[14px] text-white/68 leading-[1.9]">
@@ -87,12 +87,12 @@ export default function CoreExperienceSection({ content, isAdmin = false }: Prop
               {content.noteEyebrow}
             </div>
             <h3
-              className="mt-5 text-[clamp(1.35rem,2.2vw,1.75rem)] font-semibold leading-[1.45] text-forest-deep"
+              className="mt-5 text-[clamp(1.35rem,2.2vw,1.75rem)] font-medium leading-[1.45] text-forest-deep"
               style={{ fontFamily: 'var(--font-display)' }}
             >
               {content.noteTitle}
             </h3>
-            <div className="mt-7 space-y-5 text-[14.5px] leading-[2] text-text-secondary">
+            <div className="mt-7 space-y-5 text-[16px] leading-[2] text-text-secondary">
               {content.noteParagraphs.map(paragraph => (
                 <p key={paragraph}>{paragraph}</p>
               ))}

@@ -114,7 +114,7 @@ function PlaceholderCover({ title }: { title: string }) {
       className={`w-full h-full bg-gradient-to-br ${pickGradient(title)} flex items-center justify-center p-3`}
     >
       <span
-        className="text-white text-[15px] font-semibold leading-tight tracking-wide text-center line-clamp-4 [text-shadow:0_1px_2px_rgba(0,0,0,0.18)]"
+        className="text-white text-[16px] font-semibold leading-tight tracking-wide text-center line-clamp-4 [text-shadow:0_1px_2px_rgba(0,0,0,0.18)]"
         style={{ fontFamily: 'var(--font-display)' }}
       >
         {title}

@@ -39,12 +39,12 @@ export default async function SharesPage() {
                 {tr(content.eyebrow, locale)}
               </div>
               <h1
-                className="whitespace-pre-line text-[clamp(2.2rem,4.6vw,3.6rem)] font-semibold leading-[1.22] text-forest-deep"
+                className="whitespace-pre-line text-[clamp(2.2rem,4.6vw,3.6rem)] font-light leading-[1.22] text-forest-deep"
                 style={{ fontFamily: 'var(--font-display)' }}
               >
                 {t.heroTitle}
               </h1>
-              <p className="mt-6 max-w-[620px] text-[15px] leading-[2] text-text-secondary">
+              <p className="mt-6 max-w-[620px] text-[16px] leading-[2] text-text-secondary">
                 {t.heroLede}
               </p>
             </div>
@@ -101,7 +101,7 @@ function ShareCard({ share, locale }: { share: ShareEntry; locale: Locale }) {
           <span className="h-px w-7 bg-coral-soft/60" />
           {tr(share.kicker, locale)}
         </div>
-        <h2 className="text-[1.35rem] font-semibold leading-[1.45] text-forest-deep">
+        <h2 className="text-[1.35rem] font-normal leading-[1.45] text-forest-deep">
           {tr(share.title, locale)}
         </h2>
         <p className="mt-3 text-[13.5px] leading-[1.85] text-text-secondary">
