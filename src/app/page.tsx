@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
 import HeroVideo from '@/components/HeroVideo';
+import ForestLogo from '@/components/ForestLogo';
 import JoinSection from '@/components/JoinSection';
 import RelationNetwork from '@/components/RelationNetwork';
 import CreatorSection from '@/components/home/CreatorSection';
@@ -252,14 +253,7 @@ export default async function Home() {
         <div className="mx-auto flex max-w-[860px] flex-col items-center gap-6 text-center">
           <div>
             <div className="mb-2 flex items-center justify-center gap-2.5 font-display text-lg font-light tracking-[0.14em] text-white">
-              <svg viewBox="0 0 28 28" fill="none" width="22" height="22">
-                <circle cx="14" cy="14" r="13" stroke="#a8c9a0" strokeWidth="1.5" />
-                <path
-                  d="M14 6 C14 6, 8 12, 8 17 C8 20.3 10.7 23 14 23 C17.3 23 20 20.3 20 17 C20 12 14 6 14 6Z"
-                  fill="#8fb573"
-                  opacity="0.6"
-                />
-              </svg>
+              <ForestLogo size={22} onDark />
               {/* 品牌名和「登录」跟导航共用一份，别在页脚另存一遍 */}
               {d.nav.brand}
             </div>

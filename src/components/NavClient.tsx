@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import ForestLogo from '@/components/ForestLogo';
 import type { Locale } from '@/lib/locale';
 import type { Dictionary } from '@/i18n';
 
@@ -168,17 +169,7 @@ export default function NavClient({ locale, t }: Props) {
           href="/"
           className="flex shrink-0 items-center gap-2.5 font-display text-[21px] font-light tracking-[0.18em] text-forest-dark no-underline"
         >
-          <svg viewBox="0 0 28 28" fill="none" width="26" height="26" aria-hidden="true">
-            <path
-              d="M14 6 C14 6, 8 12, 8 17 C8 20.3 10.7 23 14 23 C17.3 23 20 20.3 20 17 C20 12 14 6 14 6Z"
-              fill="#2f513d"
-              opacity="0.55"
-            />
-            <path
-              d="M14 10 C14 10, 10 14, 10 17.5 C10 19.7 11.8 21.5 14 21.5 C16.2 21.5 18 19.7 18 17.5 C18 14 14 10 14 10Z"
-              fill="#2f513d"
-            />
-          </svg>
+          <ForestLogo size={26} className="shrink-0" />
           {t.brand}
         </Link>
 
