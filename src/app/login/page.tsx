@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import Nav from '@/components/Nav';
 import LoginForm from '@/components/LoginForm';
 import { dict } from '@/i18n';
@@ -40,36 +39,19 @@ export default async function LoginPage({ searchParams }: Props) {
       <Nav />
       <main className="min-h-screen pt-32 pb-20 px-6 bg-gradient-to-b from-[#fafaf7] via-[#f5f5f0] to-[#faf8f2]">
         <div className="max-w-[440px] mx-auto bg-white rounded-3xl border border-black/[0.06] shadow-[0_2px_24px_rgba(0,0,0,0.04)] p-8 max-md:p-6">
-          <div className="text-[11px] font-semibold tracking-[0.18em] text-moss uppercase mb-2">
-            {t.eyebrow}
-          </div>
-          <h1
-            className="text-[26px] font-light tracking-[-0.01em] text-forest-deep mb-3"
-            style={{ fontFamily: 'var(--font-display)' }}
-          >
-            {t.title}
-          </h1>
-          <p className="text-[14px] leading-relaxed text-text-secondary mb-6">
-            {t.lede}
-          </p>
-
-          {errMsg && (
-            <div className="mb-4 p-3 rounded-lg bg-coral/10 border border-coral/30 text-[13px] text-coral">
-              {errMsg}
-            </div>
-          )}
-
-          <LoginForm locale={locale} />
-
-          <p className="mt-6 text-[12px] text-text-light leading-relaxed">
-            {t.benefits}
-          </p>
-          <p className="mt-2 text-[12px] text-text-light leading-relaxed">
-            {t.noAccount.before}
-            <Link href="/#join" className="text-forest-deep underline underline-offset-2 ml-1">
-              {t.noAccount.link}
-            </Link>
-          </p>
+          {/**
+            * 眉标、标题、导语和页脚那两段都跟着表单当前这一步走，所以整块交给 LoginForm。
+            *
+            * 放在这里写死过：验证码填对、发现这个邮箱还没注册之后，表单换成
+            * 「选轻登记还是完整注册」，可页面上方仍写着「登录到你的节点」
+            * （人家还没有节点）、「输入注册时填写的邮箱」（早填完了），
+            * 下方还写着「登录用于已加入的成员」（不是成员）和
+            * 「还没有节点？先填一张节点卡」（右边就是那颗按钮）。
+            * 四句话同时和眼前的界面对不上。
+            *
+            * 只有 ?err= 那条是服务端算出来的，所以从外面传进去。
+            */}
+          <LoginForm locale={locale} linkError={errMsg} />
         </div>
       </main>
     </>

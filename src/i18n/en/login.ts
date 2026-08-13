@@ -28,6 +28,7 @@ export const login: typeof zhLogin = {
   noAccount: { before: 'No node yet?', link: 'Fill in a node card and join the forest' },
 
   newUser: {
+    title: 'First time here—choose your way in',
     body: 'Your email is confirmed. Leave a name for a light check-in, or complete a full node card now. Neither option sends another code.',
     namePlaceholder: 'What should we call you',
     lightJoin: 'Light check-in and continue',

@@ -1,11 +1,73 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import Link from 'next/link';
 import { dict } from '@/i18n';
 import type { Locale } from '@/lib/locale';
 
 /**
- * 两步登录：填邮箱 → 收验证码 → 填回来。
+ * 卡片里除表单本身以外的那几段字。每一步该说什么不一样：
+ *
+ *   email  标题「登录到你的节点」+ 导语 + 页脚两段（想登录的人需要这些）
+ *   code   导语撤掉——「输入注册时填写的邮箱」他已经填完了，
+ *          表单里那句「验证码发到了 xxx」才是当下有用的话
+ *   new    这个邮箱还没有节点：标题换成「第一次来，选择你的方式」，
+ *          页脚两段全撤——「登录用于已加入的成员」对他不成立，
+ *          「还没有节点？先填一张节点卡」和他眼前那颗按钮是同一件事
+ *
+ * 必须定义在 LoginForm **外面**。写在里面的话每次渲染都是一个新的函数引用，
+ * React 认成不同的组件类型，整棵子树卸载重挂——邮箱输入框每敲一个字就失焦。
+ */
+function Chrome({
+  t,
+  step,
+  linkError,
+  children,
+}: {
+  t: ReturnType<typeof dict>['login'];
+  step: 'email' | 'code' | 'new';
+  linkError?: string | null;
+  children: ReactNode;
+}) {
+  const isNew = step === 'new';
+  return (
+    <>
+      <div className="text-[11px] font-semibold tracking-[0.18em] text-moss uppercase mb-2">
+        {t.eyebrow}
+      </div>
+      <h1
+        className="text-[26px] font-light tracking-[-0.01em] text-forest-deep mb-3"
+        style={{ fontFamily: 'var(--font-display)' }}
+      >
+        {isNew ? t.newUser.title : t.title}
+      </h1>
+      {step === 'email' && (
+        <p className="text-[14px] leading-relaxed text-text-secondary mb-6">{t.lede}</p>
+      )}
+      {linkError && (
+        <div className="mb-4 p-3 rounded-lg bg-coral/10 border border-coral/30 text-[13px] text-coral">
+          {linkError}
+        </div>
+      )}
+      {children}
+      {!isNew && (
+        <>
+          <p className="mt-6 text-[12px] text-text-light leading-relaxed">{t.benefits}</p>
+          <p className="mt-2 text-[12px] text-text-light leading-relaxed">
+            {t.noAccount.before}
+            <Link href="/#join" className="text-forest-deep underline underline-offset-2 ml-1">
+              {t.noAccount.link}
+            </Link>
+          </p>
+        </>
+      )}
+    </>
+  );
+}
+
+/**
+ * 三步登录：填邮箱 → 收验证码 → 填回来。填对之后服务端才分辨这个邮箱
+ * 有没有注册：已注册直接进；没注册的多出第三步，选轻登记还是完整注册。
  *
  * 原来是 magic link，必须在收信那个客户端里点开。手机上收信在邮件 App，
  * 点开进的是 App 内置浏览器，和 Safari / Chrome 不共享 cookie——人想在
@@ -15,7 +77,14 @@ import type { Locale } from '@/lib/locale';
  * server → client 那道序列化边界，整片切片当 props 传会让页面直接崩。
  * 只传 locale——它仍是服务端算好的，这边不读 cookie，不会闪一下中文。
  */
-export default function LoginForm({ locale }: { locale: Locale }) {
+export default function LoginForm({
+  locale,
+  /** ?err= 带回来的登录链接错误。服务端算好的，这边只负责摆在标题下面 */
+  linkError,
+}: {
+  locale: Locale;
+  linkError?: string | null;
+}) {
   const t = useMemo(() => dict(locale).login, [locale]);
   const [step, setStep] = useState<'email' | 'code' | 'new'>('email');
   const [email, setEmail] = useState('');
@@ -132,8 +201,14 @@ export default function LoginForm({ locale }: { locale: Locale }) {
     window.location.href = '/#join';
   };
 
+  const chrome = (children: ReactNode) => (
+    <Chrome t={t} step={step} linkError={linkError}>
+      {children}
+    </Chrome>
+  );
+
   if (step === 'new') {
-    return (
+    return chrome(
       <div className="space-y-3">
         <p className="text-[13px] leading-relaxed text-text-secondary">{t.newUser.body}</p>
         <input
@@ -171,7 +246,7 @@ export default function LoginForm({ locale }: { locale: Locale }) {
   }
 
   if (step === 'code') {
-    return (
+    return chrome(
       <div className="space-y-3">
         <p className="text-[13px] leading-relaxed text-text-secondary">
           {t.code.sentTo(email.trim())}
@@ -227,7 +302,7 @@ export default function LoginForm({ locale }: { locale: Locale }) {
     );
   }
 
-  return (
+  return chrome(
     <div className="space-y-3">
       <input
         type="email"
