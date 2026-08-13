@@ -98,6 +98,48 @@ export async function issueCode(
   return { ok: true, code };
 }
 
+/**
+ * 把错误次数 +1，并保证**每一次错都被记上**。
+ *
+ * 原来是「读出来、加一、写回去」。并发下所有人读到的是同一个旧值，
+ * 写回去也是同一个新值——实测 20 个并发只记了 2 次，码还没被作废、还能接着猜。
+ * 也就是说「一个码只给 5 次机会」这道闸，把猜测并发发出去就绕开了。
+ * 它是最后一道闸：前面的 IP 限流换个 IP 就没了，发码冷却只挡「多要几个码」。
+ *
+ * 改成比较并交换：只有 attempts 还等于我读到的那个值时才写得进去，
+ * 被人抢先就重读再试。撞车的各自重试，于是每一次错都算数。
+ *
+ * 满 5 次当场作废，不等下一次请求进来才发现——少给一个来回的空子。
+ * 重试封顶 8 次，免得极端并发在这里空转；真到那个量级，
+ * 前面的 IP 限流早就拦下了。
+ */
+async function bumpAttempts(sb: SupabaseClient, id: string, seen: number): Promise<void> {
+  let current = seen;
+  for (let i = 0; i < 8; i++) {
+    const next = current + 1;
+    const { data } = await sb
+      .from('login_codes')
+      .update({
+        attempts: next,
+        ...(next >= CODE_MAX_ATTEMPTS ? { consumed_at: new Date().toISOString() } : {}),
+      })
+      .eq('id', id)
+      .eq('attempts', current)
+      .select('attempts')
+      .maybeSingle();
+    if (data) return;
+
+    const { data: fresh } = await sb
+      .from('login_codes')
+      .select('attempts')
+      .eq('id', id)
+      .maybeSingle();
+    if (!fresh) return;
+    current = fresh.attempts ?? 0;
+    if (current >= CODE_MAX_ATTEMPTS) return;
+  }
+}
+
 export type ConsumeResult =
   | { ok: true; nodeId: string | null }
   /** 失败原因只用于服务端日志。对外一律回同一句，不然就把「这个邮箱注册过没有」漏出去了。 */
@@ -136,10 +178,7 @@ export async function consumeCode(
   }
 
   if (!codeMatches(email, code, row.code_hash)) {
-    await sb
-      .from('login_codes')
-      .update({ attempts: (row.attempts ?? 0) + 1 })
-      .eq('id', row.id);
+    await bumpAttempts(sb, row.id as string, row.attempts ?? 0);
     return { ok: false, reason: 'mismatch' };
   }
 
