@@ -231,20 +231,19 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const [profileName, setProfileName] = useState('');
   const [identityReady, setIdentityReady] = useState(false);
   const [importState, setImportState] = useState<'idle' | 'importing' | 'done' | 'error'>('idle');
-  /**
-   * 老游客：登记过、还在 90 天免费期内的人照旧放行。
-   * 换了设计不能把当初按规矩登记过的人拦在外面。
-   */
-  const [legacyGuestOk, setLegacyGuestOk] = useState(false);
   const [showGate, setShowGate] = useState(false);
-  /** 浮层两步：留称呼和邮箱 → 填验证码。都在这一页完成，不跳走。 */
-  const [gateStep, setGateStep] = useState<'form' | 'code'>('form');
+  /**
+   * 浮层三步：验证邮箱 → 填验证码 → 只有新用户才选择轻登记或完整注册。
+   * 已有成员在第二步就直接登录，不再重复填称呼。
+   */
+  const [gateStep, setGateStep] = useState<'email' | 'code' | 'new'>('email');
   /**
    * 被哪一道闸拦下的。
-   *   member  —— 8 轮，还不是成员：走轻两步（称呼 + 邮箱 + 验证码）
+   *   member  —— 8 轮，还不是成员：先验证邮箱，再登录或选择登记方式
    *   profile —— 40 轮，是成员但卡片还薄：请他把节点卡填完
    */
   const [gateKind, setGateKind] = useState<'member' | 'profile'>('member');
+  const gateKindRef = useRef<'member' | 'profile'>('member');
   /** 自己的节点 id，补卡片时跳过去用 */
   const [myMemberId, setMyMemberId] = useState('');
   /** 卡片填完了没有。薄卡片的人才会在收尾处看到那句邀请。 */
@@ -255,7 +254,6 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const [gateBusy, setGateBusy] = useState(false);
   const [gateError, setGateError] = useState('');
   const [gateCooldown, setGateCooldown] = useState(0);
-  const [pendingPathId, setPendingPathId] = useState<string | null>(null);
   const [pendingRetry, setPendingRetry] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const pendingVoiceContextRef = useRef<VoiceAnalysis | null>(null);
@@ -513,47 +511,77 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     voiceOut.speak(last.text);
   }, [session, voiceOut, voiceIn.recording, voiceIn.requesting]);
 
-  // 登录检测 + 第一次对话默认导入注册资料
-  useEffect(() => {
-    let active = true;
+  /**
+   * 服务器会话是登录态的唯一来源；记忆接口只负责资料和记忆。
+   * 这样即使记忆表临时查询失败，也不会把已有登录会话误判成游客。
+   */
+  async function refreshIdentity(): Promise<boolean> {
+    try {
+      const sessionResponse = await fetch('/api/session', { cache: 'no-store' });
+      if (!sessionResponse.ok) return loggedIn;
+      const sessionJson = await sessionResponse.json();
+      const memberId = typeof sessionJson?.memberId === 'string' ? sessionJson.memberId : '';
+      setLoggedIn(Boolean(memberId));
+      setMyMemberId(memberId);
+      if (!memberId) return false;
 
-    async function loadIdentity() {
       try {
-        const response = await fetch('/api/phil-coach/memory');
-        const json = response.ok ? await response.json() : null;
-        if (!active) return;
-        if (!json) {
-          setLoggedIn(false);
-          return;
-        }
-        setLoggedIn(true);
+        const memoryResponse = await fetch('/api/phil-coach/memory', { cache: 'no-store' });
+        if (!memoryResponse.ok) return true;
+        const json = await memoryResponse.json();
         setProfileName(normalizePhilProfileName(json.profileName));
         setProfileComplete(Boolean(json.profileComplete));
-        if (typeof json.memberId === 'string') setMyMemberId(json.memberId);
         const mems: { path_id?: string }[] = json.memories ?? [];
         setProfileKnown(mems.some(m => m.path_id === PROFILE_PATH));
         // 第一次：还没有任何记忆时，默认把注册资料导入为「关于我」种子
         if (mems.length === 0) await importProfile();
       } catch {
-        if (active) setLoggedIn(false);
-      } finally {
-        if (active) setIdentityReady(true);
+        // 记忆服务失败只让个性化暂时降级，不改变已确认的登录态。
       }
+      return true;
+    } catch {
+      // 网络瞬断不是退出登录。保留当前状态，真正的对话接口仍会在需要时权威拦截。
+      return loggedIn;
     }
+  }
 
-    void loadIdentity();
+  useEffect(() => {
+    gateKindRef.current = gateKind;
+  }, [gateKind]);
+
+  useEffect(() => {
+    let active = true;
+    void refreshIdentity().finally(() => {
+      if (active) setIdentityReady(true);
+    });
     return () => {
       active = false;
     };
+    // 只在首次挂载读取；验证码成功后会显式再调用一次。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 轻登记检测（方案A：第一条小径免登记，之后登记并经主理人通过后继续）
-  // 老游客还在免费期内就照旧放行（新人不会有这个 cookie，拿到的是 false）
+  // 从邮件页或另一个标签页完成登录后，回到这页就重新确认会话。
+  // Cookie 是同源共享的，不需要再让用户在 PhilCoach 里填第二次验证码。
   useEffect(() => {
-    fetch('/api/phil-coach/guest')
-      .then(r => (r.ok ? r.json() : null))
-      .then(json => setLegacyGuestOk(Boolean(json?.approved)))
-      .catch(() => {});
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== 'visible') return;
+      void refreshIdentity().then(authenticated => {
+        if (!authenticated) return;
+        if (gateKindRef.current === 'member') {
+          setShowGate(false);
+          setGateStep('email');
+        }
+      });
+    };
+    window.addEventListener('focus', refreshOnReturn);
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => {
+      window.removeEventListener('focus', refreshOnReturn);
+      document.removeEventListener('visibilitychange', refreshOnReturn);
+    };
+    // 监听器只注册一次；每次回到页面时，权威状态都从 /api/session 重取。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 重新发送的 60 秒倒计时（服务端也有同样的冷却）
@@ -563,20 +591,14 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     return () => clearTimeout(id);
   }, [gateCooldown]);
 
-  function pathsDone(): number {
-    try {
-      return Number(localStorage.getItem('nf_phil_paths_done') || '0') || 0;
-    } catch {
-      return 0;
-    }
-  }
-  function markPathDone() {
-    try {
-      localStorage.setItem('nf_phil_paths_done', String(pathsDone() + 1));
-    } catch {
-      /* 无痕模式等场景忽略 */
-    }
-  }
+  useEffect(() => {
+    if (!showGate) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !gateBusy) setShowGate(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showGate, gateBusy]);
 
   /** 把注册资料导入/刷新为 phil-coach 的「关于我」种子（默认导入 & 重新导入共用） */
   function importProfile(): Promise<void> {
@@ -611,12 +633,6 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     if (!identityReady || importPromiseRef.current) return;
     liveVoice.cancel();
     voiceIn.cancel();
-    // 方案A：走完第一条小径后，未登录且（未登记或未获通过）→ 先走登记/等待流程
-    if (!loggedIn && !legacyGuestOk && pathsDone() >= 1) {
-      setPendingPathId(p.id);
-      setShowGate(true);
-      return;
-    }
     setDraft('');
     setVoiceInputNotice('');
     setCopied(false);
@@ -630,7 +646,6 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   function reset() {
     liveVoice.cancel();
     voiceIn.cancel();
-    if (session?.thread.some(item => item.kind === 'me')) markPathDone();
     setSession(null);
     setDraft('');
     setVoiceInputNotice('');
@@ -690,11 +705,12 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       return 'gate';
     }
     if (!res.ok || typeof json.reply !== 'string') {
-      throw new Error(json.error || 'reply-failed');
+      throw new Error(String(json.error || 'reply-failed'));
     }
+    const reply = json.reply.trim();
     setSession(current =>
       current && current.pathId === pathId
-        ? { ...current, thread: [...current.thread, { kind: 'coach', text: json.reply.trim() }] }
+        ? { ...current, thread: [...current.thread, { kind: 'coach', text: reply }] }
         : current,
     );
     // 对话有了新内容，「留住」重新可用
@@ -763,10 +779,10 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
 
 
 
-  /** 第一步：把验证码发到这个邮箱。已经是成员的人填同一个邮箱就是登录。 */
+  /** 第一步：只验证邮箱。验证码通过后，服务器才安全地分辨老用户和新用户。 */
   async function sendGateCode() {
     const email = gateEmail.trim();
-    if (!gateName.trim() || !/^.+@.+\..+$/.test(email) || gateBusy || gateCooldown > 0) return;
+    if (!/^.+@.+\..+$/.test(email) || gateBusy || gateCooldown > 0) return;
     setGateBusy(true);
     setGateError('');
     try {
@@ -788,8 +804,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   }
 
   /**
-   * 第二步：填码。对上了就登录——已经是成员的直接进，还不是的当场开一张节点卡。
-   * 全程不离开这一页：对话存在 sessionStorage 里，跳走一次就没了。
+   * 第二步：填码。已有成员直接登录；新邮箱只完成验证，随后再选轻登记或完整注册。
    */
   async function verifyGateCode() {
     const code = gateCode.replace(/\s+/g, '');
@@ -800,15 +815,21 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       const res = await fetch('/api/login/code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: gateEmail.trim(), code, name: gateName.trim() }),
+        body: JSON.stringify({ email: gateEmail.trim(), code }),
       });
       const json = await res.json().catch(() => ({}));
-      if (res.ok && json.memberId) {
+      if (res.ok && json.registered === true && json.memberId) {
         setLoggedIn(true);
+        setMyMemberId(json.memberId);
+        await refreshIdentity();
         setShowGate(false);
-        setGateStep('form');
+        setGateStep('email');
         setGateCode('');
-        await resumePending();
+        return;
+      }
+      if (res.ok && json.registered === false) {
+        setGateStep('new');
+        setGateCode('');
         return;
       }
       setGateError(res.status === 429 ? t.gate.error.tooMany : t.gate.error.code);
@@ -819,23 +840,49 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     }
   }
 
+  /** 新用户选择轻登记：邮箱已在上一步验证，这里只补称呼并创建薄节点。 */
+  async function finishLightJoin() {
+    if (!gateName.trim() || gateBusy) return;
+    setGateBusy(true);
+    setGateError('');
+    try {
+      const res = await fetch('/api/join/light', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: gateName.trim() }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 401 && json.error === 'email-verification-required') {
+        setGateStep('email');
+        setGateError(t.gate.error.verificationExpired);
+        return;
+      }
+      if (!res.ok || !json.memberId) throw new Error('join-failed');
+      setLoggedIn(true);
+      setMyMemberId(json.memberId);
+      await refreshIdentity();
+      setShowGate(false);
+      setGateStep('email');
+      setGateName('');
+    } catch {
+      setGateError(t.gate.error.join);
+    } finally {
+      setGateBusy(false);
+    }
+  }
+
+  /** 完整注册复用刚刚验证过的邮箱，首页向导不会再发第二封验证码。 */
+  function continueToFullJoin() {
+    try {
+      sessionStorage.setItem('nf_verified_join_email', gateEmail.trim());
+    } catch {
+      /* 无痕模式下仍可手动在注册表里填同一邮箱 */
+    }
+    window.location.href = '/#join';
+  }
+
   /** 通过开通后，续上被拦下的动作 */
   async function resumePending() {
-    if (pendingPathId) {
-      const p = getPhilPath(pendingPathId);
-      setPendingPathId(null);
-      if (p) {
-        setDraft('');
-        setVoiceInputNotice('');
-        setCopied(false);
-        setError('');
-        setKeepState('idle');
-        pendingVoiceContextRef.current = null;
-        retryVoiceContextRef.current = null;
-        setSession({ pathId: p.id, thread: seedThread(p, openingForNextConversation()) });
-      }
-      return;
-    }
     if (pendingRetry && session && path) {
       setPendingRetry(false);
       setLoading(true);
@@ -850,6 +897,13 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       }
     }
   }
+
+  useEffect(() => {
+    if (!loggedIn || !pendingRetry || showGate || loading) return;
+    void resumePending();
+    // resumePending 使用当前这次渲染的会话；依赖状态变化就是重试的唯一触发点。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn, pendingRetry, showGate, loading]);
 
 
   async function copyThread() {
@@ -869,15 +923,20 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   /**
    * 闸门浮层：悬浮在对话之上，对话记录保持可见可回看，可点 × 关掉。
    *
-   * 两步都在这一页完成，绝不跳走——对话存在 sessionStorage 里，
-   * 跳一次页就没了。这也是为什么登录用验证码而不是邮件链接。
+   * 已注册用户在浮层内完成验证码登录；新用户验证后可轻登记继续，
+   * 也可去首页完整注册。当前对话会保留在 sessionStorage 中。
    */
   // coach 说过几句（含开场白）——决定那句邀请出不出
   const coachTurns = session ? session.thread.filter(item => item.kind === 'coach').length : 0;
 
   const gateOverlay = showGate ? (
     <div className="fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto bg-black/55 p-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-[560px] rounded-2xl border border-coral-soft/25 bg-[#131a15] p-8 shadow-[0_24px_80px_rgba(0,0,0,0.55)] max-md:p-6">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="phil-coach-gate-title"
+        className="relative w-full max-w-[560px] rounded-2xl border border-coral-soft/25 bg-[#131a15] p-8 shadow-[0_24px_80px_rgba(0,0,0,0.55)] max-md:p-6"
+      >
         <button
           onClick={() => setShowGate(false)}
           type="button"
@@ -890,8 +949,12 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
         <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
           {gateKind === 'profile' ? t.gate.profile.eyebrow : t.gate.eyebrow}
         </div>
-        <h3 className="text-xl font-medium">
-          {gateKind === 'profile' ? t.gate.profile.title : t.gate.title}
+        <h3 id="phil-coach-gate-title" className="text-xl font-medium">
+          {gateKind === 'profile'
+            ? t.gate.profile.title
+            : gateStep === 'new'
+              ? t.gate.newTitle
+              : t.gate.title}
         </h3>
 
         {gateKind === 'profile' ? (
@@ -908,17 +971,10 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
             </div>
             <p className="mt-5 text-[12px] leading-relaxed text-white/32">{t.gate.profile.note}</p>
           </>
-        ) : gateStep === 'form' ? (
+        ) : gateStep === 'email' ? (
           <>
             <p className="mt-3 text-[14px] leading-[1.95] text-white/55">{t.gate.body}</p>
-            <div className="mt-6 grid gap-3">
-              <input
-                value={gateName}
-                onChange={e => setGateName(e.target.value)}
-                maxLength={60}
-                placeholder={t.gate.namePlaceholder}
-                className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
-              />
+            <div className="mt-6">
               <input
                 value={gateEmail}
                 onChange={e => setGateEmail(e.target.value)}
@@ -927,6 +983,8 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                 }}
                 type="email"
                 autoComplete="email"
+                autoFocus
+                aria-label={t.gate.emailPlaceholder}
                 maxLength={120}
                 placeholder={t.gate.emailPlaceholder}
                 className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
@@ -935,18 +993,17 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
             <div className="mt-4 flex flex-wrap items-center gap-4">
               <button
                 onClick={sendGateCode}
-                disabled={!gateName.trim() || !gateEmail.trim() || gateBusy}
+                disabled={!gateEmail.trim() || gateBusy}
                 type="button"
                 className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-40"
               >
                 {gateBusy ? t.gate.sending : t.gate.cta}
               </button>
-              {gateError && <span className="text-[13px] text-coral-soft">{gateError}</span>}
+              {gateError && <span role="status" aria-live="polite" className="text-[13px] text-coral-soft">{gateError}</span>}
             </div>
             <p className="mt-5 text-[12px] leading-relaxed text-white/32">{t.gate.privacy}</p>
-            <p className="mt-1.5 text-[12px] leading-relaxed text-white/32">{t.gate.alreadyMember}</p>
           </>
-        ) : (
+        ) : gateStep === 'code' ? (
           <>
             <p className="mt-3 text-[14px] leading-[1.95] text-white/55">
               {t.gate.codeSentTo(gateEmail.trim())}
@@ -963,6 +1020,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
               // 人不用切出去再回来——切出去这个标签页就可能被系统回收
               inputMode="numeric"
               autoComplete="one-time-code"
+              aria-label={t.gate.codePlaceholder}
               maxLength={8}
               autoFocus
               placeholder={t.gate.codePlaceholder}
@@ -977,12 +1035,12 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
               >
                 {gateBusy ? t.gate.verifying : t.gate.codeCta}
               </button>
-              {gateError && <span className="text-[13px] text-coral-soft">{gateError}</span>}
+              {gateError && <span role="status" aria-live="polite" className="text-[13px] text-coral-soft">{gateError}</span>}
             </div>
             <div className="mt-5 flex items-center justify-between text-[12px] text-white/32">
               <button
                 onClick={() => {
-                  setGateStep('form');
+                  setGateStep('email');
                   setGateCode('');
                   setGateError('');
                 }}
@@ -1000,6 +1058,42 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                 {gateCooldown > 0 ? t.gate.resendIn(gateCooldown) : t.gate.resend}
               </button>
             </div>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">{t.gate.newBody}</p>
+            <input
+              value={gateName}
+              onChange={e => setGateName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') void finishLightJoin();
+              }}
+              maxLength={60}
+              autoFocus
+              aria-label={t.gate.namePlaceholder}
+              placeholder={t.gate.namePlaceholder}
+              className="mt-5 w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
+            />
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                onClick={finishLightJoin}
+                disabled={!gateName.trim() || gateBusy}
+                type="button"
+                className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-40"
+              >
+                {gateBusy ? t.gate.joining : t.gate.lightJoin}
+              </button>
+              <button
+                onClick={continueToFullJoin}
+                disabled={gateBusy}
+                type="button"
+                className="rounded-full border border-white/20 px-6 py-2.5 text-[14px] font-medium text-white/80 transition-colors hover:border-white/40 hover:text-white disabled:opacity-40"
+              >
+                {t.gate.fullJoin}
+              </button>
+              {gateError && <span role="status" aria-live="polite" className="text-[13px] text-coral-soft">{gateError}</span>}
+            </div>
+            <p className="mt-5 text-[12px] leading-relaxed text-white/32">{t.gate.newPrivacy}</p>
           </>
         )}
       </div>

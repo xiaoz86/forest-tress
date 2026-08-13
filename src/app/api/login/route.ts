@@ -97,9 +97,8 @@ export async function POST(request: NextRequest) {
   const node = ((data || []) as NodeCard[]).find(
     row => row.email?.trim().toLowerCase() === normalized,
   ) || null;
-  // node 为 null 表示还不是成员——照样发码。
-  // phil-coach 闸门那条路要靠它当场开号；从外面看两种情况完全一样，
-  // 这本身也是「不暴露某人注册过没有」的一部分。
+  // node 为 null 表示还不是成员——照样发码，但验过后只给短期邮箱凭据，
+  // 不在登录接口静默开户；从发码响应看两种情况仍完全一样。
   if (!emailCoolingDown(normalized)) {
     // 语言必须在进 after 之前取好：after 里跑的时候请求上下文已经收了，
     // 那时再读 cookie / 来源国家会拿不到，信就会一律发成中文。
@@ -108,11 +107,15 @@ export async function POST(request: NextRequest) {
     after(async () => {
       const issued = await issueCode(sb, normalized, node?.id ?? null);
       if (!issued.ok) {
+        if (issued.reason === 'cooldown') {
+          console.log('[api/login] shared email cooldown active');
+          return;
+        }
         console.error('[api/login] cannot issue code', issued.reason);
         return;
       }
-      // 这个邮箱已经是成员 = 登录；不是 = 正在开号（phil-coach 闸门那条路）
-      const delivery = await notifyLoginCode(normalized, issued.code, locale, node ? 'login' : 'signup');
+      // 新邮箱先只验证归属，验证后再让本人选择轻登记或完整注册。
+      const delivery = await notifyLoginCode(normalized, issued.code, locale, node ? 'login' : 'verify');
       if (!delivery.ok) {
         console.error('[api/login] login code email not accepted', {
           reason: delivery.reason,

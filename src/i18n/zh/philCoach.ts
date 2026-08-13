@@ -228,31 +228,37 @@ export const philCoach = {
       switchVoice: '点一下换个嗓音',
     },
 
-    // —— 登记 / 等待开通那张浮层卡 ——
+    // —— 登录 / 登记浮层 ——
     gate: {
       close: '先关闭，回去看对话',
 
-      // 第一步：留称呼和邮箱
+      // 第一步：先验证邮箱；验证码通过之前不判断是否已注册，保护成员隐私
       eyebrow: '继续之前',
-      title: '留个称呼，接着聊',
-      body: '第一段路你已经走完了。留下称呼和邮箱就能继续——你也会成为森林里的一棵树，phil-coach 免费用三个月。',
+      title: '先确认是你，再接着聊',
+      body: '用邮箱确认一次。已经注册过，验证后会直接登录；第一次来，验证后再选择轻登记或完整注册。',
       namePlaceholder: '怎么称呼你',
       emailPlaceholder: '你的邮箱',
-      cta: '继续',
+      cta: '发送验证码',
       sending: '正在发送…',
-      privacy: '这些只用于认识你、联系你，不做别的。',
-      /** 已经是成员的人填同一个邮箱就是登录，不用另找入口 */
-      alreadyMember: '已经是森林里的树？填同一个邮箱就行，我认得出。',
+      privacy: '邮箱只用于确认身份和登录，不会公开展示。',
 
       // 第二步：填验证码（就地完成，不跳页——对话在这个标签页里）
       codeSentTo: (email: string) => `验证码已发到 ${email}`,
       codeHint: '10 分钟内有效。没收到就看看垃圾邮件夹。',
       codePlaceholder: '六位验证码',
-      codeCta: '好了',
+      codeCta: '确认并继续',
       verifying: '正在确认…',
       resend: '重新发送',
       resendIn: (seconds: number) => `${seconds} 秒后可重新发送`,
       changeEmail: '改一下邮箱',
+
+      // 第三步：只有验证过、且确实还不是成员的人才会看到
+      newTitle: '第一次来，选择你的方式',
+      newBody: '邮箱已经确认。你可以先留一个称呼继续聊，也可以现在完整注册一张节点卡；两种方式都不会再发一次验证码。',
+      lightJoin: '轻登记，继续对话',
+      fullJoin: '完整注册节点',
+      joining: '正在种下节点…',
+      newPrivacy: '轻登记只保存称呼和已验证邮箱，之后可以随时补全资料。',
 
       // ── 第二道闸：成员了，但卡片还是薄的（轻两步建的），聊到 40 轮 ──
       profile: {
@@ -269,6 +275,8 @@ export const philCoach = {
         tooMany: '试得有点多了，等几分钟再来。',
         send: '没发出去，稍后再试一次。',
         network: '网络不太顺，稍后再试。',
+        join: '这次登记没有完成，请稍后再试。',
+        verificationExpired: '这次邮箱确认已过期，请重新发送一个验证码。',
       },
     },
   },

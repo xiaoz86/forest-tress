@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { MEMBER_COOKIE, SESSION_COOKIE } from '@/lib/auth';
+import { MEMBER_COOKIE, SESSION_COOKIE, VERIFIED_EMAIL_COOKIE } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
   const res = NextResponse.redirect(new URL(safe, request.url));
   res.cookies.set(MEMBER_COOKIE, '', { path: '/', maxAge: 0 });
   res.cookies.set(SESSION_COOKIE, '', { path: '/', maxAge: 0 });
+  res.cookies.set(VERIFIED_EMAIL_COOKIE, '', { path: '/', maxAge: 0 });
   return res;
 }
 

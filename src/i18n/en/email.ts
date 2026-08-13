@@ -30,6 +30,14 @@ export const email: typeof zhEmail = {
       ignore: 'If this wasn’t you, you can ignore this email.',
       textTitle: 'Your Nearby Forest login code',
     },
+    verify: {
+      subject: (code: string) => `${code} is your Nearby Forest email code`,
+      heading: 'Confirm this email',
+      body: 'Enter these six digits back on the page. If you already joined, you’ll log in; otherwise you can choose a light check-in or full registration.',
+      expiry: 'The code is valid for 10 minutes and can only be used once.',
+      ignore: 'If this wasn’t you, you can ignore this email.',
+      textTitle: 'Your Nearby Forest email verification code',
+    },
     signup: {
       subject: (code: string) => `${code} is your Nearby Forest sign-up code`,
       heading: 'Confirm this email',

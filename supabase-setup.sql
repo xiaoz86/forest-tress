@@ -438,10 +438,14 @@ create table if not exists login_codes (
 create index if not exists idx_login_codes_email
   on login_codes(email, created_at desc);
 
+-- 应用现在用「邮箱哈希后的固定 UUID」作为 id，让同一邮箱在所有 Vercel
+-- 实例间共用一行和 60 秒冷却。无需另建索引；主键本身就是数据库级互斥锁。
+-- 旧的随机 id 记录仍可核销，下一次成功发码后会被应用标记为已使用。
+
 -- 和 program_orders 一样：开 RLS 不加 policy = 只有服务端能读写。
 -- 这张表要是能被浏览器直连读到，等于把所有人的登录码摆在外面。
 alter table login_codes enable row level security;
 
--- 邮箱是否验证过。验证码登录成功即盖章——它本身就证明了这个人能收到这个邮箱。
--- 注册时不验证邮箱，所以这一列是「这个人真的拥有这个邮箱」的唯一凭据。
+-- 邮箱是否验证过。验证码登录或注册成功即盖章——它本身就证明了这个人
+-- 能收到这个邮箱，也是后续判断邮箱归属的唯一凭据。
 alter table node_cards add column if not exists email_verified_at timestamptz;

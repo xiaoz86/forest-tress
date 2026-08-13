@@ -5,6 +5,7 @@ import {
   MEMBER_COOKIE,
   MEMBER_COOKIE_MAX_AGE,
   SESSION_COOKIE,
+  VERIFIED_EMAIL_COOKIE,
 } from '@/lib/auth';
 
 export const runtime = 'nodejs';
@@ -42,5 +43,6 @@ export async function GET(request: NextRequest) {
       maxAge: MEMBER_COOKIE_MAX_AGE,
     });
   }
+  res.cookies.set(VERIFIED_EMAIL_COOKIE, '', { path: '/', maxAge: 0 });
   return res;
 }

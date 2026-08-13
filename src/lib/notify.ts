@@ -301,18 +301,18 @@ export async function notifyLoginCode(
   code: string,
   locale: Locale,
   /**
-   * 哪个场景。同一套码用在登录和注册两处，文案必须分开——
+   * 哪个场景。同一套码用在登录、先验证再选择、完整注册三处，文案必须分开——
    * 一个还没有账号的人收到「你的登录验证码」会懵：登录什么？
    *
    * 调用方是知道的：/api/login 查过这个邮箱是不是成员，
-   * /api/join 一定是注册。告诉收件人「你是在登录还是在注册」
+   * /api/join 一定是注册。告诉收件人当前在做什么
    * 不算泄露——这封信只有邮箱主人收得到。
    */
-  purpose: 'login' | 'signup' = 'login',
+  purpose: 'login' | 'verify' | 'signup' = 'login',
 ): Promise<EmailSendResult> {
   const from = process.env.NOTIFY_FROM?.trim() || '';
   const c = dict(locale).email.code;
-  const t = purpose === 'signup' ? c.signup : c.login;
+  const t = purpose === 'signup' ? c.signup : purpose === 'verify' ? c.verify : c.login;
 
   const html = `<!DOCTYPE html>
 <html lang="${locale === 'en' ? 'en' : 'zh-CN'}"><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">

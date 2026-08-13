@@ -1,6 +1,11 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { MEMBER_COOKIE } from '@/lib/auth';
+import {
+  MEMBER_COOKIE,
+  MEMBER_COOKIE_MAX_AGE,
+  SESSION_COOKIE,
+  signMemberSession,
+} from '@/lib/auth';
 import { getAuthenticatedMemberId } from '@/lib/session';
 
 export const runtime = 'nodejs';
@@ -18,8 +23,30 @@ export async function GET() {
   // 这个值前端可写，绝不拿它换身份；只用来把导航上那个按钮
   // 从「种下一棵树」改成「登录」——注册过的人不该被推去再注册一遍。
   const legacy = !memberId && Boolean((await cookies()).get(MEMBER_COOKIE)?.value);
-  return NextResponse.json(
+  const response = NextResponse.json(
     { memberId: memberId || null, legacy },
     { headers: { 'Cache-Control': 'private, no-store' } },
   );
+
+  // 有效访问就把会话往后续约约六个月：只有连续几个月没再使用这个浏览器，
+  // 才需要重新验证邮箱。nf_member 同步续期，仅用于前端展示个人页入口。
+  if (memberId) {
+    const session = signMemberSession(memberId);
+    if (session.ok) {
+      response.cookies.set(MEMBER_COOKIE, memberId, {
+        httpOnly: false,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: MEMBER_COOKIE_MAX_AGE,
+      });
+      response.cookies.set(SESSION_COOKIE, session.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: MEMBER_COOKIE_MAX_AGE,
+      });
+    }
+  }
+  return response;
 }

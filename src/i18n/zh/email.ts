@@ -42,6 +42,14 @@ export const email = {
       ignore: '如果不是你本人在登录，忽略这封信就好。',
       textTitle: '你的附近森林登录验证码',
     },
+    verify: {
+      subject: (code: string) => `${code} 是你的附近森林邮箱验证码`,
+      heading: '确认一下这个邮箱',
+      body: '把下面这六位数字填回刚才的页面。验证后，如果你已注册会直接登录；如果还没注册，再选择轻登记或完整注册。',
+      expiry: '验证码 10 分钟内有效，只能用一次。',
+      ignore: '如果不是你本人在操作，忽略这封信就好。',
+      textTitle: '你的附近森林邮箱验证码',
+    },
     signup: {
       subject: (code: string) => `${code} 是你的附近森林注册验证码`,
       heading: '确认一下这个邮箱',

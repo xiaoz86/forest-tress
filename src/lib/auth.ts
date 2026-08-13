@@ -30,6 +30,14 @@ function b64url(buf: Buffer | string): string {
     .replace(/\//g, '_');
 }
 
+function fromB64url(value: string): string | null {
+  try {
+    return Buffer.from(value, 'base64url').toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
 function sign(payload: string, secret: string): string {
   return b64url(createHmac('sha256', secret).update(payload).digest());
 }
@@ -76,8 +84,61 @@ export function verifyLoginToken(token: string): VerifyResult {
 }
 
 export const MEMBER_COOKIE = 'nf_member';
-export const MEMBER_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 年
+/** 同一浏览器登录后保持约六个月；到期后才需要重新验证邮箱。 */
+export const MEMBER_COOKIE_MAX_AGE = 60 * 60 * 24 * 180;
 export const SESSION_COOKIE = 'nf_session';
+
+/**
+ * 用户刚刚通过验证码证明拥有某个邮箱，但还没有选择「轻登记」还是完整注册。
+ * 只放在 HttpOnly cookie 里，30 分钟后失效，也不能当成成员会话使用。
+ */
+export const VERIFIED_EMAIL_COOKIE = 'nf_verified_email';
+export const VERIFIED_EMAIL_MAX_AGE = 60 * 30;
+
+export function signVerifiedEmail(email: string): SignResult {
+  const secret = getSecret();
+  if (!secret) return { ok: false, reason: 'no-secret' };
+
+  const normalized = email.trim().toLowerCase();
+  const encodedEmail = b64url(normalized);
+  const expiresAt = Math.floor(Date.now() / 1000) + VERIFIED_EMAIL_MAX_AGE;
+  const payload = `${encodedEmail}.${expiresAt}`;
+  const sig = sign(`verified-email.${payload}`, secret);
+  return { ok: true, token: `${payload}.${sig}`, expiresAt };
+}
+
+export type VerifyEmailResult =
+  | { ok: true; email: string }
+  | { ok: false; reason: 'no-secret' | 'malformed' | 'bad-sig' | 'expired' };
+
+export function verifyVerifiedEmail(token: string): VerifyEmailResult {
+  const secret = getSecret();
+  if (!secret) return { ok: false, reason: 'no-secret' };
+
+  const parts = token.split('.');
+  if (parts.length !== 3) return { ok: false, reason: 'malformed' };
+  const [encodedEmail, expStr, sig] = parts;
+  if (!encodedEmail || !expStr || !sig) return { ok: false, reason: 'malformed' };
+
+  const email = fromB64url(encodedEmail);
+  if (!email || b64url(email.trim().toLowerCase()) !== encodedEmail) {
+    return { ok: false, reason: 'malformed' };
+  }
+
+  const expected = sign(`verified-email.${encodedEmail}.${expStr}`, secret);
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return { ok: false, reason: 'bad-sig' };
+  }
+
+  const exp = Number(expStr);
+  if (!Number.isFinite(exp) || exp * 1000 < Date.now()) {
+    return { ok: false, reason: 'expired' };
+  }
+
+  return { ok: true, email: email.trim().toLowerCase() };
+}
 
 /**
  * 服务器信任的会话凭证。nf_member 还要给前端读，只用来展示个人页入口；

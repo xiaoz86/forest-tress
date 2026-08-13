@@ -14,6 +14,8 @@ import {
   MEMBER_COOKIE,
   MEMBER_COOKIE_MAX_AGE,
   SESSION_COOKIE,
+  VERIFIED_EMAIL_COOKIE,
+  verifyVerifiedEmail,
 } from '@/lib/auth';
 import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
 
@@ -83,6 +85,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'email-invalid' }, { status: 400 });
     }
     const email = rawEmail.toLowerCase();
+    const proof = verifyVerifiedEmail(request.cookies.get(VERIFIED_EMAIL_COOKIE)?.value || '');
+    const alreadyVerified = proof.ok && proof.email === email;
 
     // 同邮箱已注册 → 引导去登录
     {
@@ -111,11 +115,15 @@ export async function POST(request: NextRequest) {
      * 第二次提交（带 code）：核销，通过了才往下建号。
      */
     const code = normalizeCodeInput(body.code);
-    if (!code) {
+    if (!alreadyVerified && !code) {
       const locale = await getLocale();
       after(async () => {
         const issued = await issueCode(supabase, email, null);
         if (!issued.ok) {
+          if (issued.reason === 'cooldown') {
+            console.log('[api/join] shared email cooldown active');
+            return;
+          }
           console.error('[api/join] cannot issue code', issued.reason);
           return;
         }
@@ -127,9 +135,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ needCode: true });
     }
 
-    const verdict = await consumeCode(supabase, email, code);
-    if (!verdict.ok) {
-      return NextResponse.json({ error: 'code-invalid' }, { status: 400 });
+    if (!alreadyVerified && code) {
+      const verdict = await consumeCode(supabase, email, code);
+      if (!verdict.ok) {
+        return NextResponse.json({ error: 'code-invalid' }, { status: 400 });
+      }
     }
 
     const baseRow: Record<string, unknown> = {
@@ -291,6 +301,7 @@ export async function POST(request: NextRequest) {
           maxAge: MEMBER_COOKIE_MAX_AGE,
         });
       }
+      res.cookies.set(VERIFIED_EMAIL_COOKIE, '', { path: '/', maxAge: 0 });
     }
 
     return res;

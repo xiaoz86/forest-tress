@@ -17,9 +17,10 @@ import type { Locale } from '@/lib/locale';
  */
 export default function LoginForm({ locale }: { locale: Locale }) {
   const t = useMemo(() => dict(locale).login, [locale]);
-  const [step, setStep] = useState<'email' | 'code'>('email');
+  const [step, setStep] = useState<'email' | 'code' | 'new'>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
+  const [name, setName] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'verifying'>('idle');
   const [errorText, setErrorText] = useState('');
   /** 服务端对同一个人有 60 秒冷却，界面上倒计时，别让人反复点了没反应 */
@@ -53,9 +54,8 @@ export default function LoginForm({ locale }: { locale: Locale }) {
         body: JSON.stringify({ email: e }),
       });
       if (!res.ok) throw new Error('failed');
-      // 服务端一律回 ok（不暴露这个邮箱有没有注册），所以这里无条件进第二步。
-      // 没注册的人填了码也进不去，看到的是同一句「验证码不对」——
-      // 任何区分都等于把成员名单漏出去。
+      // 发码前一律回 ok（不暴露这个邮箱有没有注册），所以这里无条件进第二步。
+      // 只有验证码填对、证明拥有邮箱之后，服务端才会告知是否已注册。
       setStep('code');
       setCode('');
       setCooldown(60);
@@ -84,6 +84,12 @@ export default function LoginForm({ locale }: { locale: Locale }) {
         window.location.href = `/creators/${json.memberId}`;
         return;
       }
+      if (res.ok && json.registered === false) {
+        setStep('new');
+        setCode('');
+        setStatus('idle');
+        return;
+      }
       setErrorText(res.status === 429 ? t.code.error.tooMany : t.code.error.invalid);
       setStatus('idle');
     } catch {
@@ -91,6 +97,78 @@ export default function LoginForm({ locale }: { locale: Locale }) {
       setStatus('idle');
     }
   };
+
+  const lightJoin = async () => {
+    if (!name.trim() || status !== 'idle') return;
+    setStatus('verifying');
+    setErrorText('');
+    try {
+      const res = await fetch('/api/join/light', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 401 && json.error === 'email-verification-required') {
+        setStep('email');
+        setErrorText(t.newUser.verificationExpired);
+        setStatus('idle');
+        return;
+      }
+      if (!res.ok || !json.memberId) throw new Error('join-failed');
+      window.location.href = `/creators/${json.memberId}`;
+    } catch {
+      setErrorText(t.newUser.error);
+      setStatus('idle');
+    }
+  };
+
+  const fullJoin = () => {
+    try {
+      window.sessionStorage.setItem('nf_verified_join_email', email.trim());
+    } catch {
+      /* 无痕模式下仍可手动填写刚刚验证过的邮箱 */
+    }
+    window.location.href = '/#join';
+  };
+
+  if (step === 'new') {
+    return (
+      <div className="space-y-3">
+        <p className="text-[13px] leading-relaxed text-text-secondary">{t.newUser.body}</p>
+        <input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') void lightJoin();
+          }}
+          maxLength={60}
+          autoFocus
+          placeholder={t.newUser.namePlaceholder}
+          aria-label={t.newUser.namePlaceholder}
+          className="w-full rounded-lg border-[1.5px] border-mist bg-warm-cream px-4 py-3 font-sans text-[14px] text-text-primary outline-none transition-all placeholder:text-text-light/50 focus:border-coral-soft focus:bg-white"
+        />
+        <button
+          type="button"
+          onClick={lightJoin}
+          disabled={!name.trim() || status === 'verifying'}
+          className="w-full rounded-full bg-forest-deep py-3 text-[14px] font-medium text-white transition-colors hover:bg-forest-mid disabled:opacity-50"
+        >
+          {status === 'verifying' ? t.newUser.joining : t.newUser.lightJoin}
+        </button>
+        <button
+          type="button"
+          onClick={fullJoin}
+          disabled={status === 'verifying'}
+          className="w-full rounded-full border border-forest-deep/20 py-3 text-[14px] font-medium text-forest-deep transition-colors hover:border-forest-deep/40 disabled:opacity-50"
+        >
+          {t.newUser.fullJoin}
+        </button>
+        {errorText && <p role="status" aria-live="polite" className="text-[12px] text-coral">{errorText}</p>}
+        <p className="text-[12px] leading-relaxed text-text-light">{t.newUser.note}</p>
+      </div>
+    );
+  }
 
   if (step === 'code') {
     return (
@@ -123,7 +201,7 @@ export default function LoginForm({ locale }: { locale: Locale }) {
         >
           {status === 'verifying' ? t.code.verifying : t.code.submit}
         </button>
-        {errorText && <p className="text-[12px] text-coral">{errorText}</p>}
+        {errorText && <p role="status" aria-live="polite" className="text-[12px] text-coral">{errorText}</p>}
         <div className="flex items-center justify-between pt-1 text-[12px]">
           <button
             type="button"
@@ -170,7 +248,7 @@ export default function LoginForm({ locale }: { locale: Locale }) {
       >
         {status === 'sending' ? t.sending : t.submit}
       </button>
-      {errorText && <p className="text-[12px] text-coral">{errorText}</p>}
+      {errorText && <p role="status" aria-live="polite" className="text-[12px] text-coral">{errorText}</p>}
     </div>
   );
 }

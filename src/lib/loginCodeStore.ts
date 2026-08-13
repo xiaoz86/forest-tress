@@ -5,16 +5,39 @@
  * 两处各写一遍的话，早晚有一边改了闸门另一边没改——而这是认证逻辑，
  * 走岔的代价不是不一致，是有一条路松了。
  */
+import { createHash } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { CODE_MAX_ATTEMPTS, CODE_TTL_MS, codeMatches, generateCode, hashCode } from '@/lib/loginCode';
 
-export type IssuedCode = { ok: true; code: string } | { ok: false; reason: 'no-secret' | 'db' };
+export type IssuedCode =
+  | { ok: true; code: string }
+  | { ok: false; reason: 'no-secret' | 'db' | 'cooldown' };
+
+const ISSUE_COOLDOWN_MS = 60 * 1000;
+
+/**
+ * 每个邮箱固定占用 login_codes 里的一行。
+ *
+ * 这不是认证秘密，只是把邮箱稳定映射成合法 UUID。固定主键让数据库本身成为
+ * 跨 Vercel 实例的互斥锁：两个实例同时发码时，只有一个能插入/更新成功。
+ */
+function codeSlotId(email: string): string {
+  const hex = createHash('sha256')
+    .update(`nearby-forest:login-code:${email.trim().toLowerCase()}`)
+    .digest('hex')
+    .slice(0, 32)
+    .split('');
+  hex[12] = '5';
+  hex[16] = ['8', '9', 'a', 'b'][parseInt(hex[16], 16) % 4];
+  const value = hex.join('');
+  return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
+}
 
 /**
  * 签发一个新码。
  *
- * 先把这个邮箱之前没用掉的全部作废：永远只有最新那个能用。
- * 不作废的话，攻击者可以攒一堆码来提高蒙中的概率。
+ * 先原子占用这个邮箱的固定槽位，再把旧版随机 id 的未用码作废：
+ * 永远只有最新那个能用，也不会因多实例并发发出两封不同验证码。
  */
 export async function issueCode(
   sb: SupabaseClient,
@@ -25,21 +48,52 @@ export async function issueCode(
   const codeHash = hashCode(email, code);
   if (!codeHash) return { ok: false, reason: 'no-secret' };
 
-  await sb
-    .from('login_codes')
-    .update({ consumed_at: new Date().toISOString() })
-    .eq('email', email)
-    .is('consumed_at', null);
-
-  const { error } = await sb.from('login_codes').insert({
+  const now = new Date();
+  const slotId = codeSlotId(email);
+  const row = {
     email,
     node_id: nodeId,
     code_hash: codeHash,
-    expires_at: new Date(Date.now() + CODE_TTL_MS).toISOString(),
-  });
-  if (error) {
-    console.error('[loginCode] cannot store code', error.message);
+    expires_at: new Date(now.getTime() + CODE_TTL_MS).toISOString(),
+    attempts: 0,
+    consumed_at: null,
+    created_at: now.toISOString(),
+  };
+
+  // 旧行只有满 60 秒才允许原子更新。并发更新会由 Postgres 行锁串行化；
+  // 后到的那次重新检查 created_at 后匹配不到，因此不会再发第二封。
+  const cutoff = new Date(now.getTime() - ISSUE_COOLDOWN_MS).toISOString();
+  const { data: updated, error: updateError } = await sb
+    .from('login_codes')
+    .update(row)
+    .eq('id', slotId)
+    .lt('created_at', cutoff)
+    .select('id')
+    .maybeSingle();
+  if (updateError) {
+    console.error('[loginCode] cannot refresh code slot', updateError.message);
     return { ok: false, reason: 'db' };
+  }
+
+  if (!updated) {
+    const { error: insertError } = await sb.from('login_codes').insert({ id: slotId, ...row });
+    if (insertError) {
+      // 固定主键已存在 = 另一实例刚发过，按冷却处理，不再发邮件。
+      if (insertError.code === '23505') return { ok: false, reason: 'cooldown' };
+      console.error('[loginCode] cannot create code slot', insertError.message);
+      return { ok: false, reason: 'db' };
+    }
+  }
+
+  // 兼容部署前生成的随机 id 记录；新码成功占位后再把旧码全部作废。
+  const { error: invalidateError } = await sb
+    .from('login_codes')
+    .update({ consumed_at: now.toISOString() })
+    .eq('email', email)
+    .neq('id', slotId)
+    .is('consumed_at', null);
+  if (invalidateError) {
+    console.error('[loginCode] cannot invalidate older codes', invalidateError.message);
   }
   return { ok: true, code };
 }

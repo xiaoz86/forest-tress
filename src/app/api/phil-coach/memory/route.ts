@@ -17,7 +17,7 @@ async function requireMember(): Promise<string | null> {
   return id ? id : null;
 }
 
-/** GET /api/phil-coach/memory —— 列出自己留住的记忆（登录检测也复用此接口） */
+/** GET /api/phil-coach/memory —— 列出自己留住的记忆；登录态单独由 /api/session 判断。 */
 export async function GET() {
   const memberId = await requireMember();
   if (!memberId) return NextResponse.json({ error: 'not-logged-in' }, { status: 401 });

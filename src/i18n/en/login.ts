@@ -27,6 +27,17 @@ export const login: typeof zhLogin = {
   benefits: 'Logging in is for members who have already joined: edit your profile, see AI suggestions for people in tune with you, and unlock a personalised phil-coach—your own companion coach that remembers you—along with more to come.',
   noAccount: { before: 'No node yet?', link: 'Fill in a node card and join the forest' },
 
+  newUser: {
+    body: 'Your email is confirmed. Leave a name for a light check-in, or complete a full node card now. Neither option sends another code.',
+    namePlaceholder: 'What should we call you',
+    lightJoin: 'Light check-in and continue',
+    fullJoin: 'Complete my node card',
+    joining: 'Joining…',
+    note: 'A light check-in stores only your name and verified email. You can complete your profile later.',
+    error: 'That check-in did not finish. Please try again shortly.',
+    verificationExpired: 'That email confirmation has expired. Please send a new code.',
+  },
+
   code: {
     sentTo: (email: string) => `We sent a code to ${email}`,
     hint: 'Valid for 10 minutes. If it hasn’t arrived, check your spam folder.',

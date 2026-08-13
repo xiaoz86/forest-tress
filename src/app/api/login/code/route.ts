@@ -4,15 +4,13 @@ import {
   MEMBER_COOKIE,
   MEMBER_COOKIE_MAX_AGE,
   SESSION_COOKIE,
+  VERIFIED_EMAIL_COOKIE,
+  VERIFIED_EMAIL_MAX_AGE,
   signMemberSession,
+  signVerifiedEmail,
 } from '@/lib/auth';
 import { normalizeCodeInput, normalizeEmail } from '@/lib/loginCode';
 import { consumeCode } from '@/lib/loginCodeStore';
-import { getLocale } from '@/lib/locale';
-import { notifyNewNode, notifyWelcome, getSiteOrigin } from '@/lib/notify';
-import { signLoginToken } from '@/lib/auth';
-import { after } from 'next/server';
-import type { NodeCard } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
 
@@ -69,12 +67,11 @@ function refundAttempt(ip: string): void {
 /**
  * POST /api/login/code  body: { email, code }
  *
- * 成功即登录，并给 node_cards 盖一个 email_verified_at ——
- * 能收到这个邮箱里的码，就证明这个邮箱确实是本人的。
- * 注册流程不验证邮箱，所以这个戳是「此人真的拥有该邮箱」的唯一凭据。
+ * 已注册邮箱成功即登录，并给 node_cards 盖一个 email_verified_at；
+ * 新邮箱只获得短期验证凭据，后续明确选择轻登记或完整注册，不在这里建号。
  *
  * 失败一律回同一个 code-invalid，不区分「没有这个码」「码错了」「过期了」
- * 「试太多次了」——任何区分都会把「这个邮箱注册过没有」漏出去。
+ * 「试太多次了」。只有验证码正确后才返回 registered 状态，此时邮箱归属已证实。
  */
 export async function POST(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -92,10 +89,6 @@ export async function POST(request: NextRequest) {
 
   const email = normalizeEmail((body as { email?: unknown })?.email);
   const code = normalizeCodeInput((body as { code?: unknown })?.code);
-  // 称呼只在「这个邮箱还不是成员」时才用得上——当场开号要有个名字。
-  // 已经是成员的话直接忽略，不拿它去覆盖人家自己填过的名字。
-  const rawName = (body as { name?: unknown })?.name;
-  const name = typeof rawName === 'string' ? rawName.trim().slice(0, 60) : '';
   if (!email || !code) {
     return NextResponse.json({ error: 'code-invalid' }, { status: 400 });
   }
@@ -115,50 +108,38 @@ export async function POST(request: NextRequest) {
 
   refundAttempt(ip);
 
-  /**
-   * 码对上了 = 这个邮箱确实是本人的。
-   *
-   * 如果发码时它还不是成员（node_id 为空），现在当场开一张节点卡。
-   * phil-coach 聊到额度用完的人走的就是这条路：填称呼和邮箱、收码、
-   * 填回来，一步成为森林里的一棵树，对话接着走。
-   *
-   * 卡是空的，所以这里**不跑撮合也不生成关键词**——对一张只有名字的卡
-   * 做撮合没有意义，而且那是两次大模型调用，会把这一秒卡死。
-   * 等 ta 填完资料再算。
-   */
+  // 发码后到验码前，另一个标签页可能已经用同一邮箱完成了注册。
+  // node_id 是发码那一刻的快照，所以为空时再按规范化邮箱精确查一次。
   let memberId = verdict.nodeId;
-  let createdNode: NodeCard | null = null;
-
   if (!memberId) {
-    // 并发兜底：两个标签页同时验同一个码时，先查一次有没有已经被建出来
-    const { data: existing } = await sb
+    const { data: possibleMembers } = await sb
       .from('node_cards')
-      .select('id')
+      .select('id, email')
       .ilike('email', email)
-      .limit(1)
-      .maybeSingle();
-
-    if (existing?.id) {
-      memberId = existing.id;
-    } else {
-      const { data: inserted, error: insertError } = await sb
-        .from('node_cards')
-        .insert([{ name: name || email.split('@')[0], email, email_verified_at: new Date().toISOString() }])
-        .select();
-      if (insertError || !inserted?.[0]?.id) {
-        console.error('[api/login/code] cannot create member', insertError?.message);
-        return NextResponse.json({ error: 'create-failed' }, { status: 500 });
-      }
-      createdNode = inserted[0] as NodeCard;
-      memberId = createdNode.id!;
-    }
+      .limit(20);
+    const existing = (possibleMembers || []).find(
+      row => typeof row.email === 'string' && row.email.trim().toLowerCase() === email,
+    );
+    memberId = typeof existing?.id === 'string' ? existing.id : null;
   }
 
-  // 到这里 memberId 一定有值（要么原本就是成员，要么刚建出来），
-  // 但类型上还是 string | null，显式收一下窄
+  // 码对上了，但邮箱还不属于成员：只保存短期「邮箱已验证」凭据。
+  // 绝不在登录接口里静默建号；前端随后让用户选择轻登记或完整注册。
   if (!memberId) {
-    console.error('[api/login/code] no member id after verification');
-    return NextResponse.json({ error: 'create-failed' }, { status: 500 });
+    const verified = signVerifiedEmail(email);
+    if (!verified.ok) {
+      console.error('[api/login/code] AUTH_SECRET not configured');
+      return NextResponse.json({ error: 'not-configured' }, { status: 500 });
+    }
+    const res = NextResponse.json({ ok: true, registered: false });
+    res.cookies.set(VERIFIED_EMAIL_COOKIE, verified.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: VERIFIED_EMAIL_MAX_AGE,
+    });
+    return res;
   }
 
   const session = signMemberSession(memberId);
@@ -176,20 +157,7 @@ export async function POST(request: NextRequest) {
     console.error('[api/login/code] cannot stamp email_verified_at', stampError.message);
   }
 
-  // 新开的号：欢迎信和主理人通知都不阻塞响应——这一秒人还等着对话续上
-  if (createdNode) {
-    const locale = await getLocale();
-    const signed = signLoginToken(memberId);
-    const magicLink = signed.ok
-      ? `${getSiteOrigin()}/api/login/verify?token=${encodeURIComponent(signed.token)}`
-      : '';
-    after(async () => {
-      await notifyNewNode(createdNode!);
-      if (magicLink) await notifyWelcome(createdNode!, magicLink, locale);
-    });
-  }
-
-  const res = NextResponse.json({ ok: true, memberId, created: Boolean(createdNode) });
+  const res = NextResponse.json({ ok: true, registered: true, memberId });
   res.cookies.set(MEMBER_COOKIE, memberId, {
     httpOnly: false,
     sameSite: 'lax',
@@ -203,5 +171,6 @@ export async function POST(request: NextRequest) {
     path: '/',
     maxAge: MEMBER_COOKIE_MAX_AGE,
   });
+  res.cookies.set(VERIFIED_EMAIL_COOKIE, '', { path: '/', maxAge: 0 });
   return res;
 }

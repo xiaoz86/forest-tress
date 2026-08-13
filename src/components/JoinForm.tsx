@@ -206,6 +206,16 @@ export default function JoinForm({ locale }: { locale: Locale }) {
     return () => clearTimeout(id);
   }, [verifyCooldown]);
 
+  useEffect(() => {
+    const verifiedEmail = window.sessionStorage.getItem('nf_verified_join_email')?.trim() || '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifiedEmail)) return;
+    const id = window.setTimeout(() => {
+      setData(current => current.email ? current : { ...current, email: verifiedEmail });
+      window.sessionStorage.removeItem('nf_verified_join_email');
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, []);
+
   const submit = async () => {
     if (!canNext) return;
     setStatus('submitting');
