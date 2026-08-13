@@ -591,10 +591,26 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     return () => clearTimeout(id);
   }, [gateCooldown]);
 
+  /**
+   * 人主动关掉浮层 = 这一次先不处理，那条待重发的消息也要一起放下。
+   *
+   * 只关浮层不清 pendingRetry 会转成一个自我循环：40 轮那道闸拦下的是**已登录**的人，
+   * 于是「已登录 + 待重试 + 浮层已关」正好凑齐下面那个 effect 的全部条件，
+   * 它重发 → 服务端照旧回 403 → 重新置上 pendingRetry → effect 再次触发，
+   * 一直打下去。而 profile 那版浮层里只有一个跳去补卡片的链接，
+   * 关掉它恰恰是最自然的动作。
+   *
+   * 放下之后不会没法继续：人再说一句话仍会撞上闸门，浮层照常弹回来。
+   */
+  function dismissGate() {
+    setShowGate(false);
+    setPendingRetry(false);
+  }
+
   useEffect(() => {
     if (!showGate) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !gateBusy) setShowGate(false);
+      if (event.key === 'Escape' && !gateBusy) dismissGate();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -938,7 +954,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
         className="relative w-full max-w-[560px] rounded-2xl border border-coral-soft/25 bg-[#131a15] p-8 shadow-[0_24px_80px_rgba(0,0,0,0.55)] max-md:p-6"
       >
         <button
-          onClick={() => setShowGate(false)}
+          onClick={dismissGate}
           type="button"
           aria-label={t.gate.close}
           className="absolute right-4 top-3 text-2xl leading-none text-white/35 transition-colors hover:text-white"
