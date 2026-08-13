@@ -257,6 +257,14 @@ export default function JoinForm({ locale }: { locale: Locale }) {
       works: worksForJson,
       email: data.email.trim(),
       wechat: data.wechat.trim(),
+      /**
+       * 第八步填的验证码必须跟着这一次提交走。
+       *
+       * 漏掉它的后果不是「验证失败」，是**注册永远走不完**：服务端看到没有 code
+       * 就再发一封信、回一个 needCode，界面又回到填码那步——填几次都一样。
+       * 第一次提交时它是空串，服务端照旧只发码，不受影响。
+       */
+      code: verifyCode.replace(/\s+/g, ''),
     };
 
     try {
