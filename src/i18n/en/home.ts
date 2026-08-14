@@ -331,6 +331,8 @@ export const home: typeof zhHome = {
         sentHint: 'Check your inbox and spam folder—open the link to carry on editing.',
         mailFailed: 'Your node is created, but the welcome email could not be sent just now.',
         mailFailedHint: (email: string) => `Head to the login page shortly and enter ${email} to get a fresh login link.`,
+        backToCoach: 'Back to your conversation',
+        backToCoachHint: 'It’s still there—pick up where you left off.',
       },
 
       error: {

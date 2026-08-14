@@ -110,6 +110,8 @@ export default function JoinForm({ locale }: { locale: Locale }) {
   const [verifyCooldown, setVerifyCooldown] = useState(0);
   const [matches, setMatches] = useState<MatchedNode[]>([]);
   const [welcomeEmailSent, setWelcomeEmailSent] = useState(false);
+  /** 从 phil-coach 的对话里过来的：注册成功那一屏要多一条回去的路 */
+  const [returnToCoach, setReturnToCoach] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
   /** 提交进行中。挡双击用，见 submit 里的说明 */
   const submittingRef = useRef(false);
@@ -208,11 +210,28 @@ export default function JoinForm({ locale }: { locale: Locale }) {
     return () => clearTimeout(id);
   }, [verifyCooldown]);
 
+  /**
+   * 两件从上一页交接过来的事，都藏在 sessionStorage 里，挂载时读一次。
+   *
+   *   nf_verified_join_email  刚验过的邮箱，填进第七步，人不用再打一遍。
+   *                           读完就清——它已经进了表单状态，留着没用。
+   *   nf_join_return          这个人是从 phil-coach 的对话里被拦下来才来注册的，
+   *                           填完之后得给他一条回去的路。**这条读完不清**：
+   *                           「收起表单」会把整个 JoinForm 卸载，再展开就是全新的
+   *                           state，这时候要是记号已经被抹了，回去的路就没了——
+   *                           而那正是这个功能本身。改成人真的点了那颗按钮再清。
+   *
+   * 放在 setTimeout 里是为了扛住严格模式的双次执行：effect 跑一遍、清理、
+   * 再跑一遍，清理会把第一次的 timer 撤掉，只有第二次真的落地。
+   */
   useEffect(() => {
-    const verifiedEmail = window.sessionStorage.getItem('nf_verified_join_email')?.trim() || '';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifiedEmail)) return;
     const id = window.setTimeout(() => {
-      setData(current => current.email ? current : { ...current, email: verifiedEmail });
+      if (window.sessionStorage.getItem('nf_join_return') === 'phil-coach') {
+        setReturnToCoach(true);
+      }
+      const verifiedEmail = window.sessionStorage.getItem('nf_verified_join_email')?.trim() || '';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(verifiedEmail)) return;
+      setData(current => (current.email ? current : { ...current, email: verifiedEmail }));
       window.sessionStorage.removeItem('nf_verified_join_email');
     }, 0);
     return () => window.clearTimeout(id);
@@ -466,6 +485,34 @@ export default function JoinForm({ locale }: { locale: Locale }) {
               )}
             </p>
           </div>
+          {/**
+            * 从对话里被拦下来的人，回去的路摆在最上面。
+            *
+            * 不做自动跳转：下面那片同频伙伴是填完七步唯一的即时回报，
+            * 刚看到就被一把拽走等于把最好的一刻扔了。给一颗按钮，看完了自己走。
+            */}
+          {returnToCoach && (
+            <div className="mt-6 mb-2 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    window.sessionStorage.removeItem('nf_join_return');
+                  } catch {
+                    /* 清不掉也不影响回去，最多下次进注册页多出一颗按钮 */
+                  }
+                  window.location.href = '/phil-coach';
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-forest-deep px-7 py-3 text-[15px] font-medium text-white transition-colors hover:bg-forest-mid"
+              >
+                {t.done.backToCoach}
+                <span className="text-[15px] leading-none">→</span>
+              </button>
+              <p className="mt-3 text-[12.5px] leading-relaxed text-text-light">
+                {t.done.backToCoachHint}
+              </p>
+            </div>
+          )}
           <MatchedNodes matches={matches} locale={locale} />
         </div>
       </div>

@@ -249,11 +249,13 @@ export const philCoach: typeof zhPhilCoach = {
       newTitle: 'First time here—choose your way in',
       newBack: 'Choose a different way',
       nameTitle: 'What should we call you?',
-      newBody: 'Your email is confirmed. Leave a name and keep talking, or complete a full node card now. Neither option sends another code.',
+      newBody: 'Your email is confirmed. Either way, no second code is sent.',
       lightJoin: 'Light check-in and continue',
+      lightDesc: 'Just a name, then back to finishing what you were saying.',
       fullJoin: 'Complete my node card',
+      fullDesc: 'Step into the forest—into yourself, into what you make, into people walking the same way.',
       joining: 'Planting your node…',
-      newPrivacy: 'A light check-in stores only your name and verified email. You can complete your profile later.',
+      newPrivacy: 'A light check-in stores only your name and verified email. The node card can wait as long as you like.',
 
       profile: {
         eyebrow: 'Almost there',

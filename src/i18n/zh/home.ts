@@ -339,6 +339,13 @@ export const home = {
         /** 节点建好了但信没发出去 */
         mailFailed: '节点已经建立，但欢迎邮件暂时未能送出。',
         mailFailedHint: (email: string) => `请稍后到登录页输入 ${email}，重新获取登录链接。`,
+        /**
+         * 只有从 phil-coach 的对话里被拦下来、跑完这七步的人才看得到这两句。
+         * 那段对话一直在他自己的浏览器里存着，回去是原样的——把这件事说出来，
+         * 他才敢点，不然会怕一走就没了。
+         */
+        backToCoach: '回到刚才的对话',
+        backToCoachHint: '那段话还在，回去接着说就好。',
       },
 
       error: {

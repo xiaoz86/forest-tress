@@ -922,6 +922,15 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   function continueToFullJoin() {
     try {
       sessionStorage.setItem('nf_verified_join_email', gateEmail.trim());
+      /**
+       * 留个记号：这个人是从对话里被拦下来才去注册的，填完那七步之后
+       * 得让他回得来。对话本身还在浏览器里，回来是原样的——没有这个记号，
+       * 他就停在注册成功那一屏，得自己想起来该怎么走回去。
+       *
+       * 只留一个记号、不留 URL：跳哪儿由这边的代码决定，
+       * 免得 sessionStorage 被改成一个任意地址当跳板。
+       */
+      sessionStorage.setItem('nf_join_return', 'phil-coach');
     } catch {
       /* 无痕模式下仍可手动在注册表里填同一邮箱 */
     }
@@ -1135,21 +1144,32 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
            */
           <>
             <p className="mt-3 text-[14px] leading-[1.95] text-white/55">{t.gate.newBody}</p>
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => setGateStep('name')}
-                type="button"
-                className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity"
-              >
-                {t.gate.lightJoin}
-              </button>
-              <button
-                onClick={continueToFullJoin}
-                type="button"
-                className="rounded-full border border-white/20 px-6 py-2.5 text-[14px] font-medium text-white/80 transition-colors hover:border-white/40 hover:text-white"
-              >
-                {t.gate.fullJoin}
-              </button>
+            {/**
+              * 两颗按钮原来是并排的，各配一行说明之后必须改成上下摞——
+              * 并排的话说明只能挤在按钮下方半个格子里，两行还会互相串行。
+              * 摞起来之后每条路是一个完整的小块：先是那颗按钮，紧跟着它是什么。
+              */}
+            <div className="mt-5 space-y-4">
+              <div>
+                <button
+                  onClick={() => setGateStep('name')}
+                  type="button"
+                  className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity"
+                >
+                  {t.gate.lightJoin}
+                </button>
+                <p className="mt-2 text-[12.5px] leading-relaxed text-white/45">{t.gate.lightDesc}</p>
+              </div>
+              <div>
+                <button
+                  onClick={continueToFullJoin}
+                  type="button"
+                  className="rounded-full border border-white/20 px-6 py-2.5 text-[14px] font-medium text-white/80 transition-colors hover:border-white/40 hover:text-white"
+                >
+                  {t.gate.fullJoin}
+                </button>
+                <p className="mt-2 text-[12.5px] leading-relaxed text-white/45">{t.gate.fullDesc}</p>
+              </div>
             </div>
             <p className="mt-5 text-[12px] leading-relaxed text-white/32">{t.gate.newPrivacy}</p>
           </>
