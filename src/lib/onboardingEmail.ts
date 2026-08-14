@@ -8,9 +8,19 @@
  * 邮件客户端（尤其 Outlook 和 QQ 邮箱）对 CSS 支持很差：
  * 全部用内联样式，不用 flex / grid / 变量，宽度写死 600px。
  */
+import { EMAIL_FONT, EMAIL_FONT_LINK } from '@/lib/emailTheme';
 import type { Locale } from '@/lib/locale';
 
 const SITE = 'https://nearby-forest.club';
+
+/**
+ * 字体必须写在每一个出文字的元素上，不能只写在 <body> 上等继承。
+ *
+ * Outlook（Windows）用 Word 的排版引擎，凡是自己没声明 font-family 的元素
+ * 一律重置成 Times New Roman——整封信会变成衬线体。Gmail 也会剥掉一部分
+ * body 级样式。所以下面每个样式常量都自带 F。
+ */
+const F = `font-family:${EMAIL_FONT};`;
 
 type Section = {
   heading: string;
@@ -339,17 +349,19 @@ function richText(s: string): string {
     .replace(/&lt;\/strong&gt;/g, '</strong>')
     .replace(/&lt;br&gt;/g, '<br>')
     .replace(/&lt;strong style="color:#2a2a2a;"&gt;/g, '<strong style="color:#2a2a2a;">')
-    .replace(/&lt;a href="([^"]+)"&gt;/g, '<a href="$1" style="color:#2d4a2d;font-weight:600;">')
+    .replace(/&lt;a href="([^"]+)"&gt;/g, `<a href="$1" style="color:#2d4a2d;font-weight:600;${F}">`)
     .replace(/&lt;\/a&gt;/g, '</a>');
 }
 
-const P = 'margin:0 0 14px;font-size:15px;line-height:1.95;color:#2a2a2a;';
-const MUTED = 'margin:0 0 14px;font-size:15px;line-height:1.95;color:#4a4a4a;';
+const P = `margin:0 0 14px;font-size:15px;line-height:1.95;color:#2a2a2a;${F}`;
+const MUTED = `margin:0 0 14px;font-size:15px;line-height:1.95;color:#4a4a4a;${F}`;
 const BTN =
-  'display:inline-block;padding:10px 22px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;';
+  `display:inline-block;padding:10px 22px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;${F}`;
+/** 小节标题。字重 700，栈里 Manrope 只到 700，正好 */
+const H2 = `margin:0 0 14px;font-size:17px;font-weight:700;color:#2d4a2d;line-height:1.5;${F}`;
 
 const btnHtml = (l: { label: string; href: string }) =>
-  `<p style="margin:16px 0 0;"><a href="${l.href}" style="${BTN}">${escape(l.label)} →</a></p>`;
+  `<p style="margin:16px 0 0;${F}"><a href="${l.href}" style="${BTN}">${escape(l.label)} →</a></p>`;
 
 function sectionHtml(s: Section): string {
   const body = s.paragraphs.map(p => `<p style="${P}">${richText(p)}</p>`).join('\n      ');
@@ -366,7 +378,7 @@ function sectionHtml(s: Section): string {
     .join('');
   return `
     <tr><td style="padding:26px 32px 0;">
-      <h2 style="margin:0 0 14px;font-size:17px;font-weight:700;color:#2d4a2d;line-height:1.5;">${escape(s.heading)}</h2>
+      <h2 style="${H2}">${escape(s.heading)}</h2>
       ${body}
       ${link}
       ${groups}
@@ -388,7 +400,7 @@ export function buildOnboardingHtml(name: string, locale: Locale, magicLink?: st
     <tr><td style="padding:22px 32px 0;">
       <div style="border:1px solid rgba(45,74,45,0.16);border-radius:14px;padding:18px 20px;background:#f7faf5;">
         <a href="${magicLink}" style="${BTN}">${escape(t.loginCta)}</a>
-        <p style="margin:10px 0 0;font-size:12px;color:#8a8a8a;">${escape(t.loginNote)}</p>
+        <p style="margin:10px 0 0;font-size:12px;color:#8a8a8a;${F}">${escape(t.loginNote)}</p>
       </div>
     </td></tr>`
     : '';
@@ -396,8 +408,9 @@ export function buildOnboardingHtml(name: string, locale: Locale, magicLink?: st
   return `<!DOCTYPE html>
 <html lang="${locale === 'en' ? 'en' : 'zh-CN'}">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escape(t.subject)}</title></head>
-<body style="margin:0;padding:24px 12px;background:#f0f5ec;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;">
+<title>${escape(t.subject)}</title>
+${EMAIL_FONT_LINK}</head>
+<body style="margin:0;padding:24px 12px;background:#f0f5ec;font-family:${EMAIL_FONT};">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 28px rgba(26,46,26,0.08);">
 
     <!--
@@ -417,9 +430,9 @@ export function buildOnboardingHtml(name: string, locale: Locale, magicLink?: st
     </td></tr>
 
     <tr><td style="padding:26px 32px 24px;background:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#fff;">
-      <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;opacity:0.75;margin-bottom:8px;">附近森林 · Nearby Forest</div>
-      <h1 style="margin:0;font-size:22px;font-weight:700;line-height:1.45;">${escape(t.h1)}</h1>
-      <p style="margin:10px 0 0;font-size:14px;line-height:1.8;opacity:0.85;">${escape(t.tagline)}</p>
+      <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;opacity:0.75;margin-bottom:8px;${F}">附近森林 · Nearby Forest</div>
+      <h1 style="margin:0;font-size:22px;font-weight:700;line-height:1.45;${F}">${escape(t.h1)}</h1>
+      <p style="margin:10px 0 0;font-size:14px;line-height:1.8;opacity:0.85;${F}">${escape(t.tagline)}</p>
     </td></tr>
 
     <tr><td style="padding:28px 32px 0;">
@@ -432,14 +445,14 @@ ${t.sections.map(sectionHtml).join('\n')}
 
     ${t.bothWays ? `<tr><td style="padding:30px 32px 0;">
       <hr style="border:none;border-top:1px solid rgba(45,74,45,0.12);margin:0 0 24px;">
-      <h2 style="margin:0 0 14px;font-size:17px;font-weight:700;color:#2d4a2d;line-height:1.5;">${escape(t.bothWays.heading)}</h2>
+      <h2 style="${H2}">${escape(t.bothWays.heading)}</h2>
       ${t.bothWays.paragraphs.map(p => `<p style="${P}">${richText(p)}</p>`).join('\n      ')}
       <p style="margin:18px 0 0;"><a href="${t.bothWays.cta.href}" style="${BTN}">${escape(t.bothWays.cta.label)} →</a></p>
     </td></tr>` : ''}
 
     <tr><td style="padding:26px 32px 0;">
       <hr style="border:none;border-top:1px solid rgba(45,74,45,0.12);margin:0 0 22px;">
-      ${t.earlyDaysHeading ? `<h2 style="margin:0 0 14px;font-size:17px;font-weight:700;color:#2d4a2d;line-height:1.5;">${escape(t.earlyDaysHeading)}</h2>` : ''}
+      ${t.earlyDaysHeading ? `<h2 style="${H2}">${escape(t.earlyDaysHeading)}</h2>` : ''}
       ${t.earlyDays.map(p => `<p style="${P}">${richText(p)}</p>`).join('\n      ')}
       ${t.maybes.length ? `<p style="${MUTED}">${t.maybes.map(escape).join('<br>')}</p>` : ''}
       ${t.feedback.map(p => `<p style="${P}">${richText(p)}</p>`).join('\n      ')}
@@ -447,24 +460,24 @@ ${t.sections.map(sectionHtml).join('\n')}
 
     <tr><td style="padding:26px 32px 0;text-align:center;">
       <div style="border-radius:14px;background:#f7faf5;padding:20px;">
-        <p style="margin:0;font-size:15px;line-height:2;font-weight:600;color:#2d4a2d;">
+        <p style="margin:0;font-size:15px;line-height:2;font-weight:600;color:#2d4a2d;${F}">
           ${t.motto}
         </p>
       </div>
-      <p style="margin:18px 0 0;font-size:15px;color:#2a2a2a;">${escape(t.farewell)}</p>
+      <p style="margin:18px 0 0;font-size:15px;color:#2a2a2a;${F}">${escape(t.farewell)}</p>
     </td></tr>
 
     <tr><td style="padding:26px 32px 30px;">
       <hr style="border:none;border-top:1px solid rgba(45,74,45,0.12);margin:0 0 20px;">
-      <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#2d4a2d;">${escape(t.signature.brand)}</p>
-      <p style="margin:10px 0 0;font-size:13px;line-height:1.9;color:#6a6a6a;">
+      <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#2d4a2d;${F}">${escape(t.signature.brand)}</p>
+      <p style="margin:10px 0 0;font-size:13px;line-height:1.9;color:#6a6a6a;${F}">
         ${escape(t.signature.founderLabel)}<br>${t.signature.founder}
       </p>
-      <p style="margin:8px 0 0;font-size:13px;line-height:1.9;color:#6a6a6a;">
+      <p style="margin:8px 0 0;font-size:13px;line-height:1.9;color:#6a6a6a;${F}">
         ${escape(t.signature.coFounderLabel)}<br>${t.signature.coFounder}
       </p>
-      <p style="margin:16px 0 0;font-size:13px;color:#6a6a6a;">
-        ${escape(t.signature.contactLabel)}<a href="${SITE}/about#contact" style="color:#2d4a2d;">${SITE}/about#contact</a>
+      <p style="margin:16px 0 0;font-size:13px;color:#6a6a6a;${F}">
+        ${escape(t.signature.contactLabel)}<a href="${SITE}/about#contact" style="color:#2d4a2d;${F}">${SITE}/about#contact</a>
       </p>
     </td></tr>
 

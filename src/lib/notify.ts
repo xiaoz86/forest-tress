@@ -1,4 +1,5 @@
 import type { NodeCard } from './supabase';
+import { EMAIL_FONT } from '@/lib/emailTheme';
 import { dict } from '@/i18n';
 import type { Locale } from '@/lib/locale';
 import {
@@ -181,7 +182,7 @@ function buildHtml(node: NodeCard): string {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>新成员加入 · 附近森林</title></head>
-<body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;">
+<body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(26,46,26,0.08);">
     <div style="padding:28px 32px;background:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#fff;">
       <div style="font-size:13px;opacity:0.75;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · 新成员</div>
@@ -315,7 +316,7 @@ export async function notifyLoginCode(
   const t = purpose === 'signup' ? c.signup : purpose === 'verify' ? c.verify : c.login;
 
   const html = `<!DOCTYPE html>
-<html lang="${locale === 'en' ? 'en' : 'zh-CN'}"><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
+<html lang="${locale === 'en' ? 'en' : 'zh-CN'}"><body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
   <div style="max-width:480px;margin:0 auto;background:#fff;border-radius:16px;padding:28px 32px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
     <h2 style="margin:0 0 12px;font-size:18px;color:#2d4a2d;">${escape(t.heading)}</h2>
     <p style="font-size:14px;color:#2a2a2a;line-height:1.8;margin:0 0 20px;">${escape(t.body)}</p>
@@ -344,7 +345,7 @@ function buildShareSubmissionHtml(node: NodeCard, share: ShareEntry, reviewUrl: 
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>新的林间分享待审核</title></head>
-<body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;">
+<body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(26,46,26,0.08);">
     <div style="padding:28px 32px;background:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#fff;">
       <div style="font-size:13px;opacity:0.75;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · 林间分享</div>
@@ -467,7 +468,7 @@ export async function notifyPhilFeedback(params: {
   ];
   const text = lines.join('\n');
   const html = `<!DOCTYPE html>
-<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
+<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
   <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:26px 30px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
     <h2 style="margin:0 0 14px;font-size:17px;color:#2d4a2d;">${isInquiry ? '🌱 有人想咨询真人教练陪伴' : '💬 phil-coach 模块反馈'}</h2>
     <p style="font-size:13px;color:#6b8f5e;margin:0 0 4px;">${params.nodeName ? `来自：${escape(params.nodeName)}（注册成员）` : '来自：访客'}</p>
@@ -537,7 +538,7 @@ export async function notifyPhilGuest(params: {
     `通过后：加 ta 微信 → 问候 + 拉入附近森林社群。`,
   ].join('\n');
   const html = `<!DOCTYPE html>
-<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
+<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:26px 30px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
     <h2 style="margin:0 0 14px;font-size:17px;color:#2d4a2d;">${params.renewal ? '🌿 老朋友申请续期 phil-coach（免费期已满）' : '🌿 新朋友登记使用 phil-coach'}</h2>
     <p style="font-size:14px;color:#2a2a2a;margin:0 0 6px;">称呼：<strong>${escape(params.name)}</strong></p>
@@ -625,7 +626,7 @@ export async function notifyProgramClaim(params: {
     }">${label}</a>`;
 
   const html = `<!DOCTYPE html>
-<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:-apple-system,'PingFang SC',sans-serif;">
+<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
   <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:26px 30px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
     <p style="margin:0 0 18px;font-size:15px;color:#2a2a2a;line-height:1.8;">
       <strong>${escape(name)}</strong> 刚说付了 ¥${yuan}，${escape(params.programTitle)}已经开好了。
