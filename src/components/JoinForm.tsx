@@ -216,7 +216,15 @@ export default function JoinForm({ locale }: { locale: Locale }) {
     return () => window.clearTimeout(id);
   }, []);
 
-  const submit = async () => {
+  /**
+   * resend=true 表示这次是「重新发送」：明确不带码提交，服务端才会去发新信。
+   *
+   * 不能靠先 setVerifyCode('') 再调 submit() 来达到这个效果。submit 是本次渲染
+   * 建出来的闭包，第 267 行读到的仍是清空前那串码——于是「重新发送」实际把
+   * 刚被判错的码原样又提交一遍：信一封没发、倒计时不重置、还白扣一次尝试机会；
+   * 万一框里那串是对的，这颗按钮会当场把注册做完。
+   */
+  const submit = async ({ resend = false }: { resend?: boolean } = {}) => {
     if (!canNext) return;
     setStatus('submitting');
     setErrorMsg(null);
@@ -264,7 +272,7 @@ export default function JoinForm({ locale }: { locale: Locale }) {
        * 就再发一封信、回一个 needCode，界面又回到填码那步——填几次都一样。
        * 第一次提交时它是空串，服务端照旧只发码，不受影响。
        */
-      code: verifyCode.replace(/\s+/g, ''),
+      code: resend ? '' : verifyCode.replace(/\s+/g, ''),
     };
 
     try {
@@ -378,7 +386,7 @@ export default function JoinForm({ locale }: { locale: Locale }) {
           <div className="mt-5 flex flex-wrap items-center gap-4">
             <button
               type="button"
-              onClick={submit}
+              onClick={() => void submit()}
               disabled={code.length !== 6}
               className="rounded-full bg-forest-deep px-6 py-3 text-sm font-medium text-white transition-opacity disabled:opacity-50"
             >
@@ -405,7 +413,7 @@ export default function JoinForm({ locale }: { locale: Locale }) {
               onClick={() => {
                 setVerifyCode('');
                 setErrorMsg(null);
-                void submit();
+                void submit({ resend: true });
               }}
               disabled={verifyCooldown > 0}
               className="underline-offset-2 hover:text-forest-deep hover:underline disabled:no-underline disabled:hover:text-text-light"
@@ -816,7 +824,7 @@ export default function JoinForm({ locale }: { locale: Locale }) {
           ) : (
             <button
               type="button"
-              onClick={submit}
+              onClick={() => void submit()}
               disabled={!canNext || status === 'submitting'}
               className={`px-7 py-3 rounded-full font-medium text-[14px] transition-all cursor-pointer ${
                 canNext && status !== 'submitting'
