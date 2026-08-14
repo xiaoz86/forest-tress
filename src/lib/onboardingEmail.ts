@@ -14,10 +14,18 @@ const SITE = 'https://nearby-forest.club';
 
 type Section = {
   heading: string;
-  /** 段落。字符串里可以带 <strong>，其余一律纯文本 */
+  /** 段落。字符串里可以带 <strong> / <br> / <a href="…">，其余一律纯文本 */
   paragraphs: string[];
   /** 段末那颗按钮（可选） */
   link?: { label: string; href: string };
+  /**
+   * 小节内部再分块，每块可以自己带一颗按钮。
+   *
+   * 03「向内生长，也向外连接」一节里有三条路（冥想 / 21 天睡眠 / 创造者），
+   * 各自要一颗按钮，单个 link 装不下。用 groups 就不必把它拆成三个编号小节，
+   * 主理人写的是一节，读者看到的也该是一节。
+   */
+  groups?: { paragraphs: string[]; link?: { label: string; href: string } }[];
 };
 
 type Letter = {
@@ -42,6 +50,8 @@ type Letter = {
   bothWays?: { heading: string; paragraphs: string[]; cta: { label: string; href: string } };
   /** 早期说明 + 邀请反馈 */
   earlyDays: string[];
+  /** 「写在最后」那种小标题。中文版有，英文版仍是直接接段落，所以可选 */
+  earlyDaysHeading?: string;
   /** 「也许是一次认识」那种换行列举 */
   maybes: string[];
   feedback: string[];
@@ -55,20 +65,20 @@ type Letter = {
 };
 
 // ──────────────────────────────────────────────────────────────
-// 中文（主理人 2026-08-09 改版：小节重排，PhilCoach 提到 02、AI 撮合降到 06）
+// 中文（主理人 2026-08-14 改版：七个编号小节收成四个，冥想 / 21 天睡眠 /
+// AI 撮合并进 03 一节；新增不编号的「从一件小事开始」；结尾接上共创社群）
 // ──────────────────────────────────────────────────────────────
 const ZH: Letter = {
-  subject: '附近森林致你的一封信｜走进自我，分享创造，相遇同行人',
+  subject: '附近森林致你的第一封信｜走进自我，分享创造，相遇同行人 🌳',
   h1: '欢迎来到附近森林 🌳',
   tagline: '走进自我，分享创造，相遇同行人',
   greeting: name => (name ? `嗨，亲爱的创造者${name}：` : '嗨，亲爱的创造者：'),
   intro: [
     '欢迎来到「附近森林」。🌳',
     '如果你已经注册了这里，也许你会好奇：<strong>附近森林究竟可以用来做什么？</strong>',
-    '我们想做的，并不只是一个展示个人主页、发布作品的平台。我们更希望它像一片真正的森林——',
+    '也许我们表面看来它像个展示个人主页、发布作品的平台网站。如果是这样，也许忽视了发现它的可能性，诚挚的邀请你走近来，并通过接下来给你的一封信向你展开。我们相信会在这样一片真正的森林里相遇。',
   ],
-  quote:
-    '<strong>每个人都可以按照自己的方式生长，在这里回到自己，也走向彼此；被看见、被连接，并让一些真正有意思的事情共同发生。</strong>树一样自在生长，彼此独立，根系扎根而又相互滋养与彼此连接。',
+  quote: '<strong>希望这封信，将会成为是你走进这片森林的开始探索的地图。</strong>',
   loginCta: '进入我的节点',
   loginNote: `链接 7 天内有效。过期了可以到 ${SITE}/login 重新获取。`,
   sections: [
@@ -77,86 +87,96 @@ const ZH: Letter = {
       paragraphs: [
         '在附近森林，每一位创造者都可以拥有自己的个人空间。',
         '你可以介绍和分享自己，也可以逐渐发布和管理自己正在创造的事情：作品、项目、服务、活动、课程，或者一个刚刚萌芽的想法。',
-        '如果你是一名教练，可以发布自己的教练服务与预约；如果你正在组织一场线下活动，可以分享出来，让森林里的伙伴发现并参与；如果你正在创造产品、内容、课程或其他作品，也可以慢慢把它们放进来。',
+        '如果你是一名教练，可以发布自己的教练服务与预约；如果你正在组织一场线下活动，可以向外分享，让森林里的伙伴发现并参与；如果你正在创造产品、内容、课程或其他作品，也可以慢慢找到它在这可能的生长方式。',
         '<strong>它不需要一开始就很完整。</strong>',
         '你可以把这里当作一棵正在生长的树——随着你不断变化，它也和你一起生长。',
       ],
     },
     {
       // 标题整行已经是粗体，里面再套 <strong> 会被 escape() 打成字面标签。
-      // 「Virtual Coach」的加粗放在下面正文那句里。
-      heading: '💬 02｜PhilCoach：一个随时可以聊聊的 Virtual Coach 虚拟教练',
+      heading: '💬 02｜PhilCoach：一个随时可以聊聊的 ACC+ Virtual Coach',
       paragraphs: [
-        '我们也希望附近森林能够陪伴每个人<strong>回到自己</strong>。',
-        '目前已经上线的 <strong>PhilCoach</strong>，就是我们正在探索的一种方式。它是一个融合了<strong>知心伙伴 × Life Coach × 顾问 × 导师</strong>角色的 <strong>Virtual Coach</strong> 虚拟教练。',
+        '我们也希望附近森林始终有一位生态「伙伴」能够陪伴每个人<strong>回到自己</strong>。',
+        '目前已经上线的 <strong>PhilCoach</strong>，是我们找到的一种陪伴方式。它是一个融合了<strong>知心伙伴 × Life Coach × 导师</strong>角色的虚拟教练（非 AI 教练）。',
         '当你面对一个暂时想不清楚的问题、一段情绪、职业与人生选择，或者只是某个晚上突然很想找个人聊聊时，都可以打开 PhilCoach。',
         '它不会只是急着给你一个标准答案。我们更希望它能够陪你梳理正在发生的事情，通过提问、回应与对话，帮助你慢慢看见：<strong>我真正关心的是什么？现在困住我的是什么？我有哪些还没有看见的可能性？下一步，我真正愿意做什么？</strong>',
-        '有时候，我们需要的并不是更多答案。而是一个空间，让自己重新听见自己。',
+        '有时候，我们需要的并不是更多答案。而是一个空间，让自己重新听见自己。<strong>因为凡流经你的，也终将留驻于你。</strong>',
+        '希望透过陪伴和向内探寻的对话，能与你一起探索关于我们生命中那些真正重要的东西，新的发现与新的可能性，一起探索关于心灵、正在经历的人生与爱的课题。愿每一次对话，都能陪伴我们更加真实地认识自己，也在这片森林里，和自己的空间里度过一个美好的时光。',
       ],
       link: { label: '打开 PhilCoach', href: `${SITE}/phil-coach` },
     },
     {
-      heading: '🌳 03｜向内生长，也向外连接',
-      paragraphs: [
-        '你可以把附近森林理解成两个方向：',
-        '<strong>向内——回到自己。</strong>通过 PhilCoach、正念冥想和 21 天睡眠陪伴，更好地认识自己、照顾自己，找到自己的节奏。',
-        '<strong>向外——走进森林。</strong>建立自己的创造者主页，分享作品与正在做的事情，通过 AI 和社区发现同频伙伴，让真实的连接与共同创造发生。',
-        '一个人可以是一棵完整的树。但当根系开始相遇，我们也许会发现：<strong>原来，我们身旁还有和我们一样的同路人，及可以共创的同盟伙伴。</strong>',
-        '如果你已经来到附近森林，现在可以从一件很小的事情开始：',
-        '· <strong>完善你的创造者主页</strong>，让别人知道你是谁、你关心什么、正在创造什么；<br>· <strong>体验一次 PhilCoach 对话或冥想</strong>，给自己一点向内的空间；<br>· 或者，<strong>去看看森林里的其他创造者</strong>——也许某个人正在做的事情，刚好与你产生奇妙的交集。',
+      /**
+       * 主理人把冥想、21 天睡眠、AI 撮合三块并进了这一节（原来是 04 / 05 / 06 三个编号小节）。
+       * 一节里有三条路、各要一颗按钮，所以用 groups 而不是拆成三节。
+       */
+      heading: '🧘 03｜向内生长，也向外连接',
+      paragraphs: ['你可以把附近森林理解为两个方向：'],
+      groups: [
+        {
+          paragraphs: [
+            '<strong>🧘 向内——回到自己。</strong>',
+            '如果 PhilCoach 是一位陪伴对话的虚拟教练伙伴，那在平凡的日常里，能否再走进一步？呼吸，也许是我们向内看见和连接感受的桥梁。',
+            '诚然，我们正在逐渐整理和设计不同主题的正念与冥想练习，希望它不只是一个「冥想音频库」，而是能够在不同生活状态下，陪伴你找到适合自己的练习。',
+            '当你感到疲惫、焦虑、脑子停不下来，或者只是想在一天结束的时候重新回到身体，都可以来到这里。哪怕只有几分钟。',
+            '<strong>暂停一下，呼吸一下，重新感受自己。</strong>',
+          ],
+          link: { label: '去正念冥想空间', href: `${SITE}/meditations` },
+        },
+        {
+          paragraphs: [
+            '<strong>🌙 21 天改善睡眠冥想陪伴</strong>',
+            '睡眠，是我们每天都需要却常常被忽略的事情。这也是我们最近特别想认真陪伴大家的一件事。',
+            '它不是要求你必须「完成 21 天打卡」的挑战，而更像是一段温和的陪伴：每天睡前，留一点时间给自己。通过呼吸、身体放松、正念觉察和不同主题的睡前冥想，慢慢回到生命的本然与休息的存在状态。',
+            '我们希望这 21 天带来的，不只是「更快睡着」。更重要的是：<strong>让身体慢慢知道——一天可以结束了，我可以暂时放下，安心休息。</strong>',
+            '如果你最近睡前思绪很多、工作结束后很难真正停下来，或者想重新建立更稳定的睡眠与休息习惯，都可以从这里开始。',
+          ],
+          link: { label: '走进 21 天睡眠陪伴', href: `${SITE}/meditations?category=sleep` },
+        },
+        {
+          paragraphs: [
+            '<strong>✨ 向外——走进森林。</strong>',
+            '可以以怎样的方式打开这张地图，或许你可以从建立自己的创造者主页，分享作品与正在做的事情，通过 AI 和社区发现同频伙伴，找到你属于你的线索，让真实的相遇、连接与共同创造发生，成为你开始生长的起点。',
+            'AI 伙伴「小芽」的身影正融入附近森林，是社区中非常重要的一个部分。',
+            '随着越来越多创造者加入，小芽会基于大家公开的个人介绍、兴趣、正在做的事情、作品与需求，持续寻找森林里<strong>可能真正值得彼此认识的人</strong>。',
+            '她不会只告诉你：「你们兴趣相似。」而会进一步尝试回答：<strong>为什么推荐你们认识？你们之间有哪些共同点？彼此可能带来什么价值？有没有什么值得一起聊聊，甚至共同创造的事情？</strong>',
+            '也许你正在做一个项目，而森林里刚好有人拥有你需要的经验；也许两个人做着完全不同的事情，却有相似的价值观；也许你发布了一场活动，恰好有人一直在寻找这样的体验。',
+            '一次 AI 推荐，可能最后变成一次咖啡、一场合作、一个共同项目，或者一段长期同行的关系。',
+            '<strong>我们希望 AI 做的，不是替代人与人的连接，而是让那些原本可能擦肩而过的人，更容易看见彼此。</strong>',
+            '而且，这张关系地图会持续生长。随着新的创造者来到森林，以及大家不断更新自己的状态、作品和正在做的事情，AI 也会重新理解这片森林，为你发现<strong>此刻与你距离更近、可能值得认识的人。</strong>',
+          ],
+          link: { label: '去看看森林里的创造者', href: `${SITE}/creators` },
+        },
       ],
-      link: { label: '去看看森林里的创造者', href: `${SITE}/creators` },
     },
     {
-      heading: '🧘 04｜呼吸：给自己留一点安静的空间',
+      heading: '🌿 04｜让你的创造，被真正需要它的人看见',
       paragraphs: [
-        '附近森林的正念冥想空间也已经上线。',
-        '我们正在逐渐整理和设计不同主题的正念与冥想练习，希望它不只是一个「冥想音频库」，而是能够在不同生活状态下，陪伴你找到适合自己的练习。',
-        '当你感到疲惫、焦虑、脑子停不下来，或者只是想在一天结束的时候重新回到身体，都可以来到这里。哪怕只有几分钟。',
-        '<strong>暂停一下，呼吸一下，重新感受自己。</strong>',
-      ],
-      link: { label: '去正念冥想空间', href: `${SITE}/meditations` },
-    },
-    {
-      heading: '🌙 05｜21 天改善睡眠冥想陪伴',
-      paragraphs: [
-        '睡眠，也是我们最近特别想认真陪伴大家的一件事。因此，我们正在附近森林中加入<strong>「21 天改善睡眠冥想陪伴」</strong>。',
-        '它不是要求你必须「完成 21 天打卡」的挑战，而更像是一段温和的陪伴：每天睡前，留一点时间给自己。通过呼吸、身体放松、正念觉察和不同主题的睡前冥想，慢慢回到生命的本然与休息的存在状态。',
-        '我们希望这 21 天带来的，不只是「更快睡着」。更重要的是：<strong>让身体慢慢知道——一天可以结束了，我可以暂时放下，安心休息。</strong>',
-        '如果你最近睡前思绪很多、工作结束后很难真正停下来，或者想重新建立更稳定的睡眠与休息习惯，都可以从这里开始。',
-      ],
-      link: { label: '走进 21 天睡眠陪伴', href: `${SITE}/meditations?category=sleep` },
-    },
-    {
-      heading: '✨ 06｜AI 帮助森林里的彼此相遇',
-      paragraphs: [
-        '创造相遇，这是附近森林非常重要的一部分。',
-        '随着越来越多创造者加入，AI 会基于大家公开的个人介绍、兴趣、正在做的事情、作品与需求，持续寻找森林里<strong>可能真正值得彼此认识的人</strong>。',
-        '它不会只告诉你：「你们兴趣相似。」而会进一步尝试回答：<strong>为什么推荐你们认识？你们之间有哪些共同点？彼此可能带来什么价值？有没有什么值得一起聊聊，甚至共同创造的事情？</strong>',
-        '也许你正在做一个项目，而森林里刚好有人拥有你需要的经验；也许两个人做着完全不同的事情，却有相似的价值观；也许你发布了一场活动，恰好有人一直在寻找这样的体验。',
-        '一次 AI 推荐，可能最后变成一次咖啡、一场合作、一个共同项目，或者一段长期同行的关系。',
-        '<strong>我们希望 AI 做的，不是替代人与人的连接，而是让那些原本可能擦肩而过的人，更容易看见彼此。</strong>',
-        '而且，这张关系地图会持续生长。随着新的创造者来到森林，以及大家不断更新自己的状态、作品和正在做的事情，AI 也会重新理解这片森林，为你发现<strong>此刻与你距离更近、可能值得认识的人。</strong>',
-      ],
-    },
-    {
-      heading: '🌿 07｜让你的创造，被真正需要它的人看见',
-      paragraphs: [
-        'AI 也会逐渐帮助创造者理解：<strong>谁可能对我的作品感兴趣？哪些人正在寻找我能够提供的东西？大家对哪些内容、活动或服务更感兴趣？我的创造正在回应怎样的真实需求？</strong>',
+        '我们正设计，让 AI 也可以逐渐帮助附近森林的创造者理解：<strong>谁可能对我的作品感兴趣？哪些人正在寻找我能够提供的东西？大家对哪些内容、活动或服务更感兴趣？我的创造正在回应怎样的真实需求？</strong>',
         '当你发布教练服务、课程、活动、作品或项目时，我们希望附近森林不只是提供一个「发布入口」。未来，它也能够逐渐帮助你理解需求、发现潜在参与者，并促成真实的报名、体验、合作与连接。',
         '值得被更多人看见的线下活动和创造，我们也会通过附近森林进行 <strong>Highlight</strong> 与分享。',
       ],
     },
+    {
+      /** 这一节没有编号：它不是又一项功能，是「现在就可以做的第一件事」 */
+      heading: '🗺️ 从一件小事开始',
+      paragraphs: [
+        '一个人可以是一棵完整的树。但当根系开始相遇，我们也许会发现：<strong>原来，我们身旁还有和我们一样的同路人，及可以共创的同盟伙伴。</strong>',
+        '如果你已经来到附近森林，现在可以从一件很小的事情开始：',
+        '· <strong>完善你的创造者主页</strong>，让别人知道你是谁、你关心什么、正在创造什么<br>· <strong>体验一次 PhilCoach 对话或冥想</strong>，给自己一点向内的空间<br>· 或者，<strong>去看看森林里的其他创造者</strong>——也许某个人正在做的事情，刚好与你产生奇妙的交集',
+      ],
+    },
   ],
+  earlyDaysHeading: '写在最后',
   earlyDays: [
     '附近森林目前仍然很早期。我们还会继续迭代 AI 连接、创造者作品与活动、个性化推荐、PhilCoach 与冥想体验，也正在为之后的<strong>小程序版本</strong>做准备。',
-    '所以，你现在看到的不是一个已经完成的平台。<strong>更像是一片刚刚开始生长的森林。</strong>而你，是最早来到这里、种下一棵树的人之一。',
-    '我们很期待：当越来越多有温度的创造者被看见、被连接，当 AI 帮助我们发现那些原本看不见的关系，这片森林最终会自然生长出什么？',
+    '所以，你现在看到的不是一个已经完成的样子。<strong>更像是一片刚刚开始生长的森林。</strong>而你，是最早来到这里、种下一棵树的人之一，希望我们可以让你知道，当你完成注册时也并不是结束，而才刚刚开始进入，你可以找到伙伴，我们会在<a href="https://nearby-forest.club/about#contact">社区生态生长共创社群</a>里相聚连接，相信会继续生长出新的可能性。',
   ],
-  maybes: ['也许是一次认识。', '也许是一场活动。', '也许是一个共同创造的项目。', '也许只是在某个人生阶段，遇见了一个真正同频的人。'],
+  /** 主理人这一版把「也许是一次认识…」那组换行列举撤掉了，留空即不渲染 */
+  maybes: [],
   feedback: [
     '我们也很希望听见你的声音。如果你在使用附近森林、PhilCoach、正念冥想，或者参与 21 天改善睡眠冥想陪伴的过程中，有任何感受、想法、建议，甚至只是一个突然冒出来的 💡 Idea，都欢迎来找我们聊聊。',
-    '<strong>这片森林并不是由我们设计完成之后，再交给大家使用。</strong>我们更希望，它是在每一个来到这里的人参与、反馈、连接与创造的过程中，<strong>一起慢慢长出来的。在陪伴大家同时，她也和大家一样正生长出不一样的可能性。</strong>',
+    '<strong>这片森林并不是由我们设计完成之后，再交给大家使用。</strong>我们更希望，它是在每一个来到这里的人参与、反馈、连接与创造的过程中，<strong>一起慢慢长出来的。在陪伴大家的同时，她也和大家一样，正生长出不一样的可能性。</strong>',
   ],
   motto: 'Grow your own way.<br>Be seen.<br>Find your people.<br>Create together.',
   farewell: '愿我们在森林里相遇。🌳',
@@ -306,13 +326,21 @@ function escape(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** 段落里允许 <strong> 和 <br>，其余尖括号转义 */
+/**
+ * 段落里允许 <strong>、<br> 和 <a href="…">，其余尖括号转义。
+ *
+ * 这些字符串全是这个文件里写死的，不接任何外部输入，所以放行这几个标签
+ * 不构成注入面。href 里的 & 已经被 escape 成 &amp;——那正是 HTML 属性里
+ * 该有的写法，浏览器和邮件客户端都会解回原样。
+ */
 function richText(s: string): string {
   return escape(s)
     .replace(/&lt;strong&gt;/g, '<strong>')
     .replace(/&lt;\/strong&gt;/g, '</strong>')
     .replace(/&lt;br&gt;/g, '<br>')
-    .replace(/&lt;strong style="color:#2a2a2a;"&gt;/g, '<strong style="color:#2a2a2a;">');
+    .replace(/&lt;strong style="color:#2a2a2a;"&gt;/g, '<strong style="color:#2a2a2a;">')
+    .replace(/&lt;a href="([^"]+)"&gt;/g, '<a href="$1" style="color:#2d4a2d;font-weight:600;">')
+    .replace(/&lt;\/a&gt;/g, '</a>');
 }
 
 const P = 'margin:0 0 14px;font-size:15px;line-height:1.95;color:#2a2a2a;';
@@ -320,16 +348,28 @@ const MUTED = 'margin:0 0 14px;font-size:15px;line-height:1.95;color:#4a4a4a;';
 const BTN =
   'display:inline-block;padding:10px 22px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;';
 
+const btnHtml = (l: { label: string; href: string }) =>
+  `<p style="margin:16px 0 0;"><a href="${l.href}" style="${BTN}">${escape(l.label)} →</a></p>`;
+
 function sectionHtml(s: Section): string {
   const body = s.paragraphs.map(p => `<p style="${P}">${richText(p)}</p>`).join('\n      ');
-  const link = s.link
-    ? `<p style="margin:16px 0 0;"><a href="${s.link.href}" style="${BTN}">${escape(s.link.label)} →</a></p>`
-    : '';
+  const link = s.link ? btnHtml(s.link) : '';
+  // 小节内部的分块之间留一条淡分隔线，读者才看得出「这是同一节里的另一条路」
+  const groups = (s.groups || [])
+    .map(
+      g => `
+      <div style="margin-top:22px;padding-top:20px;border-top:1px solid rgba(45,74,45,0.10);">
+        ${g.paragraphs.map(p => `<p style="${P}">${richText(p)}</p>`).join('\n        ')}
+        ${g.link ? btnHtml(g.link) : ''}
+      </div>`,
+    )
+    .join('');
   return `
     <tr><td style="padding:26px 32px 0;">
       <h2 style="margin:0 0 14px;font-size:17px;font-weight:700;color:#2d4a2d;line-height:1.5;">${escape(s.heading)}</h2>
       ${body}
       ${link}
+      ${groups}
     </td></tr>`;
 }
 
@@ -360,7 +400,23 @@ export function buildOnboardingHtml(name: string, locale: Locale, magicLink?: st
 <body style="margin:0;padding:24px 12px;background:#f0f5ec;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 28px rgba(26,46,26,0.08);">
 
-    <tr><td style="padding:34px 32px 24px;background:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#fff;">
+    <!--
+      Logo 单独占一条米色带，不压在下面那片深绿上：这张 PNG 自带米色底，
+      放在深绿渐变里会是一块突兀的米色方砖，而圆角在 Outlook 桌面版不生效，
+      指望 border-radius 把它磨圆是靠不住的。带子的底色取的就是图自己的
+      #f5f1e8——只有两边严丝合缝，那个方块的边才看不出来。
+
+      用 PNG 不用站上那两个 SVG——Gmail、Outlook、QQ 邮箱都不渲染 SVG。
+      /apple-icon.png 是 Next 的 metadata 路由，线上已经是可直接取的 200，
+      不依赖这次部署。宽高写死：图没加载出来时，占位不会把版面撑塌。
+      默认屏蔽图片的客户端会显示 alt——所以 logo 不承载任何必要信息。
+    -->
+    <tr><td style="padding:26px 32px;background:#f5f1e8;text-align:center;">
+      <img src="${SITE}/apple-icon.png" width="64" height="64" alt="附近森林"
+        style="display:inline-block;width:64px;height:64px;border:0;outline:none;text-decoration:none;">
+    </td></tr>
+
+    <tr><td style="padding:26px 32px 24px;background:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#fff;">
       <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;opacity:0.75;margin-bottom:8px;">附近森林 · Nearby Forest</div>
       <h1 style="margin:0;font-size:22px;font-weight:700;line-height:1.45;">${escape(t.h1)}</h1>
       <p style="margin:10px 0 0;font-size:14px;line-height:1.8;opacity:0.85;">${escape(t.tagline)}</p>
@@ -382,8 +438,10 @@ ${t.sections.map(sectionHtml).join('\n')}
     </td></tr>` : ''}
 
     <tr><td style="padding:26px 32px 0;">
+      <hr style="border:none;border-top:1px solid rgba(45,74,45,0.12);margin:0 0 22px;">
+      ${t.earlyDaysHeading ? `<h2 style="margin:0 0 14px;font-size:17px;font-weight:700;color:#2d4a2d;line-height:1.5;">${escape(t.earlyDaysHeading)}</h2>` : ''}
       ${t.earlyDays.map(p => `<p style="${P}">${richText(p)}</p>`).join('\n      ')}
-      <p style="${MUTED}">${t.maybes.map(escape).join('<br>')}</p>
+      ${t.maybes.length ? `<p style="${MUTED}">${t.maybes.map(escape).join('<br>')}</p>` : ''}
       ${t.feedback.map(p => `<p style="${P}">${richText(p)}</p>`).join('\n      ')}
     </td></tr>
 
@@ -415,7 +473,12 @@ ${t.sections.map(sectionHtml).join('\n')}
 </html>`;
 }
 
-const strip = (s: string) => s.replace(/<\/?strong[^>]*>/g, '').replace(/<br>/g, '\n');
+/** 纯文本版：去掉标签，但链接不能丢——把 href 摊在文字后面的括号里 */
+const strip = (s: string) =>
+  s
+    .replace(/<a href="([^"]+)">([^<]*)<\/a>/g, '$2（$1）')
+    .replace(/<\/?strong[^>]*>/g, '')
+    .replace(/<br>/g, '\n');
 
 /** 纯文本版：有些客户端不显示 HTML，也让反垃圾评分好看一些 */
 export function buildOnboardingText(name: string, locale: Locale, magicLink?: string): string {
@@ -429,6 +492,11 @@ export function buildOnboardingText(name: string, locale: Locale, magicLink?: st
     lines.push('', '─────────────────────', s.heading, '');
     for (const p of s.paragraphs) lines.push(strip(p), '');
     if (s.link) lines.push(`${s.link.label}: ${s.link.href}`);
+    for (const g of s.groups || []) {
+      lines.push('');
+      for (const p of g.paragraphs) lines.push(strip(p), '');
+      if (g.link) lines.push(`${g.link.label}: ${g.link.href}`);
+    }
   }
 
   if (t.bothWays) {
@@ -436,8 +504,10 @@ export function buildOnboardingText(name: string, locale: Locale, magicLink?: st
     for (const p of t.bothWays.paragraphs) lines.push(strip(p), '');
     lines.push(`${t.bothWays.cta.label}: ${t.bothWays.cta.href}`, '');
   }
+  lines.push('', '─────────────────────');
+  if (t.earlyDaysHeading) lines.push(t.earlyDaysHeading, '');
   for (const p of t.earlyDays) lines.push(strip(p), '');
-  lines.push(...t.maybes, '');
+  if (t.maybes.length) lines.push(...t.maybes, '');
   for (const p of t.feedback) lines.push(strip(p), '');
   lines.push(
     '',
