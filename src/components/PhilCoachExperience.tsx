@@ -244,6 +244,8 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
    */
   const [gateKind, setGateKind] = useState<'member' | 'profile'>('member');
   const gateKindRef = useRef<'member' | 'profile'>('member');
+  /** 我们自己发起的跳转，用来让 beforeunload 那道提示放行 */
+  const leavingOnPurposeRef = useRef(false);
   /** 自己的节点 id，补卡片时跳过去用 */
   const [myMemberId, setMyMemberId] = useState('');
   /** 卡片填完了没有。薄卡片的人才会在收尾处看到那句邀请。 */
@@ -490,6 +492,11 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   useEffect(() => {
     if (!session) return;
     const warn = (e: BeforeUnloadEvent) => {
+      // 我们自己按钮发起的跳转不拦。这道提示是防手滑关掉页面丢了对话，
+      // 而点「完整注册」是明确要去注册——再弹一次「离开此网站？」
+      // 等于让人对自己刚点的按钮再确认一遍，点了取消还会停在原地。
+      // 对话本来就存在 sessionStorage 里，跳走也不会丢。
+      if (leavingOnPurposeRef.current) return;
       e.preventDefault();
     };
     window.addEventListener('beforeunload', warn);
@@ -894,6 +901,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     } catch {
       /* 无痕模式下仍可手动在注册表里填同一邮箱 */
     }
+    leavingOnPurposeRef.current = true;
     window.location.href = '/#join';
   }
 

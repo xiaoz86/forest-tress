@@ -111,6 +111,8 @@ export default function JoinForm({ locale }: { locale: Locale }) {
   const [matches, setMatches] = useState<MatchedNode[]>([]);
   const [welcomeEmailSent, setWelcomeEmailSent] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
+  /** 提交进行中。挡双击用，见 submit 里的说明 */
+  const submittingRef = useRef(false);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setData(p => ({ ...p, [k]: v }));
@@ -226,6 +228,15 @@ export default function JoinForm({ locale }: { locale: Locale }) {
    */
   const submit = async ({ resend = false }: { resend?: boolean } = {}) => {
     if (!canNext) return;
+    /**
+     * 用 ref 而不是 status 挡重入。setStatus 是异步的，快速双击的第二下
+     * 在重渲染之前发生，两次都能进来——于是并发打两次 /api/join：
+     * 两边都看到码还没核销、都比对成功、都去插节点，第二个撞上
+     * node_cards 的邮箱唯一约束报错。第一个其实已经建成了，
+     * 用户却可能看到「提交失败」。ref 是同步的，当场就挡住。
+     */
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setStatus('submitting');
     setErrorMsg(null);
 
@@ -354,6 +365,10 @@ export default function JoinForm({ locale }: { locale: Locale }) {
     } catch {
       setErrorMsg(t.error.network);
       setStatus('error');
+    } finally {
+      // 每一条出口都要放锁：中途 return 的分支（needCode、code-invalid、
+      // email-taken）也算这一次提交结束了，不放的话按钮从此再也按不动。
+      submittingRef.current = false;
     }
   };
 
