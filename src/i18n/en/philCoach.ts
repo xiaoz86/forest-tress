@@ -253,7 +253,7 @@ export const philCoach: typeof zhPhilCoach = {
       lightJoin: 'Light check-in and continue',
       lightDesc: 'Just a name, then back to finishing what you were saying.',
       fullJoin: 'Complete my node card',
-      fullDesc: 'Step into the forest—into yourself, into what you make, into people walking the same way.',
+      fullDesc: 'Into yourself, into what you make, into people walking the same way.',
       joining: 'Planting your node…',
       newPrivacy: 'A light check-in stores only your name and verified email. The node card can wait as long as you like.',
 
