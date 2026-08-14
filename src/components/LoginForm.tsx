@@ -11,9 +11,10 @@ import type { Locale } from '@/lib/locale';
  *   email  标题「登录到你的节点」+ 导语 + 页脚两段（想登录的人需要这些）
  *   code   导语撤掉——「输入注册时填写的邮箱」他已经填完了，
  *          表单里那句「验证码发到了 xxx」才是当下有用的话
- *   new    这个邮箱还没有节点：标题换成「第一次来，选择你的方式」，
- *          页脚两段全撤——「登录用于已加入的成员」对他不成立，
- *          「还没有节点？先填一张节点卡」和他眼前那颗按钮是同一件事
+ *   new/   这个邮箱还没有节点，他在加入而不是登录：眉标换成「Join · 加入」，
+ *   name   标题换成「第一次来，选择你的方式」，页脚两段全撤——
+ *          「登录用于已加入的成员」对他不成立，「还没有节点？先填一张节点卡」
+ *          和他眼前那颗按钮是同一件事
  *
  * 必须定义在 LoginForm **外面**。写在里面的话每次渲染都是一个新的函数引用，
  * React 认成不同的组件类型，整棵子树卸载重挂——邮箱输入框每敲一个字就失焦。
@@ -25,21 +26,22 @@ function Chrome({
   children,
 }: {
   t: ReturnType<typeof dict>['login'];
-  step: 'email' | 'code' | 'new';
+  step: 'email' | 'code' | 'new' | 'name';
   linkError?: string | null;
   children: ReactNode;
 }) {
-  const isNew = step === 'new';
+  // 选择方式和填称呼都属于「加入」，不是登录——页头两行都得跟着换
+  const isNew = step === 'new' || step === 'name';
   return (
     <>
       <div className="text-[11px] font-semibold tracking-[0.18em] text-moss uppercase mb-2">
-        {t.eyebrow}
+        {isNew ? t.newUser.eyebrow : t.eyebrow}
       </div>
       <h1
         className="text-[26px] font-light tracking-[-0.01em] text-forest-deep mb-3"
         style={{ fontFamily: 'var(--font-display)' }}
       >
-        {isNew ? t.newUser.title : t.title}
+        {step === 'name' ? t.newUser.nameTitle : isNew ? t.newUser.title : t.title}
       </h1>
       {step === 'email' && (
         <p className="text-[14px] leading-relaxed text-text-secondary mb-6">{t.lede}</p>
@@ -86,7 +88,7 @@ export default function LoginForm({
   linkError?: string | null;
 }) {
   const t = useMemo(() => dict(locale).login, [locale]);
-  const [step, setStep] = useState<'email' | 'code' | 'new'>('email');
+  const [step, setStep] = useState<'email' | 'code' | 'new' | 'name'>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
@@ -112,7 +114,7 @@ export default function LoginForm({
    */
   useEffect(() => {
     if (step === 'code') codeRef.current?.focus();
-    if (step === 'new') nameRef.current?.focus();
+    if (step === 'name') nameRef.current?.focus();
   }, [step]);
 
   const sendCode = async () => {
@@ -215,10 +217,41 @@ export default function LoginForm({
     </Chrome>
   );
 
+  /**
+   * 第三步只做选择，不问称呼。
+   *
+   * 原来称呼框摆在两颗按钮之上，可它只属于「轻登记」那条路——想走完整注册的人
+   * 根本用不着填。而主按钮在称呼填之前是灰的，于是一进来这一屏读起来像
+   * 「你得先取个名字才能往下」，把另一条路盖住了。
+   * 现在两条路平等摆着，选了轻登记再问称呼。
+   */
   if (step === 'new') {
     return chrome(
       <div className="space-y-3">
         <p className="text-[13px] leading-relaxed text-text-secondary">{t.newUser.body}</p>
+        <button
+          type="button"
+          onClick={() => setStep('name')}
+          className="w-full rounded-full bg-forest-deep py-3 text-[14px] font-medium text-white transition-colors hover:bg-forest-mid"
+        >
+          {t.newUser.lightJoin}
+        </button>
+        <button
+          type="button"
+          onClick={fullJoin}
+          className="w-full rounded-full border border-forest-deep/20 py-3 text-[14px] font-medium text-forest-deep transition-colors hover:border-forest-deep/40"
+        >
+          {t.newUser.fullJoin}
+        </button>
+        {errorText && <p role="status" aria-live="polite" className="text-[12px] text-coral">{errorText}</p>}
+        <p className="text-[12px] leading-relaxed text-text-light">{t.newUser.note}</p>
+      </div>
+    );
+  }
+
+  if (step === 'name') {
+    return chrome(
+      <div className="space-y-3">
         <input
           value={name}
           onChange={e => setName(e.target.value)}
@@ -239,15 +272,19 @@ export default function LoginForm({
         >
           {status === 'verifying' ? t.newUser.joining : t.newUser.lightJoin}
         </button>
-        <button
-          type="button"
-          onClick={fullJoin}
-          disabled={status === 'verifying'}
-          className="w-full rounded-full border border-forest-deep/20 py-3 text-[14px] font-medium text-forest-deep transition-colors hover:border-forest-deep/40 disabled:opacity-50"
-        >
-          {t.newUser.fullJoin}
-        </button>
         {errorText && <p role="status" aria-live="polite" className="text-[12px] text-coral">{errorText}</p>}
+        <div className="pt-1 text-[12px]">
+          <button
+            type="button"
+            onClick={() => {
+              setStep('new');
+              setErrorText('');
+            }}
+            className="text-text-light underline-offset-2 hover:text-forest-deep hover:underline"
+          >
+            {t.newUser.back}
+          </button>
+        </div>
         <p className="text-[12px] leading-relaxed text-text-light">{t.newUser.note}</p>
       </div>
     );

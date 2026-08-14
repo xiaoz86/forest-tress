@@ -247,6 +247,8 @@ export const philCoach: typeof zhPhilCoach = {
       changeEmail: 'Change the email',
 
       newTitle: 'First time here—choose your way in',
+      newBack: 'Choose a different way',
+      nameTitle: 'What should we call you?',
       newBody: 'Your email is confirmed. Leave a name and keep talking, or complete a full node card now. Neither option sends another code.',
       lightJoin: 'Light check-in and continue',
       fullJoin: 'Complete my node card',

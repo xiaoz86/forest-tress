@@ -29,6 +29,9 @@ export const login: typeof zhLogin = {
 
   newUser: {
     title: 'First time here—choose your way in',
+    eyebrow: 'Join · 加入',
+    back: 'Choose a different way',
+    nameTitle: 'What should we call you?',
     body: 'Your email is confirmed. Leave a name for a light check-in, or complete a full node card now. Neither option sends another code.',
     namePlaceholder: 'What should we call you',
     lightJoin: 'Light check-in and continue',

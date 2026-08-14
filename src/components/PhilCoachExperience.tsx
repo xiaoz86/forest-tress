@@ -236,7 +236,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
    * 浮层三步：验证邮箱 → 填验证码 → 只有新用户才选择轻登记或完整注册。
    * 已有成员在第二步就直接登录，不再重复填称呼。
    */
-  const [gateStep, setGateStep] = useState<'email' | 'code' | 'new'>('email');
+  const [gateStep, setGateStep] = useState<'email' | 'code' | 'new' | 'name'>('email');
   /**
    * 被哪一道闸拦下的。
    *   member  —— 8 轮，还不是成员：先验证邮箱，再登录或选择登记方式
@@ -573,7 +573,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
    * 而 autoFocus 只在挂载那一刻生效，那个属性根本不会被执行。
    */
   useEffect(() => {
-    if (showGate && gateStep === 'new') gateNameRef.current?.focus();
+    if (showGate && gateStep === 'name') gateNameRef.current?.focus();
   }, [showGate, gateStep]);
 
   useEffect(() => {
@@ -1011,8 +1011,10 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
         <h3 id="phil-coach-gate-title" className="text-xl font-medium">
           {gateKind === 'profile'
             ? t.gate.profile.title
-            : gateStep === 'new'
-              ? t.gate.newTitle
+            : gateStep === 'name'
+              ? t.gate.nameTitle
+              : gateStep === 'new'
+                ? t.gate.newTitle
               : t.gate.title}
         </h3>
 
@@ -1125,9 +1127,34 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
               </button>
             </div>
           </>
-        ) : (
+        ) : gateStep === 'new' ? (
+          /**
+           * 只做选择，不问称呼。称呼框原来摆在两颗按钮之上，可它只属于
+           * 「轻登记」那条路——要走完整注册的人根本用不着填，而主按钮
+           * 在填之前是灰的，整屏读起来像「得先取个名字才能往下」。
+           */
           <>
             <p className="mt-3 text-[14px] leading-[1.95] text-white/55">{t.gate.newBody}</p>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => setGateStep('name')}
+                type="button"
+                className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity"
+              >
+                {t.gate.lightJoin}
+              </button>
+              <button
+                onClick={continueToFullJoin}
+                type="button"
+                className="rounded-full border border-white/20 px-6 py-2.5 text-[14px] font-medium text-white/80 transition-colors hover:border-white/40 hover:text-white"
+              >
+                {t.gate.fullJoin}
+              </button>
+            </div>
+            <p className="mt-5 text-[12px] leading-relaxed text-white/32">{t.gate.newPrivacy}</p>
+          </>
+        ) : (
+          <>
             <input
               ref={gateNameRef}
               value={gateName}
@@ -1150,12 +1177,15 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                 {gateBusy ? t.gate.joining : t.gate.lightJoin}
               </button>
               <button
-                onClick={continueToFullJoin}
+                onClick={() => {
+                  setGateStep('new');
+                  setGateError('');
+                }}
                 disabled={gateBusy}
                 type="button"
-                className="rounded-full border border-white/20 px-6 py-2.5 text-[14px] font-medium text-white/80 transition-colors hover:border-white/40 hover:text-white disabled:opacity-40"
+                className="text-[12px] text-white/32 underline-offset-4 transition-colors hover:text-white hover:underline disabled:hover:text-white/32"
               >
-                {t.gate.fullJoin}
+                {t.gate.newBack}
               </button>
               {gateError && <span role="status" aria-live="polite" className="text-[13px] text-coral-soft">{gateError}</span>}
             </div>
