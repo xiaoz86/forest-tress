@@ -99,25 +99,43 @@ export async function issueCode(
 }
 
 /**
- * 把错误次数 +1，并保证**每一次错都被记上**。
+ * 先抢下一次尝试额度，抢到了才允许去比对。
  *
- * 原来是「读出来、加一、写回去」。并发下所有人读到的是同一个旧值，
- * 写回去也是同一个新值——实测 20 个并发只记了 2 次，码还没被作废、还能接着猜。
- * 也就是说「一个码只给 5 次机会」这道闸，把猜测并发发出去就绕开了。
- * 它是最后一道闸：前面的 IP 限流换个 IP 就没了，发码冷却只挡「多要几个码」。
+ * 这个顺序是要害。原来是「读 attempts → 判断够不够 → 比对 → 事后加一」，
+ * 判断用的是比对之前读到的那个值：并发进来的一批全部读到 0，全部通过闸门，
+ * 全部被真实比对。计数最后确实涨到 5、行也确实作废了，但那是事后记账——
+ * 这一批里没有任何一个被拦下。也就是说一个码到底能被猜多少次，
+ * 取决于攻击者的并发度，而不是那个 5。
  *
- * 改成比较并交换：只有 attempts 还等于我读到的那个值时才写得进去，
- * 被人抢先就重读再试。撞车的各自重试，于是每一次错都算数。
+ * 「每次错都记上」和「记满就不再比对」是两件事。上一版只做到了前者。
  *
- * 满 5 次当场作废，不等下一次请求进来才发现——少给一个来回的空子。
- * 重试封顶 8 次，免得极端并发在这里空转；真到那个量级，
- * 前面的 IP 限流早就拦下了。
+ * 这里改成占位：只有 attempts 还等于我刚读到的值、且行还没作废时才写得进去。
+ * 抢到 = 这一次尝试归我，可以比对；抢不到就重读再试，满了直接拒，
+ * 连比对都不做。撞车的各自重试，于是每一次比对都实打实占掉一个名额。
+ *
+ * 第 5 次占位当场把行作废，不等下一次请求进来才发现——少给一个来回的空子。
+ * 注意 code_hash 是在这之前就读出来的，所以第 5 次如果填的是正确的码，
+ * 照样能登录成功，不会被自己作废掉。
+ *
+ * 重试封顶 8 次，抢不到就当满了——宁可拒错，不可放过。
  */
-async function bumpAttempts(sb: SupabaseClient, id: string, seen: number): Promise<void> {
-  let current = seen;
+type Claim = 'ok' | 'exhausted' | 'gone';
+
+async function claimAttempt(sb: SupabaseClient, id: string): Promise<Claim> {
   for (let i = 0; i < 8; i++) {
+    const { data: row } = await sb
+      .from('login_codes')
+      .select('attempts, consumed_at')
+      .eq('id', id)
+      .maybeSingle();
+    if (!row) return 'gone';
+    if (row.consumed_at) return 'gone';
+
+    const current = row.attempts ?? 0;
+    if (current >= CODE_MAX_ATTEMPTS) return 'exhausted';
+
     const next = current + 1;
-    const { data } = await sb
+    const { data: won } = await sb
       .from('login_codes')
       .update({
         attempts: next,
@@ -125,19 +143,12 @@ async function bumpAttempts(sb: SupabaseClient, id: string, seen: number): Promi
       })
       .eq('id', id)
       .eq('attempts', current)
+      .is('consumed_at', null)
       .select('attempts')
       .maybeSingle();
-    if (data) return;
-
-    const { data: fresh } = await sb
-      .from('login_codes')
-      .select('attempts')
-      .eq('id', id)
-      .maybeSingle();
-    if (!fresh) return;
-    current = fresh.attempts ?? 0;
-    if (current >= CODE_MAX_ATTEMPTS) return;
+    if (won) return 'ok';
   }
+  return 'exhausted';
 }
 
 export type ConsumeResult =
@@ -171,14 +182,17 @@ export async function consumeCode(
     return { ok: false, reason: 'expired' };
   }
 
-  // 错满即作废：一个码只给 5 次机会，剩下的 99.999% 空间就不用猜了
-  if ((row.attempts ?? 0) >= CODE_MAX_ATTEMPTS) {
-    await invalidate();
-    return { ok: false, reason: 'exhausted' };
+  /**
+   * 闸门必须落在比对之前：先原子抢下一个尝试名额，抢不到就连比都不比。
+   * 上面 select 出来的 row.attempts 是个快照，拿它做判断在并发下等于没判断。
+   */
+  const claim = await claimAttempt(sb, row.id as string);
+  if (claim !== 'ok') {
+    if (claim === 'exhausted') await invalidate();
+    return { ok: false, reason: claim === 'exhausted' ? 'exhausted' : 'none' };
   }
 
   if (!codeMatches(email, code, row.code_hash)) {
-    await bumpAttempts(sb, row.id as string, row.attempts ?? 0);
     return { ok: false, reason: 'mismatch' };
   }
 
