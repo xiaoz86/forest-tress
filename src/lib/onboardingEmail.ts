@@ -361,12 +361,12 @@ function richText(s: string): string {
     .replace(/&lt;\/a&gt;/g, '</a>');
 }
 
-const P = `margin:0 0 14px;font-size:15px;line-height:1.95;color:#2a2a2a;${F}`;
-const MUTED = `margin:0 0 14px;font-size:15px;line-height:1.95;color:#4a4a4a;${F}`;
+const P = `margin:0 0 14px;font-size:16px;line-height:1.95;color:#2a2a2a;${F}`;
+const MUTED = `margin:0 0 14px;font-size:16px;line-height:1.95;color:#4a4a4a;${F}`;
 const BTN =
   `display:inline-block;padding:10px 22px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;${F_UI}`;
 /** 小节标题。字重 700，栈里 Manrope 只到 700，正好 */
-const H2 = `margin:0 0 14px;font-size:17px;font-weight:700;color:#2d4a2d;line-height:1.5;${F}`;
+const H2 = `margin:0 0 14px;font-size:18px;font-weight:700;color:#2d4a2d;line-height:1.5;${F}`;
 
 const btnHtml = (l: { label: string; href: string }) =>
   `<p style="margin:16px 0 0;${F}"><a href="${l.href}" style="${BTN}">${escape(l.label)} →</a></p>`;
@@ -406,9 +406,9 @@ export function buildOnboardingHtml(name: string, locale: Locale, magicLink?: st
   const loginBlock = magicLink
     ? `
     <tr><td style="padding:22px 32px 0;">
-      <div style="border:1px solid rgba(45,74,45,0.16);border-radius:14px;padding:18px 20px;background:#f7faf5;">
+      <div style="border:1px solid rgba(45,74,45,0.16);border-radius:14px;padding:18px 20px;background:#ebe4d5;">
         <a href="${magicLink}" style="${BTN}">${escape(t.loginCta)}</a>
-        <p style="margin:10px 0 0;font-size:12px;color:#8a8a8a;${F}">${escape(t.loginNote)}</p>
+        <p style="margin:10px 0 0;font-size:12.5px;color:#8a8a8a;${F}">${escape(t.loginNote)}</p>
       </div>
     </td></tr>`
     : '';
@@ -418,8 +418,8 @@ export function buildOnboardingHtml(name: string, locale: Locale, magicLink?: st
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escape(t.subject)}</title>
 ${EMAIL_FONT_LINK}</head>
-<body style="margin:0;padding:24px 12px;background:#f0f5ec;font-family:${EMAIL_SERIF};">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 28px rgba(26,46,26,0.08);">
+<body style="margin:0;padding:24px 12px;background:#e8e0d2;font-family:${EMAIL_SERIF};">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#f5f1e8;border-radius:18px;overflow:hidden;box-shadow:0 4px 28px rgba(26,46,26,0.08);">
 
     <!--
       Logo 单独占一条米色带，不压在下面那片深绿上：这张 PNG 自带米色底，
@@ -467,24 +467,24 @@ ${t.sections.map(sectionHtml).join('\n')}
     </td></tr>
 
     <tr><td style="padding:26px 32px 0;text-align:center;">
-      <div style="border-radius:14px;background:#f7faf5;padding:20px;">
-        <p style="margin:0;font-size:15px;line-height:2;font-weight:600;color:#2d4a2d;${F}">
+      <div style="border-radius:14px;background:#ebe4d5;padding:20px;">
+        <p style="margin:0;font-size:16px;line-height:2;font-weight:600;color:#2d4a2d;${F}">
           ${t.motto}
         </p>
       </div>
-      <p style="margin:18px 0 0;font-size:15px;color:#2a2a2a;${F}">${escape(t.farewell)}</p>
+      <p style="margin:18px 0 0;font-size:16px;color:#2a2a2a;${F}">${escape(t.farewell)}</p>
     </td></tr>
 
     <tr><td style="padding:26px 32px 30px;">
       <hr style="border:none;border-top:1px solid rgba(45,74,45,0.12);margin:0 0 20px;">
       <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#2d4a2d;${F}">${escape(t.signature.brand)}</p>
-      <p style="margin:10px 0 0;font-size:13px;line-height:1.9;color:#6a6a6a;${F}">
+      <p style="margin:10px 0 0;font-size:13.5px;line-height:1.9;color:#6a6a6a;${F}">
         ${escape(t.signature.founderLabel)}<br>${t.signature.founder}
       </p>
-      <p style="margin:8px 0 0;font-size:13px;line-height:1.9;color:#6a6a6a;${F}">
+      <p style="margin:8px 0 0;font-size:13.5px;line-height:1.9;color:#6a6a6a;${F}">
         ${escape(t.signature.coFounderLabel)}<br>${t.signature.coFounder}
       </p>
-      <p style="margin:16px 0 0;font-size:13px;color:#6a6a6a;${F}">
+      <p style="margin:16px 0 0;font-size:13.5px;color:#6a6a6a;${F}">
         ${escape(t.signature.contactLabel)}<a href="${SITE}/about#contact" style="color:#2d4a2d;${F}">${SITE}/about#contact</a>
       </p>
     </td></tr>
