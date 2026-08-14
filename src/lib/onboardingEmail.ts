@@ -8,19 +8,27 @@
  * 邮件客户端（尤其 Outlook 和 QQ 邮箱）对 CSS 支持很差：
  * 全部用内联样式，不用 flex / grid / 变量，宽度写死 600px。
  */
-import { EMAIL_FONT, EMAIL_FONT_LINK } from '@/lib/emailTheme';
+import { EMAIL_FONT, EMAIL_FONT_LINK, EMAIL_SERIF } from '@/lib/emailTheme';
 import type { Locale } from '@/lib/locale';
 
 const SITE = 'https://nearby-forest.club';
 
 /**
- * 字体必须写在每一个出文字的元素上，不能只写在 <body> 上等继承。
+ * 这封信走站上的「人文内容」那一栈（--font-serif），不走主字体：
+ * 它和宣言、理念、创造者故事、冥想文案是同一类东西，不是界面。
  *
+ * 字体必须写在每一个出文字的元素上，不能只写在 <body> 上等继承。
  * Outlook（Windows）用 Word 的排版引擎，凡是自己没声明 font-family 的元素
- * 一律重置成 Times New Roman——整封信会变成衬线体。Gmail 也会剥掉一部分
- * body 级样式。所以下面每个样式常量都自带 F。
+ * 一律重置成 Times New Roman；Gmail 也会剥掉一部分 body 级样式。
+ * 所以下面每个样式常量都自带 F。
  */
-const F = `font-family:${EMAIL_FONT};`;
+const F = `font-family:${EMAIL_SERIF};`;
+
+/**
+ * 按钮上的字仍走主字体。站上把按钮划归 UI（--font-sans），不划归人文内容——
+ * 一颗小圆角按钮里塞衬线字，字重一上去就糊。正文是信，按钮是界面。
+ */
+const F_UI = `font-family:${EMAIL_FONT};`;
 
 type Section = {
   heading: string;
@@ -356,7 +364,7 @@ function richText(s: string): string {
 const P = `margin:0 0 14px;font-size:15px;line-height:1.95;color:#2a2a2a;${F}`;
 const MUTED = `margin:0 0 14px;font-size:15px;line-height:1.95;color:#4a4a4a;${F}`;
 const BTN =
-  `display:inline-block;padding:10px 22px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;${F}`;
+  `display:inline-block;padding:10px 22px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;${F_UI}`;
 /** 小节标题。字重 700，栈里 Manrope 只到 700，正好 */
 const H2 = `margin:0 0 14px;font-size:17px;font-weight:700;color:#2d4a2d;line-height:1.5;${F}`;
 
@@ -410,7 +418,7 @@ export function buildOnboardingHtml(name: string, locale: Locale, magicLink?: st
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escape(t.subject)}</title>
 ${EMAIL_FONT_LINK}</head>
-<body style="margin:0;padding:24px 12px;background:#f0f5ec;font-family:${EMAIL_FONT};">
+<body style="margin:0;padding:24px 12px;background:#f0f5ec;font-family:${EMAIL_SERIF};">
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 28px rgba(26,46,26,0.08);">
 
     <!--
