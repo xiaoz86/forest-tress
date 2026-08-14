@@ -22,6 +22,42 @@ import type { NodeCard, Work, AIRecommendation } from '@/lib/supabase';
 const MAX_WORKS_AT_JOIN = 12;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * 发码那一步的 IP 限流。
+ *
+ * 这条路和 /api/login 打的是同一个 issueCode + notifyLoginCode，那边有
+ * 10 分钟 10 次的闸，这边一直没有——于是「往任意地址发验证码信」这件事
+ * 从这个接口是敞开的。issueCode 自带的 60 秒冷却按邮箱算，挡的是
+ * 「同一个地址连着要码」，对「换一批地址接着发」完全不起作用。
+ *
+ * 被烧的不是收件人，是发信域名：没人要过的验证码信会攒出投诉率和退信率，
+ * Resend 的信誉一旦烧掉，全站的登录码都进不去收件箱——而登录没有备用通道，
+ * 那就是整体不可用。
+ *
+ * 只拦发信那一支：填验证码、以及带着凭据的最终提交都不该占这个额度，
+ * 否则正常人填一次表就能把自己锁在外面。
+ */
+const SEND_WINDOW_MS = 10 * 60 * 1000;
+const MAX_SENDS_PER_IP = 10;
+const sendBuckets = new Map<string, number[]>();
+
+function sendRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const recent = (sendBuckets.get(ip) || []).filter(time => now - time < SEND_WINDOW_MS);
+  if (recent.length >= MAX_SENDS_PER_IP) {
+    sendBuckets.set(ip, recent);
+    return true;
+  }
+  recent.push(now);
+  sendBuckets.set(ip, recent);
+  // 进程内的 Map，多实例下不精确——这是全站既有取舍（/api/login、
+  // /api/login/code 同款）。这里跟着做上限清理，别让它无限涨。
+  if (sendBuckets.size > 5000) {
+    for (const key of Array.from(sendBuckets.keys()).slice(0, 2500)) sendBuckets.delete(key);
+  }
+  return false;
+}
+
 function makeWorkId(): string {
   return `w_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -116,6 +152,18 @@ export async function POST(request: NextRequest) {
      */
     const code = normalizeCodeInput(body.code);
     if (!alreadyVerified && !code) {
+      /**
+       * 回的仍是 needCode，和正常发码一模一样。
+       *
+       * 换成 429 会把「这个 IP 发过几封」漏给对方，而且真被限住的人
+       * 看到的界面本来也一样——他能做的只有等。信没发出去，
+       * 那个码就还是上一个，60 秒后按「重新发送」会真的补一封。
+       */
+      const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+      if (sendRateLimited(ip)) {
+        console.warn('[api/join] code send rate limited');
+        return NextResponse.json({ needCode: true });
+      }
       const locale = await getLocale();
       after(async () => {
         const issued = await issueCode(supabase, email, null);
