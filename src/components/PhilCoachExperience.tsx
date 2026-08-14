@@ -1155,6 +1155,8 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
           </>
         ) : (
           <>
+            {/* 不放 placeholder：标题就在框子正上方，同一句话说两遍。
+                aria-label 留着——读屏逐个控件念，读到输入框时标题已经过去了。 */}
             <input
               ref={gateNameRef}
               value={gateName}
@@ -1163,8 +1165,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                 if (e.key === 'Enter') void finishLightJoin();
               }}
               maxLength={60}
-              aria-label={t.gate.namePlaceholder}
-              placeholder={t.gate.namePlaceholder}
+              aria-label={t.gate.nameTitle}
               className="mt-5 w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
             />
             <div className="mt-4 flex flex-wrap items-center gap-3">

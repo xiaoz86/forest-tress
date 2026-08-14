@@ -260,8 +260,11 @@ export default function LoginForm({
           }}
           ref={nameRef}
           maxLength={60}
-          placeholder={t.newUser.namePlaceholder}
-          aria-label={t.newUser.namePlaceholder}
+          /**
+           * 不放 placeholder：标题就在框子正上方，同一句话说两遍。
+           * aria-label 留着——读屏是逐个控件念的，读到输入框时标题已经过去了。
+           */
+          aria-label={t.newUser.nameTitle}
           className="w-full rounded-lg border-[1.5px] border-mist bg-warm-cream px-4 py-3 font-sans text-[14px] text-text-primary outline-none transition-all placeholder:text-text-light/50 focus:border-coral-soft focus:bg-white"
         />
         <button
