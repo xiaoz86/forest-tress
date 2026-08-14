@@ -246,6 +246,15 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const gateKindRef = useRef<'member' | 'profile'>('member');
   /** 我们自己发起的跳转，用来让 beforeunload 那道提示放行 */
   const leavingOnPurposeRef = useRef(false);
+  /** 浮层第三步的称呼框。不能靠 autoFocus，见下面那个 effect */
+  const gateNameRef = useRef<HTMLInputElement>(null);
+  /**
+   * 浮层里的提交进行中。用 ref 不用 gateBusy：setGateBusy 是异步的，
+   * 快速双击的第二下在重渲染之前发生，两次都能进去——「确认并继续」
+   * 双击会把同一个码提交两遍，第二遍查不到未核销的行、报「验证码不对」，
+   * 可其实第一遍已经验过了，人看到的是一个自相矛盾的报错。
+   */
+  const gateSubmittingRef = useRef(false);
   /** 自己的节点 id，补卡片时跳过去用 */
   const [myMemberId, setMyMemberId] = useState('');
   /** 卡片填完了没有。薄卡片的人才会在收尾处看到那句邀请。 */
@@ -556,6 +565,17 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     gateKindRef.current = gateKind;
   }, [gateKind]);
 
+  /**
+   * 走到第三步就把光标放进称呼框。
+   *
+   * 不能靠 autoFocus：验证码框和称呼框在浮层里是同一个父节点的同一个位置、
+   * 又都是 <input>，React 认成同一个节点直接复用，不重新挂载——
+   * 而 autoFocus 只在挂载那一刻生效，那个属性根本不会被执行。
+   */
+  useEffect(() => {
+    if (showGate && gateStep === 'new') gateNameRef.current?.focus();
+  }, [showGate, gateStep]);
+
   useEffect(() => {
     let active = true;
     void refreshIdentity().finally(() => {
@@ -831,7 +851,8 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
    */
   async function verifyGateCode() {
     const code = gateCode.replace(/\s+/g, '');
-    if (code.length !== 6 || gateBusy) return;
+    if (code.length !== 6 || gateBusy || gateSubmittingRef.current) return;
+    gateSubmittingRef.current = true;
     setGateBusy(true);
     setGateError('');
     try {
@@ -860,12 +881,14 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       setGateError(t.gate.error.network);
     } finally {
       setGateBusy(false);
+      gateSubmittingRef.current = false;
     }
   }
 
   /** 新用户选择轻登记：邮箱已在上一步验证，这里只补称呼并创建薄节点。 */
   async function finishLightJoin() {
-    if (!gateName.trim() || gateBusy) return;
+    if (!gateName.trim() || gateBusy || gateSubmittingRef.current) return;
+    gateSubmittingRef.current = true;
     setGateBusy(true);
     setGateError('');
     try {
@@ -891,6 +914,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       setGateError(t.gate.error.join);
     } finally {
       setGateBusy(false);
+      gateSubmittingRef.current = false;
     }
   }
 
@@ -1078,6 +1102,13 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                   setGateStep('email');
                   setGateCode('');
                   setGateError('');
+                  /**
+                   * 冷却也要清。服务端那 60 秒按邮箱算，换个邮箱不受它管；
+                   * 留着的话回到第一步，「发送验证码」看着能点（那颗按钮的
+                   * disabled 里没有 cooldown），而 sendGateCode 一进门就
+                   * cooldown > 0 直接 return——按下去什么都不发生，也没有提示。
+                   */
+                  setGateCooldown(0);
                 }}
                 type="button"
                 className="underline-offset-4 transition-colors hover:text-white hover:underline"
@@ -1098,13 +1129,13 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
           <>
             <p className="mt-3 text-[14px] leading-[1.95] text-white/55">{t.gate.newBody}</p>
             <input
+              ref={gateNameRef}
               value={gateName}
               onChange={e => setGateName(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter') void finishLightJoin();
               }}
               maxLength={60}
-              autoFocus
               aria-label={t.gate.namePlaceholder}
               placeholder={t.gate.namePlaceholder}
               className="mt-5 w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
