@@ -68,7 +68,8 @@ function refundAttempt(ip: string): void {
  * POST /api/login/code  body: { email, code }
  *
  * 已注册邮箱成功即登录，并给 node_cards 盖一个 email_verified_at；
- * 新邮箱只获得短期验证凭据，后续明确选择轻登记或完整注册，不在这里建号。
+ * 新邮箱只获得短期验证凭据，不在这里建号。拿着那张凭据往下走成什么样，由调用方决定：
+ * 登录页直接送去七步注册向导，phil-coach 浮层则让人选轻登记还是完整注册。
  *
  * 失败一律回同一个 code-invalid，不区分「没有这个码」「码错了」「过期了」
  * 「试太多次了」。只有验证码正确后才返回 registered 状态，此时邮箱归属已证实。
