@@ -95,6 +95,7 @@ export default function LoginForm({
   /** 服务端对同一个人有 60 秒冷却，界面上倒计时，别让人反复点了没反应 */
   const [cooldown, setCooldown] = useState(0);
   const codeRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -102,9 +103,16 @@ export default function LoginForm({
     return () => clearTimeout(id);
   }, [cooldown]);
 
-  // 进到第二步就把光标放进验证码框，省一次点击
+  /**
+   * 进到哪一步就把光标放进那一步的输入框，省一次点击。
+   *
+   * 称呼框不能靠 autoFocus：它和验证码框在同一个父节点里的同一个位置，
+   * 都是 <input>，React 认成同一个节点直接复用，不会重新挂载——
+   * 而 autoFocus 只在挂载那一刻生效，所以那个属性根本不会被执行。
+   */
   useEffect(() => {
     if (step === 'code') codeRef.current?.focus();
+    if (step === 'new') nameRef.current?.focus();
   }, [step]);
 
   const sendCode = async () => {
@@ -217,8 +225,8 @@ export default function LoginForm({
           onKeyDown={e => {
             if (e.key === 'Enter') void lightJoin();
           }}
+          ref={nameRef}
           maxLength={60}
-          autoFocus
           placeholder={t.newUser.namePlaceholder}
           aria-label={t.newUser.namePlaceholder}
           className="w-full rounded-lg border-[1.5px] border-mist bg-warm-cream px-4 py-3 font-sans text-[14px] text-text-primary outline-none transition-all placeholder:text-text-light/50 focus:border-coral-soft focus:bg-white"
@@ -284,6 +292,12 @@ export default function LoginForm({
               setStep('email');
               setCode('');
               setErrorText('');
+              /**
+               * 冷却也要一起清。服务端那 60 秒是按邮箱算的，换个邮箱不受它管；
+               * 留着的话回到第一步「发送验证码」看着能点，sendCode 里
+               * cooldown > 0 直接 return——按下去什么都不发生，也不给任何提示。
+               */
+              setCooldown(0);
             }}
             className="text-text-light underline-offset-2 hover:text-forest-deep hover:underline"
           >

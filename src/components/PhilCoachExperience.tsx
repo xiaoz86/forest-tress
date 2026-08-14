@@ -904,8 +904,19 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       setLoading(true);
       try {
         const r = await sendThread(session.thread, path.id, retryVoiceContextRef.current);
-        if (r === 'ok') retryVoiceContextRef.current = null;
-        else setPendingRetry(true);
+        if (r === 'ok') {
+          retryVoiceContextRef.current = null;
+        } else {
+          /**
+           * 重发又撞上闸门：必须把浮层弹回来，不能只把 pendingRetry 置回去。
+           *
+           * 只置 pendingRetry 的话，「已登录 + 待重发 + 浮层关着」正好又凑齐
+           * 下面那个 effect 的条件，它再发、再撞、再置——静默打成死循环，
+           * 界面上什么都看不见。弹回浮层同时也是实话：这一步确实还没过。
+           */
+          setPendingRetry(true);
+          setShowGate(true);
+        }
       } catch {
         setError(t.error.resend);
       } finally {
