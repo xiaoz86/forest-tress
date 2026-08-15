@@ -330,7 +330,6 @@ export const home = {
       lastStep: '最后一步 · 留下联系方式 →',
       submit: '🌱 种下我的种子',
       submitting: '正在种下…',
-      consent: '提交即表示同意森林收下你的信息，用来撮合同频的人。',
 
       done: {
         title: '你的种子已经种下了',

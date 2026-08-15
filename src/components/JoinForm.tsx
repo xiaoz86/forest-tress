@@ -900,9 +900,6 @@ export default function JoinForm({ locale }: { locale: Locale }) {
         </div>
       </div>
 
-      <p className="text-center text-[11.5px] text-text-light/80 mt-5 leading-relaxed">
-        {t.consent}
-      </p>
     </div>
   );
 }

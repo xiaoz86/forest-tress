@@ -323,7 +323,6 @@ export const home: typeof zhHome = {
       lastStep: 'Last step · how to reach you →',
       submit: '🌱 Plant my seed',
       submitting: 'Planting…',
-      consent: 'By submitting you agree to let the forest keep your details, and use them to introduce you to people in tune with you.',
 
       done: {
         title: 'Your seed is planted',
