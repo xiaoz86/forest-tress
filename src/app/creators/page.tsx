@@ -6,6 +6,7 @@ import Nav from '@/components/Nav';
 import { dict } from '@/i18n';
 import { tr } from '@/lib/contentTranslate';
 import { getLocale } from '@/lib/locale';
+import { fetchListedNodes } from '@/lib/nodeVisibility';
 import CreatorTree from '@/components/CreatorTree';
 import type { NodeCard } from '@/lib/supabase';
 
@@ -25,14 +26,9 @@ async function fetchCreators(): Promise<NodeCard[]> {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) return [];
 
-  const supabase = createClient(supabaseUrl, serviceKey);
-  const { data, error } = await supabase
-    .from('node_cards')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error || !data) return [];
-  return data as NodeCard[];
+  // 只取在森林里的那些。空卡（轻登记刚建、还没填）和收起来的、离开的都不在此列——
+  // 判定在 lib/nodeVisibility.ts，不要在这里自己拼 filter
+  return fetchListedNodes(createClient(supabaseUrl, serviceKey));
 }
 
 export default async function CreatorsPage() {

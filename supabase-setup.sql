@@ -34,6 +34,24 @@ alter table node_cards add column if not exists ai_recommendations jsonb default
 alter table node_cards add column if not exists ai_recommendations_at timestamptz;
 alter table node_cards add column if not exists beauty text default '';
 alter table node_cards add column if not exists seed text default '';
+
+-- 2026-08-15 可见性与生命周期
+--
+-- status —— 「这张卡在不在公开的森林里」，存下来而不是算出来。
+--   draft     建了但还没准备好露面。轻登记落在这里；将来「先审后放」也落这里
+--   listed    在森林里（默认值，走完七步注册的人就是这个）
+--   hidden    自己选择暂时收起来。数据和权限全留着，随时能回来
+--   archived  离开了。不展示、不参与撮合，但数据保留——离开森林不该等于被抹掉
+--
+-- 为什么不用「卡填完了没有」现算：那回答的是信息够不够，不是这个人愿不愿意露面。
+-- 两者今天答案碰巧一样，但会分开（填完了想安静一阵、想离开、测试数据填得很完整）。
+-- 更要紧的是：判定一旦是算出来的，哪天完整度口径一改，一批老成员会毫无征兆地消失。
+--
+-- 流转规则和所有判定都在 src/lib/nodeVisibility.ts，不要在别处自己比对字符串。
+alter table node_cards add column if not exists status text not null default 'listed';
+alter table node_cards add column if not exists updated_at timestamptz default now();
+create index if not exists idx_node_cards_status on node_cards(status);
+
 -- works 单条结构（jsonb 数组里的对象）：
 --   { id: string, title: string, desc?: string, image_url?: string, url?: string, created_at: string }
 -- ai_recommendations 单条结构：

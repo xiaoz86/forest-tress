@@ -1,7 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
+import { getLocale } from '@/lib/locale';
+import { matchNodesAI } from '@/lib/match';
+import { isProfileComplete } from '@/lib/memberTrust';
+import { NODE_LISTED, fetchListedNodes, shouldPromoteToListed } from '@/lib/nodeVisibility';
 import { getAuthenticatedMemberId } from '@/lib/session';
+import type { NodeCard } from '@/lib/supabase';
+import { toRecommendationSnapshot } from '../join/route';
 
 export const runtime = 'nodejs';
 
@@ -127,9 +133,27 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
+  /**
+   * 存之前先看这次改动会不会把人送进森林。
+   *
+   * patch 只带被改过的字段，光看它判断不了「填完没有」——得拿改完之后的整张卡去判。
+   * 所以先读一次现状，和 patch 合出结果再问 shouldPromoteToListed。
+   */
+  const { data: before } = await sb
+    .from('node_cards')
+    .select('*')
+    .eq('id', nodeId)
+    .single();
+  const merged = { ...(before as NodeCard | null), ...patch } as NodeCard;
+  const promoting = shouldPromoteToListed((before as NodeCard | null)?.status, merged);
+
   const { data, error } = await sb
     .from('node_cards')
-    .update(patch)
+    .update({
+      ...patch,
+      updated_at: new Date().toISOString(),
+      ...(promoting ? { status: NODE_LISTED } : {}),
+    })
     .eq('id', nodeId)
     .select()
     .single();
@@ -146,5 +170,37 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ node: data });
+  /**
+   * 刚进森林的人，当场给他算一批同频伙伴。
+   *
+   * 不补这一下的话，走轻登记进来、后来才把卡填完的人，节点页上那块推荐区是空的——
+   * 推荐只在「注册提交那一刻」和「本人手动点重新生成」两个时机生成，
+   * draft → listed 不在其中。而他恰恰是最想看看森林里有谁的那个人。
+   * 走正常注册的人在提交那一刻就拿到了，两条路不该在这里分叉。
+   *
+   * 用 after()：算 AI 要几秒，不该让保存按钮在那儿转圈。失败也不影响这次保存，
+   * 他仍然可以自己去点「重新生成」。
+   */
+  if (promoting && data) {
+    after(async () => {
+      try {
+        const pool = (await fetchListedNodes(sb)).filter(
+          n => n.id !== nodeId && isProfileComplete(n),
+        );
+        const matches = await matchNodesAI(data as NodeCard, pool, 3, await getLocale());
+        if (matches.length === 0) return;
+        await sb
+          .from('node_cards')
+          .update({
+            ai_recommendations: matches.map(toRecommendationSnapshot),
+            ai_recommendations_at: new Date().toISOString(),
+          })
+          .eq('id', nodeId);
+      } catch (err) {
+        console.error('[api/profile] 进森林后补算推荐失败', err);
+      }
+    });
+  }
+
+  return NextResponse.json({ node: data, promoted: promoting });
 }

@@ -15,6 +15,7 @@ import StorySection from '@/components/home/StorySection';
 import ValueSection from '@/components/home/ValueSection';
 import { dict } from '@/i18n';
 import { getLocale } from '@/lib/locale';
+import { fetchListedNodes } from '@/lib/nodeVisibility';
 import { toPublicGraph } from '@/lib/publicNode';
 import { buildRelationGraph } from '@/lib/network';
 import type { NodeCard } from '@/lib/supabase';
@@ -36,13 +37,8 @@ async function fetchCreators(): Promise<NodeCard[]> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) return [];
-  const supabase = createClient(supabaseUrl, serviceKey);
-  const { data, error } = await supabase
-    .from('node_cards')
-    .select('*')
-    .order('created_at', { ascending: false });
-  if (error || !data) return [];
-  return data as NodeCard[];
+  // 首页展示区和关系网都只画在森林里的那些，判定见 lib/nodeVisibility.ts
+  return fetchListedNodes(createClient(supabaseUrl, serviceKey));
 }
 
 /** 只把展示需要的字段交给客户端组件——联系方式之类不出现在页面数据里 */

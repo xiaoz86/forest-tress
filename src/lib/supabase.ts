@@ -36,6 +36,14 @@ export type NodeCard = {
   ai_recommendations?: AIRecommendation[];
   /** AI 推荐生成时间（ISO） — 让用户知道现在看到的是什么时候的快照 */
   ai_recommendations_at?: string;
+  /**
+   * 这张卡在不在公开的森林里。draft / listed / hidden / archived，
+   * 判定和流转规则都在 src/lib/nodeVisibility.ts，不要在别处自己比对字符串。
+   * 迁移前建的老行没有这个值，一律按 listed 处理。
+   */
+  status?: string;
+  /** 最后一次改动。迁移时加的，将来做「最近活跃」和撮合权重会用到 */
+  updated_at?: string;
   created_at?: string;
   /** 走验证码登录成功时盖上——「这个邮箱确实是本人的」的唯一凭据 */
   email_verified_at?: string | null;

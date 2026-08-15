@@ -10,6 +10,7 @@ import {
   verifyVerifiedEmail,
 } from '@/lib/auth';
 import { getLocale } from '@/lib/locale';
+import { NODE_DRAFT } from '@/lib/nodeVisibility';
 import { getSiteOrigin, notifyNewNode, notifyWelcome } from '@/lib/notify';
 import type { NodeCard } from '@/lib/supabase';
 
@@ -60,6 +61,12 @@ export async function POST(request: NextRequest) {
         name,
         email: verified.email,
         email_verified_at: new Date().toISOString(),
+        /**
+         * 轻登记建的是 draft，不是 listed：他是真成员（能登录、能用 phil-coach），
+         * 只是卡上还没有可看的东西，不该出现在创造者列表里，也不该进 AI 撮合池。
+         * 等他把卡填完，保存那一刻自动转 listed——见 lib/nodeVisibility.ts。
+         */
+        status: NODE_DRAFT,
       }])
       .select();
     if (error || !inserted?.[0]?.id) {
