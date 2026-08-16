@@ -30,8 +30,11 @@ import {
  * 内容改过就往上加，否则 Resend 的幂等键会挡住重发。
  * v3 = 主理人 2026-08-10 改版（小节重排：PhilCoach 提到 02、AI 撮合降到 06）
  * v4 = 2026-08-16 Outlook 兼容（头图白字压白底看不见）+「暂停、呼吸，重新感受自己。」
+ * v5 = 同上内容，但 v4 的键在合并前的旧版信上已经用掉了（当时发过两封测试）。
+ *      信的内容后来换成了带 logo 和米黄纸的那一版，键必须跟着换，
+ *      否则 Resend 认得 v4 这个键，会直接把新的这封吞掉、一封都不投。
  */
-const VERSION = 'v4';
+const VERSION = 'v5';
 
 /** 群发语言。node_cards 没存语言，默认中文，要发英文加 --locale en */
 const LOCALE: Locale = process.argv.includes('en') ? 'en' : 'zh';
