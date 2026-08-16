@@ -137,7 +137,7 @@ const ZH: Letter = {
             '如果 PhilCoach 是一位陪伴对话的虚拟教练伙伴，那在平凡的日常里，能否再走进一步？呼吸，也许是我们向内看见和连接感受的桥梁。',
             '诚然，我们正在逐渐整理和设计不同主题的正念与冥想练习，希望它不只是一个「冥想音频库」，而是能够在不同生活状态下，陪伴你找到适合自己的练习。',
             '当你感到疲惫、焦虑、脑子停不下来，或者只是想在一天结束的时候重新回到身体，都可以来到这里。哪怕只有几分钟。',
-            '<strong>暂停一下，呼吸一下，重新感受自己。</strong>',
+            '<strong>暂停、呼吸，重新感受自己。</strong>',
           ],
           link: { label: '去正念冥想空间', href: `${SITE}/meditations` },
         },
@@ -406,10 +406,12 @@ export function buildOnboardingHtml(name: string, locale: Locale, magicLink?: st
   const loginBlock = magicLink
     ? `
     <tr><td style="padding:22px 32px 0;">
-      <div style="border:1px solid rgba(45,74,45,0.16);border-radius:14px;padding:18px 20px;background:#ebe4d5;">
-        <a href="${magicLink}" style="${BTN}">${escape(t.loginCta)}</a>
-        <p style="margin:10px 0 0;font-size:12.5px;color:#8a8a8a;${F}">${escape(t.loginNote)}</p>
-      </div>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr><td bgcolor="#ebe4d5" style="border:1px solid rgba(45,74,45,0.16);border-radius:14px;padding:18px 20px;background-color:#ebe4d5;">
+          <a href="${magicLink}" style="${BTN}">${escape(t.loginCta)}</a>
+          <p style="margin:10px 0 0;font-size:12.5px;color:#7a7568;${F}">${escape(t.loginNote)}</p>
+        </td></tr>
+      </table>
     </td></tr>`
     : '';
 
@@ -418,8 +420,8 @@ export function buildOnboardingHtml(name: string, locale: Locale, magicLink?: st
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escape(t.subject)}</title>
 ${EMAIL_FONT_LINK}</head>
-<body style="margin:0;padding:24px 12px;background:#e8e0d2;font-family:${EMAIL_SERIF};">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;background:#f5f1e8;border-radius:18px;overflow:hidden;box-shadow:0 4px 28px rgba(26,46,26,0.08);">
+<body bgcolor="#e8e0d2" style="margin:0;padding:24px 12px;background-color:#e8e0d2;font-family:${EMAIL_SERIF};">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#f5f1e8" style="max-width:600px;margin:0 auto;background-color:#f5f1e8;border-radius:18px;overflow:hidden;box-shadow:0 4px 28px rgba(26,46,26,0.08);">
 
     <!--
       Logo 单独占一条米色带，不压在下面那片深绿上：这张 PNG 自带米色底，
@@ -432,15 +434,26 @@ ${EMAIL_FONT_LINK}</head>
       不依赖这次部署。宽高写死：图没加载出来时，占位不会把版面撑塌。
       默认屏蔽图片的客户端会显示 alt——所以 logo 不承载任何必要信息。
     -->
-    <tr><td style="padding:26px 32px;background:#f5f1e8;text-align:center;">
+    <tr><td bgcolor="#f5f1e8" style="padding:26px 32px;background-color:#f5f1e8;text-align:center;">
       <img src="${SITE}/apple-icon.png" width="64" height="64" alt="附近森林"
         style="display:inline-block;width:64px;height:64px;border:0;outline:none;text-decoration:none;">
     </td></tr>
 
-    <tr><td style="padding:26px 32px 24px;background:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#fff;">
-      <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;opacity:0.75;margin-bottom:8px;${F}">附近森林 · Nearby Forest</div>
-      <h1 style="margin:0;font-size:22px;font-weight:700;line-height:1.45;${F}">${escape(t.h1)}</h1>
-      <p style="margin:10px 0 0;font-size:14px;line-height:1.8;opacity:0.85;${F}">${escape(t.tagline)}</p>
+    <!--
+      白字压深绿底，所以背景色绝不能只写在 background 简写里：
+      Outlook 不认 linear-gradient，整条声明被丢掉之后没有任何回退，
+      白字就压在上面那条 #f5f1e8 米色带上，标题在收件箱里等于消失
+      （QQ 邮箱、Apple Mail 都正常，所以很容易漏掉）。
+      三重保险：bgcolor 属性（Outlook 只认这个）、background-color 实色打底、
+      再叠 background-image 让支持的客户端看到渐变。
+
+      opacity 在 Outlook 里同样被忽略，那两行小字会变成纯白、和标题一样重，
+      层次全平。所以改用调好的实色，不靠透明度压。
+    -->
+    <tr><td bgcolor="#2d4a2d" style="padding:26px 32px 24px;background-color:#2d4a2d;background-image:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#ffffff;">
+      <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#d7e5d2;margin-bottom:8px;${F}">附近森林 · Nearby Forest</div>
+      <h1 style="margin:0;font-size:22px;font-weight:700;line-height:1.45;color:#ffffff;${F}">${escape(t.h1)}</h1>
+      <p style="margin:10px 0 0;font-size:14px;line-height:1.8;color:#e3eede;${F}">${escape(t.tagline)}</p>
     </td></tr>
 
     <tr><td style="padding:28px 32px 0;">
@@ -467,11 +480,13 @@ ${t.sections.map(sectionHtml).join('\n')}
     </td></tr>
 
     <tr><td style="padding:26px 32px 0;text-align:center;">
-      <div style="border-radius:14px;background:#ebe4d5;padding:20px;">
-        <p style="margin:0;font-size:16px;line-height:2;font-weight:600;color:#2d4a2d;${F}">
-          ${t.motto}
-        </p>
-      </div>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr><td bgcolor="#ebe4d5" style="border-radius:14px;background-color:#ebe4d5;padding:20px;text-align:center;">
+          <p style="margin:0;font-size:16px;line-height:2;font-weight:600;color:#2d4a2d;${F}">
+            ${t.motto}
+          </p>
+        </td></tr>
+      </table>
       <p style="margin:18px 0 0;font-size:16px;color:#2a2a2a;${F}">${escape(t.farewell)}</p>
     </td></tr>
 

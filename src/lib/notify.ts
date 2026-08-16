@@ -184,11 +184,20 @@ function buildHtml(node: NodeCard): string {
 <head><meta charset="utf-8"><title>新成员加入 · 附近森林</title></head>
 <body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(26,46,26,0.08);">
-    <div style="padding:28px 32px;background:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#fff;">
-      <div style="font-size:13px;opacity:0.75;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · 新成员</div>
-      <h1 style="margin:0;font-size:22px;font-weight:700;">🌱 ${escape(node.name)} 加入了森林</h1>
-      ${node.city ? `<div style="margin-top:6px;font-size:14px;opacity:0.85;">${escape(node.city)}</div>` : ''}
-    </div>
+    <!--
+      白字压深绿底。Outlook 不认 linear-gradient，也常常忽略 div 上的背景，
+      两条都落空之后白字就压在白卡片上，整个抬头在收件箱里消失。
+      所以这里必须是 table + bgcolor（Outlook 只认这两样），
+      再叠 background-image 给支持的客户端看渐变。
+      opacity 同样被 Outlook 忽略，那两行小字改用实色。
+    -->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr><td bgcolor="#2d4a2d" style="padding:28px 32px;background-color:#2d4a2d;background-image:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#ffffff;">
+        <div style="font-size:13px;color:#d7e5d2;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · 新成员</div>
+        <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">🌱 ${escape(node.name)} 加入了森林</h1>
+        ${node.city ? `<div style="margin-top:6px;font-size:14px;color:#e3eede;">${escape(node.city)}</div>` : ''}
+      </td></tr>
+    </table>
     <table style="width:100%;border-collapse:collapse;">
       ${row('名字', node.name)}
       ${row('城市', node.city)}
@@ -347,11 +356,14 @@ function buildShareSubmissionHtml(node: NodeCard, share: ShareEntry, reviewUrl: 
 <head><meta charset="utf-8"><title>新的林间分享待审核</title></head>
 <body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(26,46,26,0.08);">
-    <div style="padding:28px 32px;background:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#fff;">
-      <div style="font-size:13px;opacity:0.75;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · 林间分享</div>
-      <h1 style="margin:0;font-size:22px;font-weight:700;">有新的分享待审核</h1>
-      <div style="margin-top:8px;font-size:14px;opacity:0.85;">${escape(node.name)} 上传了「${escape(share.title)}」</div>
-    </div>
+    <!-- 和新成员通知同一个 Outlook 坑，处理方式见上面那段注释 -->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr><td bgcolor="#2d4a2d" style="padding:28px 32px;background-color:#2d4a2d;background-image:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#ffffff;">
+        <div style="font-size:13px;color:#d7e5d2;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · 林间分享</div>
+        <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">有新的分享待审核</h1>
+        <div style="margin-top:8px;font-size:14px;color:#e3eede;">${escape(node.name)} 上传了「${escape(share.title)}」</div>
+      </td></tr>
+    </table>
     <table style="width:100%;border-collapse:collapse;">
       ${row('分享者', node.name)}
       ${row('标题', share.title)}

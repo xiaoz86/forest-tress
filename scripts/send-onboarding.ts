@@ -29,8 +29,9 @@ import {
 /**
  * 内容改过就往上加，否则 Resend 的幂等键会挡住重发。
  * v3 = 主理人 2026-08-10 改版（小节重排：PhilCoach 提到 02、AI 撮合降到 06）
+ * v4 = 2026-08-16 Outlook 兼容（头图白字压白底看不见）+「暂停、呼吸，重新感受自己。」
  */
-const VERSION = 'v3';
+const VERSION = 'v4';
 
 /** 群发语言。node_cards 没存语言，默认中文，要发英文加 --locale en */
 const LOCALE: Locale = process.argv.includes('en') ? 'en' : 'zh';
