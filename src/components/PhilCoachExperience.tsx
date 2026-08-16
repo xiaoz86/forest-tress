@@ -283,6 +283,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const captionWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const starveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const peakLevelRef = useRef(0);
+  const voiceStartLockRef = useRef(false);
   const liveVoice = useSpeechInput(text => {
     captionSeenRef.current = true;
     setCaption(current => appendTranscript(current, text));
@@ -292,7 +293,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     const mode = voiceModeRef.current;
     voiceModeRef.current = null;
     setVoiceMode(null);
-    if (mode === 'direct') {
+    if (mode === 'direct' && !result.needsReview) {
       void sendVoiceMessage(result.text.trim().slice(0, 1200), result.voiceContext);
       return;
     }
@@ -362,12 +363,12 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   // 而 Chrome/Edge 的后端在 Google——在够不着 Google 的网络里 API 在、一用就报
   // network。所以判据是「它有没有真的出字」，不是嗅探 UA。
   //
-  // iPhone / iPad 上还有一层：Web Speech 会自己开一路麦克风，和我们采 PCM 的
-  // AudioContext 是两个消费者，可能互相饿死。这条没有真机验不了，所以默认仍然
-  // 只走服务端；带上 ?webspeech=1 可以在 iOS Safari 上单独试（微信不受影响）。
-  const iosWebSpeechOptIn = useClientFlag(
+  // iOS Safari 优先用本机 Web Speech 给即时字幕，同时保留 PCM 做完整定稿。
+  // 若某台设备两路采音冲突，下面的电平看门狗会自动切回服务端；排障时也可用
+  // ?webspeech=0 主动关掉。微信仍然不会走这条。
+  const webSpeechOptOut = useClientFlag(
     () => typeof window !== 'undefined'
-      && new URLSearchParams(window.location.search).get('webspeech') === '1',
+      && new URLSearchParams(window.location.search).get('webspeech') === '0',
   );
   // 还有一层比「支不支持」更要紧的：能不能和我们的采音共存。
   // Chrome 上 SpeechRecognition 会把麦克风独占走，我们这一路只录到静音，
@@ -375,11 +376,13 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const webKitEngine = useClientFlag(isWebKitBrowser);
   const useWebSpeechCaptions =
     liveVoice.supported && !liveVoice.inWeChat && webKitEngine
-    && (!liveVoice.inIOS || iosWebSpeechOptIn);
+    && !webSpeechOptOut;
   // 实时字幕：谁有内容就显示谁。
   // 不能按 useWebSpeechCaptions 固定挑一边——看门狗把浏览器听写换成服务端之后，
   // 显示源不跟着切的话，请求照发、字却永远不出现。
-  const liveCaption = appendTranscript(caption, liveVoice.interim) || voiceIn.partial;
+  // 一旦退回服务端，以服务端从录音开头重建的字幕为准；否则旧的浏览器定稿会
+  // 一直挡在前面，让服务端明明在出字、输入框却看起来没有更新。
+  const liveCaption = voiceIn.partial || appendTranscript(caption, liveVoice.interim);
   const voiceBusy = voiceIn.requesting || voiceIn.recording || voiceIn.transcribing;
   // 直达：大面板只管「正在录」这一段，录音一停立即退场——
   // 等待由对话里的占位气泡承担，面板再留着就是同一状态出现两遍，
@@ -392,6 +395,8 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     dictating && liveCaption ? appendTranscript(draft, liveCaption) : draft;
   // 三个入口统一包一层：字幕跟着录音一起起停，且字幕失败不影响录音
   const startVoice = async (mode: 'dictate' | 'direct') => {
+    if (voiceStartLockRef.current || voiceBusy) return;
+    voiceStartLockRef.current = true;
     // 它正念着的时候开录，麦克风会把它自己的话录回输入框——
     // 手机外放尤其明显，回声消除挡不住。开录第一件事就是让它闭嘴。
     voiceOut.stop();
@@ -405,23 +410,32 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       starveTimerRef.current = null;
     }
     // Web Speech 在跑就先不花钱做分段转写，等看门狗判定
-    await voiceIn.start({
-      partials: !useWebSpeechCaptions,
-      // 灰色麦克风只是听写，不需要等较慢的语气分析；直达模式才保留声音观察。
-      analysis: mode === 'direct',
-    });
-    // 一定要等麦克风到手再起浏览器听写。两个都在抢麦克风，同时发起的话
-    // 两套权限流程会叠在一起——Mac Chrome 上表现为卡在「正在打开麦克风…」。
-    if (!useWebSpeechCaptions || voiceModeRef.current !== mode) return;
-    liveVoice.start();
-    // 看门狗现在只是兜底。正常的失败（没权限、没麦克风、连不上 Google）都会
-    // 触发 error 事件，下面那个 effect 会立刻切走，不必白等这几秒。
-    // 留着它是为了「不报错也不出字」那种装死的情况。
-    if (captionWatchdogRef.current) clearTimeout(captionWatchdogRef.current);
-    captionWatchdogRef.current = setTimeout(() => {
-      if (captionSeenRef.current) return;
-      fallbackToServerCaptions();
-    }, CAPTION_WATCHDOG_MS);
+    try {
+      const started = await voiceIn.start({
+        partials: !useWebSpeechCaptions,
+        // 灰色麦克风只是听写，不需要等较慢的语气分析；直达模式才保留声音观察。
+        analysis: mode === 'direct',
+      });
+      if (!started || voiceModeRef.current !== mode) {
+        voiceModeRef.current = null;
+        setVoiceMode(null);
+        return;
+      }
+      // 一定要等麦克风到手再起浏览器听写。两个都在抢麦克风，同时发起的话
+      // 两套权限流程会叠在一起——Mac Chrome 上表现为卡在「正在打开麦克风…」。
+      if (!useWebSpeechCaptions) return;
+      liveVoice.start();
+      // 看门狗现在只是兜底。正常的失败（没权限、没麦克风、连不上 Google）都会
+      // 触发 error 事件，下面那个 effect 会立刻切走，不必白等这几秒。
+      // 留着它是为了「不报错也不出字」那种装死的情况。
+      if (captionWatchdogRef.current) clearTimeout(captionWatchdogRef.current);
+      captionWatchdogRef.current = setTimeout(() => {
+        if (captionSeenRef.current) return;
+        fallbackToServerCaptions();
+      }, CAPTION_WATCHDOG_MS);
+    } finally {
+      voiceStartLockRef.current = false;
+    }
   };
   /** 收掉浏览器听写，接上服务端分段转写。PCM 从开录就在攒，所以字幕从头出，不会缺一截。 */
   const fallbackToServerCaptions = () => {
@@ -437,12 +451,27 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     voiceIn.armPartials();
   };
   const finishVoice = () => {
-    if (captionWatchdogRef.current) clearTimeout(captionWatchdogRef.current);
-    liveVoice.cancel();   // 定稿以服务端转写为准，字幕直接丢弃
-    voiceIn.stop();
+    if (captionWatchdogRef.current) {
+      clearTimeout(captionWatchdogRef.current);
+      captionWatchdogRef.current = null;
+    }
+    if (starveTimerRef.current) {
+      clearTimeout(starveTimerRef.current);
+      starveTimerRef.current = null;
+    }
+    liveVoice.cancel();
+    // 完整录音仍是定稿；浏览器字幕只在音频链路失败时兜底，用户说过的话不丢。
+    voiceIn.stop(liveCaption);
   };
   const cancelVoice = () => {
-    if (captionWatchdogRef.current) clearTimeout(captionWatchdogRef.current);
+    if (captionWatchdogRef.current) {
+      clearTimeout(captionWatchdogRef.current);
+      captionWatchdogRef.current = null;
+    }
+    if (starveTimerRef.current) {
+      clearTimeout(starveTimerRef.current);
+      starveTimerRef.current = null;
+    }
     liveVoice.cancel();
     setCaption('');
     voiceModeRef.current = null;
@@ -1558,9 +1587,10 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                         type="button"
                         aria-label={t.voice.dictateLabel}
                         title={t.voice.dictateTitle}
-                        className="grid h-10 w-10 place-items-center rounded-full border border-white/14 bg-white/[0.05] text-white/70 transition-colors hover:bg-white/12 hover:text-white disabled:opacity-40"
+                        className="inline-flex h-12 min-w-[58px] flex-col items-center justify-center gap-0.5 rounded-2xl border border-white/14 bg-white/[0.05] px-2 text-white/70 transition-colors hover:bg-white/12 hover:text-white disabled:opacity-40"
                       >
                         <MicrophoneIcon />
+                        <span className="text-[10px] leading-none">{t.voice.dictateShort}</span>
                       </button>
                       <button
                         onClick={() => void startVoice('direct')}
@@ -1568,9 +1598,10 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                         type="button"
                         aria-label={t.voice.speakLabel}
                         title={t.voice.speakTitle}
-                        className="grid h-10 w-10 place-items-center rounded-full bg-coral-soft/90 text-[#24140f] transition-colors hover:bg-coral-soft disabled:opacity-40"
+                        className="inline-flex h-12 min-w-[58px] flex-col items-center justify-center gap-0.5 rounded-2xl bg-coral-soft/90 px-2 text-[#24140f] transition-colors hover:bg-coral-soft disabled:opacity-40"
                       >
                         <VoiceWaveIcon />
+                        <span className="text-[10px] leading-none">{t.voice.speakShort}</span>
                       </button>
                     </div>
                   )}

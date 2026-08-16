@@ -5,10 +5,17 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { normalizeVoiceAnalysis, type VoiceAnalysis } from '@/lib/philCoachVoice';
+import {
+  chooseCompleteTranscript,
+  mergeIncrementalTranscript,
+  normalizeAsrTranscript,
+} from '@/lib/voiceTranscript';
 
 export type VoiceInputResult = {
   text: string;
   voiceContext: VoiceAnalysis | null;
+  /** 最终整段转写失败，只能把实时字幕放回输入框请用户确认，不能直接发送。 */
+  needsReview?: boolean;
 };
 
 const MAX_RECORDING_MS = 55_000;
@@ -17,13 +24,13 @@ const MAX_WAV_BYTES = 1_950_000;
 const PARTIAL_MS = 600;         // 派发间隔。请求是重叠的，所以可以比一次往返短得多
 const PARTIAL_FIRST_MS = 700;   // 第一次早发，别让人盯着空框等一个完整周期
 const PARTIAL_TIMEOUT_MS = 7_000;
-// 这条链路每次请求固定要一两秒，且与音频长短无关（实测 15KB 与 78KB 同样耗时）。
-// 串行就是「录 0.7 秒 + 等 2 秒」，字每三秒才蹦一大块；重叠发出之后，
-// 滞后仍是一次往返，但每 0.7 秒就能接上一段，字是连着出来的。
+// 这条链路每次请求固定要一两秒，且与音频长短无关。请求重叠发出后，
+// 滞后仍是一次往返，但后续短语会持续接上，不必等上一段返回才发下一段。
 const MAX_INFLIGHT_PARTIALS = 3;
-const STOP_DRAIN_MS = 5_000;    // 收口时最多等在途的分段这么久
-const MIN_SEG_S = 0.7;          // 太短的片段容易只有半个音节，先和后面合起来
-const MAX_SEG_S = 1.6;          // 一直没停顿也得切，否则字迟迟不出
+const MIN_SEG_S = 0.9;          // 太短的片段缺上下文，容易漂成日文或同音错词
+const MAX_SEG_S = 2.2;          // 连续说话时稍多留上下文，最终仍由整段录音校准
+const PARTIAL_OVERLAP_S = 0.3;  // 保留词边界，文字合并时再去重
+const QUIET_WINDOWS_REQUIRED = 4; // 至少 120ms 持续安静才算停顿，30ms 毛刺不能切句
 // 「安静」得相对于当前环境来判断。固定阈值在有底噪的地方永远够不着，
 // 于是每一段都只能等 MAX_SEG_S 硬切——那正是手机上「说完还要等三四秒」的来源。
 const QUIET_RATIO = 0.22;       // 低于本段峰值的这个比例算停顿
@@ -43,12 +50,11 @@ const AUDIO_CONSTRAINTS = {
   autoGainControl: true,
 } as const;
 const SILENT_MIC_RMS = 0.004;   // 整段最高电平低于这个，就不是「说得轻」，是根本没进来声音  // 点完成后给手机录音编码器留住最后几个字
-// 边说边纠错：在停顿处把已经攒下的整段顺一遍，而不是逐段顺。
-// 逐段不行——纠错靠上下文，单独一个「很平近」的碎片没有判断依据。
-const LIVE_POLISH_DEBOUNCE_MS = 1_100;   // 一段转完后再静一会儿才动手，避开连着说的时候
-const LIVE_POLISH_MIN_INTERVAL_MS = 3_000;
-const LIVE_POLISH_MIN_CHARS = 10;        // 太短没有上下文，纠了也是猜
-const LIVE_POLISH_MIN_GROWTH = 7;        // 没新增多少就别重复调用
+// 纠错只在停止后做一次，对着整段。逐段纠不行——纠错靠上下文，
+// 单独一个「很平近」的碎片没有判断依据。实测这一步 0.5–1.4 秒，压在整段转写（约 0.8 秒）后面，
+// 合计不到两秒——比边说边纠时「字出来了又跳变」好受得多。
+const FINAL_POLISH_MIN_CHARS = 10;       // 太短没有上下文，纠了也是猜
+const FINAL_POLISH_TIMEOUT_MS = 4_000;   // 超时就用原文，绝不让它拖住已经转好的话
 
 function writeAscii(view: DataView, offset: number, value: string) {
   for (let index = 0; index < value.length; index += 1) {
@@ -86,7 +92,13 @@ function encodePcmWav(flat: Float32Array, sampleRate: number): Blob {
   view.setUint32(40, outputLength * 2, true);
 
   for (let index = 0; index < outputLength; index += 1) {
-    const clamped = Math.max(-1, Math.min(1, flat[Math.floor(index * ratio)] || 0));
+    // 下采样前做一个轻量盒式低通，不再直接隔几个点抽一个点；后者会把高频混叠
+    // 到人声频段，尤其容易伤到中文辅音。
+    const from = Math.floor(index * ratio);
+    const to = Math.max(from + 1, Math.min(flat.length, Math.floor((index + 1) * ratio)));
+    let sum = 0;
+    for (let sample = from; sample < to; sample += 1) sum += flat[sample] || 0;
+    const clamped = Math.max(-1, Math.min(1, sum / Math.max(1, to - from)));
     view.setInt16(44 + index * 2, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
   }
   return new Blob([wav], { type: 'audio/wav' });
@@ -132,10 +144,15 @@ function findQuietCut(flat: Float32Array, rate: number): number | null {
   }
   const quiet = Math.min(QUIET_RMS_CEIL, Math.max(QUIET_RMS_FLOOR, peak * QUIET_RATIO));
 
+  let quietRun = 0;
   for (let index = 0; index < windows.length; index += 1) {
     const end = flat.length - index * win;
     if (end - win < minSamples) break;
-    if (windows[index] < quiet) return end;
+    quietRun = windows[index] < quiet ? quietRun + 1 : 0;
+    if (quietRun >= QUIET_WINDOWS_REQUIRED) {
+      const newestQuietIndex = index - QUIET_WINDOWS_REQUIRED + 1;
+      return flat.length - newestQuietIndex * win;
+    }
   }
   return flat.length / rate >= MAX_SEG_S ? flat.length : null;
 }
@@ -148,20 +165,6 @@ function findQuietCut(flat: Float32Array, rate: number): number | null {
  */
 function trimSeamPunctuation(text: string): string {
   return text.replace(/[。．.!！?？,，、;；]+$/, '');
-}
-
-/** 最终识别若明显只少了尾句，保留实时字幕里已经识别出的完整版本。 */
-function preferCompleteTranscript(finalText: string, partialText: string): string {
-  const finalValue = finalText.trim();
-  const partialValue = partialText.trim();
-  if (!partialValue) return finalValue;
-  if (!finalValue) return partialValue;
-  const compact = (value: string) => value.replace(/[\s，。！？、；：,.!?;:]/g, '');
-  const finalCompact = compact(finalValue);
-  const partialCompact = compact(partialValue);
-  return partialCompact.startsWith(finalCompact) && partialCompact.length > finalCompact.length
-    ? partialValue
-    : finalValue;
 }
 
 /**
@@ -241,12 +244,11 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   const genRef = useRef(0);
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stoppingRef = useRef(false);
+  /** 浏览器实时听写已经显示出的文字；完整录音失败时也不能把它弄丢。 */
+  const stopFallbackRef = useRef('');
   // 已经转完并接进字幕的进度：文字 + 已消费到第几个样本
   const committedRef = useRef({ text: '', samples: 0 });
-  const polishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const polishRequestRef = useRef<AbortController | null>(null);
-  const polishBusyRef = useRef(false);
-  const polishedRef = useRef({ length: 0, at: 0 });
   // 整段录音里的最高电平 + 正在用的设备名。
   // 「一路静音」是很常见的真实故障（选错输入设备、被别的应用独占、
   // 虚拟声卡没在工作），而它和「说了但没转出字」在结果上长得一模一样——
@@ -257,8 +259,8 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   // 抢默认输入很常见，抢到了就是一路静音——让人自己挑一次，然后记住。
   const preferredDeviceRef = useRef<string>('');
   const [inputDevices, setInputDevices] = useState<{ id: string; label: string }[]>([]);
-  // 只有听写才边说边纠：直达最后要整段重转，纠字幕纯属白花钱
-  const livePolishRef = useRef(false);
+  // 听写模式（直达发送的那颗按钮不需要纠错——它整段重转完就直接送走）
+  const dictationRef = useRef(false);
 
   useEffect(() => {
     onResultRef.current = onResult;
@@ -317,12 +319,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     committedRef.current = { text: '', samples: 0 };
   }, []);
 
-  /**
-   * keepPartials：正常收口时用。在途的分段还在路上，
-   * 掐掉它们就等于把已经说出口的话丢了——收口逻辑会等它们回来再定稿。
-   * 取消录音才是真掐断。
-   */
-  const stopMeter = useCallback((keepPartials = false) => {
+  const stopMeter = useCallback(() => {
     partialsClosedRef.current = true;      // 不再派发新的分段
     if (partialTimerRef.current) {
       clearInterval(partialTimerRef.current);
@@ -336,19 +333,11 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       clearTimeout(finishTimerRef.current);
       finishTimerRef.current = null;
     }
-    if (polishTimerRef.current) {
-      clearTimeout(polishTimerRef.current);
-      polishTimerRef.current = null;
-    }
-    if (!keepPartials) {
-      partialControllersRef.current.forEach(c => c.abort());
-      partialControllersRef.current.clear();
-      resetPartialState();
-    }
+    partialControllersRef.current.forEach(c => c.abort());
+    partialControllersRef.current.clear();
+    resetPartialState();
     polishRequestRef.current?.abort();
     polishRequestRef.current = null;
-    polishBusyRef.current = false;
-    polishedRef.current = { length: 0, at: 0 };
     try {
       tapRef.current?.disconnect();
     } catch {
@@ -368,63 +357,49 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   }, [resetPartialState]);
 
   /**
-   * 停顿时把已经攒下的字幕整段顺一遍：同音错字、切点补出来的假句号，
-   * 在你还在想下一句的时候就已经改好了，不必等到点完停止才一次性整理。
+   * 停止后把整段文字顺一遍：同音错字、切点补出来的假句号，一次性改好。
    *
-   * 顺的是「整段」而不是「刚转好的那一段」——纠错全靠上下文，
-   * 「很平近」单独拿出来没法判断，接在整句里才知道是「平静」。
+   * 原来是边说边纠（防抖 1.1 秒、最短间隔 3 秒）。实测下来那样更难受：
+   * 字先出来，三五秒后又跳变一次，人正看着它读，它自己变了。
+   * 现在实时只出分片原文（快、稳、不跳字），纠错只在收口时做这一次。
+   *
+   * 顺的是「整段」而不是某一片——纠错全靠上下文，「很平近」单独拿出来
+   * 没法判断，接在整句里才知道是「平静」。
+   *
+   * 顺不动就返回原文：这一步是锦上添花，不能因为它把已经转好的话弄丢。
    */
-  const runLivePolish = useCallback(async (generation: number) => {
-    if (polishBusyRef.current) return;
-    const before = committedRef.current.text;
-    if (before.length < LIVE_POLISH_MIN_CHARS) return;
-    if (before.length - polishedRef.current.length < LIVE_POLISH_MIN_GROWTH) return;
-
-    polishBusyRef.current = true;
-    const controller = new AbortController();
-    polishRequestRef.current = controller;
-    try {
-      const res = await fetch('/api/phil-coach/polish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: before }),
-        signal: controller.signal,
-      });
-      const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      if (generationRef.current !== generation) return;
-      polishedRef.current = { length: before.length, at: Date.now() };
-      if (!res.ok || typeof json.text !== 'string' || !json.changed) return;
-      // 等结果的这段时间里可能又转好了新的一段，把它接回去
-      const now = committedRef.current.text;
-      if (!now.startsWith(before)) return;
-      // 顺的是「说到一半」的话，模型会顺手补个句号收尾——留着它，
-      // 下一段接上来就又成了假的句子边界。真正的收尾标点等停止后那一次再补。
-      const merged = `${trimSeamPunctuation(json.text.trim())}${now.slice(before.length)}`;
-      committedRef.current = { ...committedRef.current, text: merged };
-      polishedRef.current = { length: merged.length, at: Date.now() };
-      setPartial(merged);
-    } catch {
-      /* 顺不动就还是原文，字幕本身没坏 */
-      polishedRef.current = { length: before.length, at: Date.now() };
-    } finally {
-      if (polishRequestRef.current === controller) polishRequestRef.current = null;
-      polishBusyRef.current = false;
-    }
-  }, []);
-
-  const scheduleLivePolish = useCallback(
-    (generation: number) => {
-      if (!livePolishRef.current) return;
-      if (polishTimerRef.current) clearTimeout(polishTimerRef.current);
-      const since = Date.now() - polishedRef.current.at;
-      const wait = Math.max(LIVE_POLISH_DEBOUNCE_MS, LIVE_POLISH_MIN_INTERVAL_MS - since);
-      polishTimerRef.current = setTimeout(() => {
-        polishTimerRef.current = null;
-        if (generationRef.current !== generation) return;
-        void runLivePolish(generation);
-      }, wait);
+  const polishFinalText = useCallback(
+    async (text: string, generation: number): Promise<string> => {
+      if (text.length < FINAL_POLISH_MIN_CHARS) return text;
+      const controller = new AbortController();
+      polishRequestRef.current = controller;
+      const timeout = setTimeout(() => controller.abort(), FINAL_POLISH_TIMEOUT_MS);
+      try {
+        const res = await fetch('/api/phil-coach/polish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+          signal: controller.signal,
+        });
+        const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        if (generationRef.current !== generation) return text;
+        if (!res.ok || typeof json.text !== 'string' || !json.changed) return text;
+        /*
+          纠错回来的文字也要过一遍语种检查。
+          分片和整段转写都会挡日文，唯独这里曾经是「模型返回什么就写什么」——
+          只要它某次改了别的字、把假名留在结果里回来，假名就直接进输入框。
+        */
+        const reviewed = normalizeAsrTranscript(json.text.trim());
+        if (!reviewed.text || reviewed.suspiciousLanguage) return text;
+        return reviewed.text;
+      } catch {
+        return text;
+      } finally {
+        clearTimeout(timeout);
+        if (polishRequestRef.current === controller) polishRequestRef.current = null;
+      }
     },
-    [runLivePolish],
+    [],
   );
 
   /**
@@ -468,7 +443,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
    * 谁先到就先拼，话会被打乱，所以先攒着，轮到谁才接谁。
    */
   const drainPending = useCallback(
-    (generation: number) => {
+    () => {
       let grew = false;
       for (;;) {
         const entry = pendingRef.current.get(commitSeqRef.current);
@@ -478,7 +453,10 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         if (entry.raw) {
           committedRef.current = {
             // 接缝处的句末标点是转写补的，不代表这句说完了——去掉才接得上下一句
-            text: `${committedRef.current.text}${trimSeamPunctuation(entry.raw)}`,
+            text: mergeIncrementalTranscript(
+              committedRef.current.text,
+              trimSeamPunctuation(entry.raw),
+            ),
             samples: entry.end,
           };
           grew = true;
@@ -487,12 +465,11 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           committedRef.current = { ...committedRef.current, samples: entry.end };
         }
       }
-      if (grew) {
-        setPartial(committedRef.current.text);
-        scheduleLivePolish(generation);
-      }
+      // 实时只出分片原文，不纠错——纠错留到停止时对整段做一次。
+      // 边说边纠会让已经出来的字在三五秒后自己跳变，比不纠更难受。
+      if (grew) setPartial(committedRef.current.text);
     },
-    [scheduleLivePolish],
+    [],
   );
 
   /**
@@ -517,21 +494,22 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       const from = dispatchedRef.current;
       if ((total - from) / rate < MIN_SEG_S) return;   // 太短转不出东西，白花一次请求
 
-      const flat = flattenRange(chunks, from, total);
-      const cut = findQuietCut(flat, rate);
+      const fresh = flattenRange(chunks, from, total);
+      const cut = findQuietCut(fresh, rate);
       if (cut === null) return;                        // 还没到停顿、也没到硬切长度
 
       const seq = seqRef.current;
       seqRef.current += 1;
       const end = from + cut;
       dispatchedRef.current = end;
-      const blob = encodePcmWav(flat.subarray(0, cut), rate);
+      const audioFrom = Math.max(0, from - Math.floor(PARTIAL_OVERLAP_S * rate));
+      const blob = encodePcmWav(flattenRange(chunks, audioFrom, end), rate);
 
       const task = (async () => {
         const raw = await transcribeSegment(blob, generation);
-        if (generationRef.current !== generation) return;
+        if (generationRef.current !== generation || partialsClosedRef.current) return;
         pendingRef.current.set(seq, { raw, end });
-        drainPending(generation);
+        drainPending();
       })();
       inflightRef.current.add(task);
       void task.finally(() => inflightRef.current.delete(task));
@@ -555,12 +533,17 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     [pushPartial],
   );
 
-  const startMeter = useCallback((stream: MediaStream, withPartials: boolean, generation: number) => {
+  const startMeter = useCallback(async (
+    stream: MediaStream,
+    withPartials: boolean,
+    generation: number,
+  ): Promise<boolean> => {
     try {
       const ctx = audioCtxRef.current;
-      if (!ctx) return;
+      if (!ctx) return false;
       // iOS 上就算在手势里建好，拿到麦克风这一等也可能把它挂起；再推一次
-      if (ctx.state === 'suspended') void ctx.resume().catch(() => undefined);
+      if (ctx.state === 'suspended') await ctx.resume();
+      if (ctx.state !== 'running') return false;
       const source = ctx.createMediaStreamSource(stream);
       sourceRef.current = source;
       startedAtRef.current = Date.now();
@@ -595,8 +578,10 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       tapRef.current = tap;
       genRef.current = generation;
       if (withPartials) beginPartials(generation);
+      return true;
     } catch {
-      /* 没有音量表也不影响录音 */
+      // PCM 已是唯一录音源；初始化失败不能再伪装成「正在听」。
+      return false;
     }
   }, [beginPartials, resetPartialState]);
 
@@ -611,12 +596,12 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     beginPartials(genRef.current);
   }, [beginPartials]);
 
-  const cleanup = useCallback((keepPartials = false) => {
+  const cleanup = useCallback(() => {
     if (maxTimerRef.current) {
       clearTimeout(maxTimerRef.current);
       maxTimerRef.current = null;
     }
-    stopMeter(keepPartials);
+    stopMeter();
     try {
       streamRef.current?.getTracks().forEach(t => t.stop());
     } catch {
@@ -629,9 +614,10 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
    * 手机点下「完成」时，声音与编码数据还会晚几十到几百毫秒抵达。
    * 先立即切到整理状态，再给尾音一个很短的缓冲，最后主动冲出编码数据。
    */
-  const requestStop = useCallback((tailMs = RECORDING_TAIL_MS) => {
+  const requestStop = useCallback((tailMs = RECORDING_TAIL_MS, fallbackText = '') => {
     if (!finalizeRef.current || stoppingRef.current) return;
     stoppingRef.current = true;
+    stopFallbackRef.current = fallbackText.trim();
     if (maxTimerRef.current) {
       clearTimeout(maxTimerRef.current);
       maxTimerRef.current = null;
@@ -662,13 +648,14 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   useEffect(() => cancel, [cancel]);
 
   const start = useCallback(async (options?: { partials?: boolean; analysis?: boolean }) => {
-    if (busyRef.current) return;
+    if (busyRef.current) return false;
     busyRef.current = true;
     stoppingRef.current = false;
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     setError('');
     setPartial('');
+    stopFallbackRef.current = '';
     setRequesting(true);
     // AudioContext 必须在这里同步建起来：等 getUserMedia 回来就脱离了用户手势，
     // iOS Safari / 微信会给一个 suspended 的上下文——分析器读不到数据（波形一直是
@@ -715,12 +702,17 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         // busyRef 也一直是 true，连重新开始都按不动。
         setRequesting(false);
         busyRef.current = false;
-        return;
+        return false;
       }
       setRequesting(false);
       streamRef.current = stream;
-      livePolishRef.current = options?.analysis === false;
-      startMeter(stream, options?.partials !== false, generation);
+      dictationRef.current = options?.analysis === false;
+      const meterStarted = await startMeter(stream, options?.partials !== false, generation);
+      if (!meterStarted) {
+        const error = new Error('audio-context-not-running') as Error & { name: string };
+        error.name = 'AudioContextError';
+        throw error;
+      }
       // 只用 Web Audio 采音，不再挂 MediaRecorder。
       // iOS Safari 上同一条音轨被两个消费者同时读时，AudioContext 会被饿死——
       // 表现就是波形全程静止、实时字幕拿到的全是静音，而 MediaRecorder 那边一切正常。
@@ -731,72 +723,77 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         const pcmRate = pcmRateRef.current;
         const pcmSamples = pcmChunks.reduce((total, chunk) => total + chunk.length, 0);
         const dictation = options?.analysis === false;
-        // 听写：字幕已经把前面绝大部分转完了，收口时只补「还没派发出去」的那一小段，
-        // 不必把整段重转一遍——那正是「点完停止还要干等」的来源。
-        // 直达不走这条：那段话要直接发出去，且语气观察需要完整音频。
-        const tailOnly = dictation && pcmRate > 0 && dispatchedRef.current > 0;
+        // 分片只负责实时预览，不能承担最终数据完整性：任一切片超时、被错判成静音，
+        // 若收口只上传尾巴，前面的那段话就永久丢了。最终始终重转完整录音；
+        // SenseVoice 的耗时主要是一次网络往返，完整 WAV 不会比“只传尾巴”多等一轮。
         const uploadFlat = pcmRate
-          ? flattenRange(pcmChunks, tailOnly ? dispatchedRef.current : 0, pcmSamples)
+          ? flattenRange(pcmChunks, 0, pcmSamples)
           : new Float32Array(0);
         const enoughAudio = uploadFlat.length > pcmRate / 4;
         const pcmBlob = enoughAudio ? encodePcmWav(uploadFlat, pcmRate) : null;
-        // 在途的分段还在路上，别掐——那是已经说出口的话
-        cleanup(dictation);
+        const liveTextAtStop = chooseCompleteTranscript(
+          committedRef.current.text,
+          stopFallbackRef.current,
+        );
+        // 完整录音已经覆盖全部内容，停止并丢弃迟到切片，防止它们在收口后“幽灵回填”。
+        cleanup();
         if (generationRef.current !== generation) return;
 
-        // 尾巴和在途分段是并行的：先把尾巴发出去，再回头等在途的，
-        // 于是收口只等一次往返，而不是「等完在途，再等尾巴」两次。
-        let tailPromise: Promise<Response> | null = null;
-        let tailController: AbortController | null = null;
+        let finalPromise: Promise<Response> | null = null;
+        let finalController: AbortController | null = null;
         if (pcmBlob && pcmBlob.size >= 1200) {
           const fd = new FormData();
           fd.append('audio', pcmBlob, 'speech.wav');
           fd.append('analysis', dictation ? '0' : '1');
-          // 补尾走轻量转写：不做语气观察，也不占正式配额
-          if (tailOnly) fd.append('partial', '1');
-          tailController = new AbortController();
-          requestRef.current = tailController;
+          finalController = new AbortController();
+          requestRef.current = finalController;
           setTranscribing(true);
-          tailPromise = fetch('/api/phil-coach/voice', {
+          finalPromise = fetch('/api/phil-coach/voice', {
             method: 'POST',
             body: fd,
-            signal: tailController.signal,
+            signal: finalController.signal,
           });
-          void tailPromise.catch(() => undefined);   // 真正的处理在下面，这里只防未捕获
+          void finalPromise.catch(() => undefined);   // 真正的处理在下面，这里只防未捕获
         }
-        if (tailOnly) {
-          await Promise.race([
-            Promise.allSettled([...inflightRef.current]),
-            new Promise(resolve => setTimeout(resolve, STOP_DRAIN_MS)),
-          ]);
-          if (generationRef.current !== generation) return;
-        }
-        const partialTextAtStop = committedRef.current.text;
-        resetPartialState();
 
-        // 尾巴短到没东西可转：字幕本身就是结果，一个字都不用等
-        if (tailOnly && !tailPromise) {
+        // PCM 采集偶发失效时，浏览器/服务端实时字幕仍然可以保住用户已经说的话。
+        if (!finalPromise && liveTextAtStop) {
           setPartial('');
-          onResultRef.current({ text: partialTextAtStop, voiceContext: null });
+          onResultRef.current({
+            text: liveTextAtStop,
+            voiceContext: null,
+            needsReview: !dictation,
+          });
+          if (!dictation) {
+            setError('完整定稿没有回来，先把刚才听到的放进输入框，确认后再发。');
+          }
           setTranscribing(false);
           busyRef.current = false;
           return;
         }
-        if (!tailPromise) {
+        if (!finalPromise) {
           setError(silentMic() ? micHint() : '好像没录到声音，再说一次试试。');
           setTranscribing(false);
           busyRef.current = false;
           return;
         }
         try {
-          const res = await tailPromise;
+          const res = await finalPromise;
           const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
           if (generationRef.current !== generation) return;
           if (!res.ok || typeof json.text !== 'string') {
-            if (partialTextAtStop && dictation) {
+            if (liveTextAtStop) {
               setPartial('');
-              onResultRef.current({ text: partialTextAtStop, voiceContext: null });
-              setError('最后一句没能听清，先留着刚才听到的，改完再发也行。');
+              onResultRef.current({
+                text: liveTextAtStop,
+                voiceContext: null,
+                needsReview: !dictation,
+              });
+              setError(
+                dictation
+                  ? '完整定稿没有回来，先留着刚才听到的，改完再发也行。'
+                  : '完整定稿没有回来，先把刚才听到的放进输入框，确认后再发。',
+              );
             } else {
               setError(
                 json.error === 'too-many'
@@ -807,31 +804,39 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
               );
             }
           } else {
-            const text = tailOnly
-              // 只转了尾巴，接在字幕后面就是完整的一段
-              ? `${partialTextAtStop}${json.text.trim()}`.trim()
-              : dictation
-                ? preferCompleteTranscript(json.text, partialTextAtStop)
-                : json.text.trim();
+            const raw = chooseCompleteTranscript(json.text, liveTextAtStop);
             const voiceContext = normalizeVoiceAnalysis(json.voiceContext);
+            // 整段转写拿到了，再顺一次错字和假句号——全程只有这一次。
+            // 直达发送那颗按钮不顺：它转完就直接送走，没人会看这段字。
+            const text = dictation ? await polishFinalText(raw, generation) : raw;
+            if (generationRef.current !== generation) return;
             setPartial('');
             onResultRef.current({
+              // 情绪分析是对着原始转写做的，别把顺过的文字塞回去当它的依据
               text,
-              voiceContext: voiceContext ? { ...voiceContext, transcript: text } : null,
+              voiceContext: voiceContext ? { ...voiceContext, transcript: raw } : null,
             });
           }
         } catch {
           if (generationRef.current === generation) {
-            if (partialTextAtStop && dictation) {
+            if (liveTextAtStop) {
               setPartial('');
-              onResultRef.current({ text: partialTextAtStop, voiceContext: null });
-              setError('网络不太顺，先留着刚才听到的，改完再发也行。');
+              onResultRef.current({
+                text: liveTextAtStop,
+                voiceContext: null,
+                needsReview: !dictation,
+              });
+              setError(
+                dictation
+                  ? '网络不太顺，先留着刚才听到的，改完再发也行。'
+                  : '网络不太顺，先把刚才听到的放进输入框，确认后再发。',
+              );
             } else {
               setError('网络不太顺，这段没送出去。');
             }
           }
         } finally {
-          if (requestRef.current === tailController) requestRef.current = null;
+          if (requestRef.current === finalController) requestRef.current = null;
           if (generationRef.current === generation) {
             busyRef.current = false;
             setTranscribing(false);
@@ -842,8 +847,9 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       maxTimerRef.current = setTimeout(() => {
         requestStop(0);
       }, MAX_RECORDING_MS);
+      return true;
     } catch (e) {
-      if (generationRef.current !== generation) return;
+      if (generationRef.current !== generation) return false;
       const name = (e as { name?: string })?.name || '';
       const inWeChat = /MicroMessenger/i.test(navigator.userAgent);
       setError(
@@ -851,17 +857,20 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           ? inWeChat
             ? '微信没有开放麦克风。请点右上角「…」，选择在浏览器打开后再允许麦克风。'
             : '没有拿到麦克风权限。允许之后就可以对它说话了。'
-          : '这个环境暂时用不了麦克风，可以先打字。',
+          : name === 'AudioContextError'
+            ? '麦克风已允许，但浏览器没有送来声音。刷新页面或换系统浏览器再试。'
+            : '这个环境暂时用不了麦克风，可以先打字。',
       );
       cleanup();
       busyRef.current = false;
       setRequesting(false);
       setRecording(false);
+      return false;
     }
-  }, [cleanup, micHint, requestStop, resetPartialState, silentMic, startMeter, stopMeter]);
+  }, [cleanup, micHint, polishFinalText, requestStop, silentMic, startMeter, stopMeter]);
 
-  const stop = useCallback(() => {
-    requestStop();
+  const stop = useCallback((fallbackText = '') => {
+    requestStop(RECORDING_TAIL_MS, fallbackText);
   }, [requestStop]);
 
   const toggle = useCallback(() => {

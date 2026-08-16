@@ -4,6 +4,7 @@
 // 因此这里只作为渐进增强，微信等不可靠环境会降级到录音后上传转写。
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { normalizeAsrTranscript } from '@/lib/voiceTranscript';
 
 /** 读取「浏览器是否支持某能力」——SSR 安全，且不需要在 effect 里 setState */
 const noopSubscribe = () => () => {};
@@ -142,7 +143,10 @@ export function useSpeechInput(onText: (text: string) => void) {
         let pending = '';
         for (let i = e.resultIndex; i < e.results.length; i += 1) {
           const r = e.results[i];
-          const text = r[0]?.transcript ?? '';
+          const normalized = normalizeAsrTranscript(r[0]?.transcript ?? '');
+          // 入口明确指定 zh-CN。偶发的日文/韩文结果是语种漂移，不能把它写进输入框；
+          // 看门狗随后会切到完整录音的服务端转写。
+          const text = normalized.suspiciousLanguage ? '' : normalized.text;
           if (r.isFinal) finalText += text;
           else pending += text;
         }

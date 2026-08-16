@@ -200,6 +200,7 @@ export const philCoach = {
 
       // 直接说给它听
       speakLabel: '说完直接发给它',
+      speakShort: '直接发',
       speakTitle: '按一下开始说，说完直接发给它',
       speakHint: '再次点击，说完直接发给它',
       speakStop: '再次点击以完成录音',
@@ -208,6 +209,7 @@ export const philCoach = {
 
       // 听写进输入框
       dictateLabel: '说话变文字',
+      dictateShort: '转文字',
       dictateTitle: '说话变文字，先进输入框，可改再发',
       dictateCancel: '取消听写',
       dictateDone: '完成听写',

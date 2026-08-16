@@ -199,6 +199,7 @@ export const philCoach: typeof zhPhilCoach = {
       converting: 'Turning speech into text…',
 
       speakLabel: 'Speak and send straight to it',
+      speakShort: 'Send now',
       speakTitle: 'Tap to start speaking; when you’re done it goes straight to it',
       speakHint: 'Tap again, and it goes straight to it',
       speakStop: 'Tap again to finish recording',
@@ -206,6 +207,7 @@ export const philCoach: typeof zhPhilCoach = {
       cancelRecording: 'Cancel this recording',
 
       dictateLabel: 'Speech to text',
+      dictateShort: 'To text',
       dictateTitle: 'Speech to text—goes into the box first, so you can edit before sending',
       dictateCancel: 'Cancel dictation',
       dictateDone: 'Finish dictation',
