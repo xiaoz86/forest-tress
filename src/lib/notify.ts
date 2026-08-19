@@ -1,5 +1,7 @@
 import type { NodeCard } from './supabase';
 import { toPublicNode, type PublicNode } from '@/lib/publicNode';
+import { buildUnsubscribeUrl } from '@/lib/matchNotify';
+import { translateMatchReason } from '@/lib/match';
 import { EMAIL_FONT } from '@/lib/emailTheme';
 import { dict } from '@/i18n';
 import type { Locale } from '@/lib/locale';
@@ -46,6 +48,12 @@ type ResendMessage = {
   subject: string;
   html: string;
   text: string;
+  /**
+   * 自定义邮件头，原样传给 Resend。目前只用来放 List-Unsubscribe：
+   * 那对头让 Gmail / Outlook 在标题栏上直接给出「退订」按钮，
+   * 人不必翻到信底找链接——而收件方看到有一键退订，也会给更好的送达评分。
+   */
+  headers?: Record<string, string>;
 };
 
 const EMAIL_TIMEOUT_MS = 8_000;
@@ -261,7 +269,7 @@ function buildText(node: NodeCard): string {
 
 /** 撮合理由。字段名对齐 lib/match.ts 的 MatchedNode，调用方直接把匹配结果传进来即可。 */
 export type PeerMatchReason = {
-  /** 「同频」「互补」「同城」——数据里的固定取值 */
+  /** 「同频」「互补」「同城」——数据里的固定中文取值，按收件人语言查表显示 */
   matchType?: string;
   /** 为何匹配，一句话 */
   aiSummary?: string;
@@ -269,28 +277,49 @@ export type PeerMatchReason = {
   aiCoCreate?: string;
   /** 规则或 AI 给的短理由，≤3 条 */
   reasons?: string[];
+  /**
+   * 这几段理由是用哪种语言生成的。
+   *
+   * 必须显式传：撮合是在**注册者**的语言下算的，而这封信发给**收件人**。
+   * 两边语言不一致时（中文用户注册 → 英文用户收信），照原样塞进去
+   * 就是一封英文信里夹着整段中文。有了这个字段才知道该不该转换。
+   */
+  reasonLocale?: Locale;
 };
+
+/** matchType 是数据里的固定中文值，显示成什么由字典说了算 */
+function matchTypeLabel(value: string | undefined, locale: Locale): string {
+  if (!value) return '';
+  const table = dict(locale).creatorDetail.matchType as Record<string, string>;
+  return table[value] || value;
+}
 
 /**
  * 「为什么把这个人推给你」那一块。
  *
  * 没有它，这封信对收件人来说就只是一张陌生人的名片，看完不知道为何而来。
  * 所以它排在卡片**前面**：先给理由，再给人。
- * 撮合信息缺失时整块不渲染——宁可不解释，也不要挂一句空洞的「你们很匹配」。
+ * 撮合信息全缺时整块不渲染——宁可不解释，也不要挂一句空洞的「你们很匹配」。
  */
-function buildWhyBlock(why: PeerMatchReason | undefined, name: string): string {
+function buildWhyBlock(
+  why: PeerMatchReason | undefined,
+  name: string,
+  locale: Locale,
+): string {
   if (!why) return '';
+  const t = dict(locale).email.peerIntro;
   const reasons = (why.reasons || []).filter(r => r && r.trim()).slice(0, 3);
   if (!why.aiSummary && !why.aiCoCreate && reasons.length === 0) return '';
 
-  const chip = why.matchType
-    ? `<span style="display:inline-block;padding:3px 10px;background:#e8ecd8;color:#4a7c4a;border-radius:999px;font-size:12px;font-weight:600;margin-bottom:10px;">${escape(why.matchType)}</span><br>`
+  const typeLabel = matchTypeLabel(why.matchType, locale);
+  const chip = typeLabel
+    ? `<span style="display:inline-block;padding:3px 10px;background:#e8ecd8;color:#4a7c4a;border-radius:999px;font-size:12px;font-weight:600;margin-bottom:10px;">${escape(typeLabel)}</span><br>`
     : '';
   const summary = why.aiSummary
     ? `<p style="margin:0 0 10px;font-size:15px;line-height:1.8;color:#2a2a2a;">${escape(why.aiSummary)}</p>`
     : '';
   const coCreate = why.aiCoCreate
-    ? `<p style="margin:0 0 10px;font-size:14px;line-height:1.8;color:#5a5a5a;"><strong style="color:#2d4a2d;">可能一起做的事：</strong>${escape(why.aiCoCreate)}</p>`
+    ? `<p style="margin:0 0 10px;font-size:14px;line-height:1.8;color:#5a5a5a;"><strong style="color:#2d4a2d;">${escape(t.coCreateLabel)}</strong>${escape(why.aiCoCreate)}</p>`
     : '';
   const list = reasons.length
     ? `<div style="font-size:13px;line-height:1.9;color:#6b8f5e;">${reasons
@@ -303,7 +332,7 @@ function buildWhyBlock(why: PeerMatchReason | undefined, name: string): string {
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
         <tr><td bgcolor="#faf8f2" style="background-color:#faf8f2;border:1px solid #e8ecd8;border-radius:12px;padding:18px 20px;">
           ${chip}
-          <div style="font-size:12px;letter-spacing:1px;color:#8a8a8a;margin-bottom:8px;">为什么把 ${escape(name)} 介绍给你</div>
+          <div style="font-size:12px;letter-spacing:1px;color:#8a8a8a;margin-bottom:8px;">${escape(t.whyTitle(name))}</div>
           ${summary}
           ${coCreate}
           ${list}
@@ -313,46 +342,72 @@ function buildWhyBlock(why: PeerMatchReason | undefined, name: string): string {
 }
 
 /**
+ * 卡片正文那几行——**不含任何联系方式**，标签按收件人语言。
+ *
+ * 参数类型故意收成 PublicNode：微信和邮箱在类型上就取不到，
+ * 不是靠在第二个模板里记得删。
+ */
+function buildPeerCardRows(node: PublicNode, locale: Locale): string {
+  const f = dict(locale).email.peerIntro.fields;
+  const topics = (node.topics || []).join(locale === 'en' ? ', ' : '、');
+  return `
+      ${row(f.name, node.name)}
+      ${row(f.city, node.city)}
+      ${row(f.doing, node.doing)}
+      ${topics ? row(f.topics, topics) : ''}
+      ${row(f.experience, node.experience)}
+      ${row(f.offer, node.offer)}
+      ${row(f.seeking, node.seeking)}
+      ${row(f.product, node.product)}`;
+}
+
+/**
  * 发给同频伙伴的「有新成员和你可能对得上」。
  *
  * 和主理人那封是两封信，不是同一封换收件人：
- *   一、**没有联系方式**。参数收 PublicNode，微信和邮箱在类型上就取不到。
- *       想认识对方要去 TA 的主页，那里对已登录成员才显示联系方式——
+ *   一、**没有联系方式**。想认识对方要去 TA 的主页，那里对已登录成员才显示——
  *       和 /creators/[id] 现有的口径一致，不在邮件里开一道后门。
  *   二、先讲理由再给名片。收件人没主动要这封信，得先知道它为何而来。
+ *   三、末尾始终有一条退订路径。这封信不是本人触发的，就必须能关掉。
  */
 function buildPeerHtml(
   node: PublicNode,
   peerName: string,
   why: PeerMatchReason | undefined,
   profileUrl: string,
+  unsubscribeUrl: string,
+  locale: Locale,
 ): string {
+  const t = dict(locale).email.peerIntro;
+  const unsubLink = unsubscribeUrl
+    ? `<br><a href="${unsubscribeUrl}" style="color:#8a8a8a;text-decoration:underline;">${escape(t.unsubscribe)}</a>`
+    : '';
   return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><title>森林里来了一位可能和你同频的人</title></head>
+<html lang="${locale === 'en' ? 'en' : 'zh-CN'}">
+<head><meta charset="utf-8"><title>${escape(t.eyebrow)}</title></head>
 <body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(26,46,26,0.08);">
     <!-- 深绿抬头的 Outlook 处理同新成员通知，见上面那段注释 -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       <tr><td bgcolor="#2d4a2d" style="padding:28px 32px;background-color:#2d4a2d;background-image:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#ffffff;">
-        <div style="font-size:13px;color:#d7e5d2;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · 可能值得认识</div>
-        <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">🌱 ${escape(node.name)} 来到了森林</h1>
-        <div style="margin-top:6px;font-size:14px;color:#e3eede;">${escape(peerName)}，这是我们觉得你可能会想认识的人</div>
+        <div style="font-size:13px;color:#d7e5d2;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">${escape(t.eyebrow)}</div>
+        <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">${escape(t.heading(node.name))}</h1>
+        <div style="margin-top:6px;font-size:14px;color:#e3eede;">${escape(t.lead(peerName))}</div>
       </td></tr>
     </table>
     <table style="width:100%;border-collapse:collapse;">
-      ${buildWhyBlock(why, node.name)}
+      ${buildWhyBlock(why, node.name, locale)}
     </table>
-    <div style="padding:22px 32px 6px;font-size:12px;letter-spacing:1px;color:#8a8a8a;">TA 的节点卡</div>
+    <div style="padding:22px 32px 6px;font-size:12px;letter-spacing:1px;color:#8a8a8a;">${escape(t.cardTitle)}</div>
     <table style="width:100%;border-collapse:collapse;">
-      ${buildCardRows(node)}
+      ${buildPeerCardRows(node, locale)}
     </table>
     <div style="padding:24px 32px 8px;text-align:center;">
-      <a href="${profileUrl}" style="display:inline-block;padding:11px 24px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">去看看 ${escape(node.name)} 的主页 →</a>
+      <a href="${profileUrl}" style="display:inline-block;padding:11px 24px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">${escape(t.cta(node.name))} →</a>
     </div>
     <div style="padding:14px 32px 24px;background:#faf8f2;font-size:12px;color:#8a8a8a;text-align:center;line-height:1.8;">
-      联系方式在 TA 的主页上，登录后可见——我们不在邮件里直接给出别人的微信。<br>
-      你收到这封信，是因为你和 TA 被判断为可能同频。
+      ${escape(t.contactNote)}<br>
+      ${escape(t.whyYou)}${unsubLink}
     </div>
   </div>
 </body>
@@ -364,30 +419,37 @@ function buildPeerText(
   peerName: string,
   why: PeerMatchReason | undefined,
   profileUrl: string,
+  unsubscribeUrl: string,
+  locale: Locale,
 ): string {
+  const t = dict(locale).email.peerIntro;
+  const f = t.fields;
+  const sep = locale === 'en' ? ', ' : '、';
   const reasons = (why?.reasons || []).filter(r => r && r.trim()).slice(0, 3);
+  const typeLabel = matchTypeLabel(why?.matchType, locale);
   const lines = [
-    `附近森林 · 可能值得认识的人`,
+    t.textTitle,
     `─────────────────────`,
-    `${peerName}，${node.name} 来到了森林，我们觉得你可能会想认识 TA。`,
+    t.textLead(peerName, node.name),
     ``,
-    why?.matchType ? `匹配类型：${why.matchType}` : '',
-    why?.aiSummary ? `为什么推荐：${why.aiSummary}` : '',
-    why?.aiCoCreate ? `可能一起做的事：${why.aiCoCreate}` : '',
+    typeLabel ? t.textMatchType(typeLabel) : '',
+    why?.aiSummary ? t.textWhy(why.aiSummary) : '',
+    why?.aiCoCreate ? t.textCoCreate(why.aiCoCreate) : '',
     reasons.length ? reasons.map(r => `· ${r}`).join('\n') : '',
     ``,
-    `── TA 的节点卡 ──`,
-    `名字：${node.name || ''}`,
-    node.city ? `城市：${node.city}` : '',
-    node.doing ? `在做：${node.doing}` : '',
-    node.topics?.length ? `关注议题：${node.topics.join('、')}` : '',
-    node.experience ? `经验与独特性：${node.experience}` : '',
-    node.offer ? `可以提供：${node.offer}` : '',
-    node.seeking ? `寻找的连接：${node.seeking}` : '',
-    node.product ? `产品/项目：${node.product}` : '',
+    t.textCardTitle,
+    `${f.name}: ${node.name || ''}`,
+    node.city ? `${f.city}: ${node.city}` : '',
+    node.doing ? `${f.doing}: ${node.doing}` : '',
+    node.topics?.length ? `${f.topics}: ${node.topics.join(sep)}` : '',
+    node.experience ? `${f.experience}: ${node.experience}` : '',
+    node.offer ? `${f.offer}: ${node.offer}` : '',
+    node.seeking ? `${f.seeking}: ${node.seeking}` : '',
+    node.product ? `${f.product}: ${node.product}` : '',
     ``,
-    `去看看 TA 的主页：${profileUrl}`,
-    `联系方式在主页上，登录后可见——我们不在邮件里直接给出别人的微信。`,
+    t.textCta(profileUrl),
+    t.contactNote,
+    unsubscribeUrl ? t.textUnsubscribe(unsubscribeUrl) : '',
   ];
   return lines.filter(Boolean).join('\n');
 }
@@ -395,12 +457,14 @@ function buildPeerText(
 /**
  * 把新成员介绍给一位可能同频的伙伴。
  *
- * 一次只发一个人：收件人的名字要出现在信里，而且幂等键得按「新人 × 收件人」
- * 分开——合并成一次群发就没法分辨谁收到过。
+ * 一次只发一个人：收件人的名字要出现在信里，幂等键也得按「新人 × 收件人」
+ * 分开——合并成一次群发就没法分辨谁收到过、谁退订了。
+ *
+ * 语言随**收件人**走（peer.locale），不随触发这封信的注册者走。
  */
 export async function notifyPeerNewNode(
   newNode: NodeCard,
-  peer: Pick<NodeCard, 'id' | 'name' | 'email'>,
+  peer: Pick<NodeCard, 'id' | 'name' | 'email' | 'locale'>,
   why?: PeerMatchReason,
 ): Promise<EmailSendResult> {
   const to = (peer.email || '').trim();
@@ -409,21 +473,39 @@ export async function notifyPeerNewNode(
   if (peer.id === newNode.id) return { ok: false, reason: 'skipped' };
 
   const from = process.env.NOTIFY_FROM?.trim() || '';
+  const locale: Locale = peer.locale === 'en' ? 'en' : 'zh';
   const publicNode = toPublicNode(newNode);
-  const profileUrl = `${getSiteOrigin()}/creators/${newNode.id}`;
-  const peerName = (peer.name || '').trim() || '你好';
+  const origin = getSiteOrigin();
+  const profileUrl = `${origin}/creators/${newNode.id}`;
+  const unsubscribeUrl = buildUnsubscribeUrl(peer.id);
+  const peerName = (peer.name || '').trim() || (locale === 'en' ? 'Hi' : '你好');
 
-  return sendCriticalEmail(
-    'new-node-peer',
-    {
-      from,
-      to: [to],
-      subject: `🌱 ${newNode.name || '一位新成员'} 来到了森林，可能和你同频`,
-      html: buildPeerHtml(publicNode, peerName, why, profileUrl),
-      text: buildPeerText(publicNode, peerName, why, profileUrl),
-    },
-    `new-node-peer/${newNode.id}/${peer.id}`,
-  );
+  /**
+   * 理由是按注册者的语言算的。和收件人对不上时先转换一次——
+   * 失败就用原文，宁可夹一段外语，也不要把「为什么推荐」整块丢掉，
+   * 那是这封信存在的理由。
+   */
+  const localized =
+    why && why.reasonLocale && why.reasonLocale !== locale
+      ? await translateMatchReason(why, locale)
+      : why;
+
+  const message: ResendMessage = {
+    from,
+    to: [to],
+    subject: dict(locale).email.peerIntro.subject(newNode.name || ''),
+    html: buildPeerHtml(publicNode, peerName, localized, profileUrl, unsubscribeUrl, locale),
+    text: buildPeerText(publicNode, peerName, localized, profileUrl, unsubscribeUrl, locale),
+  };
+  if (unsubscribeUrl) {
+    // RFC 8058：一键退订必须走 POST，避免邮件客户端预取链接时误退订
+    message.headers = {
+      'List-Unsubscribe': `<${unsubscribeUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    };
+  }
+
+  return sendCriticalEmail('new-node-peer', message, `new-node-peer/${newNode.id}/${peer.id}`);
 }
 
 /**

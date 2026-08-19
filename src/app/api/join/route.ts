@@ -297,6 +297,24 @@ export async function POST(request: NextRequest) {
       ]);
       matches = aiMatches;
 
+      /**
+       * 记下这个人注册时看到的语言，供日后发给 TA 的信使用。
+       *
+       * 单独一次 update 而不是并进 insert：这一列可能还没建（迁移是手动跑的），
+       * 混进 insert 会让整个注册失败。写回失败只是这个人日后可能收到中文信，
+       * 比注册不成功轻得多——所以这里只记日志，不往上抛。
+       */
+      if (newNode.id) {
+        const joinLocale = await getLocale();
+        const { error: localeErr } = await supabase
+          .from('node_cards')
+          .update({ locale: joinLocale })
+          .eq('id', newNode.id);
+        if (localeErr && !/locale/i.test(localeErr.message)) {
+          console.error('[api/join] locale save failed', localeErr.message);
+        }
+      }
+
       // 关键词写回
       if (aiKeywords.length > 0 && newNode.id) {
         const { error: updateErr } = await supabase
@@ -327,18 +345,24 @@ export async function POST(request: NextRequest) {
        * 把新成员也介绍给被匹配到的那几位——原来只有主理人知道有新人来，
        * 被推荐的 B、C 自己毫不知情，连接就断在这里。
        *
-       * 三道闸，缺一不可：
+       * 四道闸，缺一不可：
        *   一、新人自己得在森林里。轻登记落在 draft，那是「还没准备好露面」，
        *       把这种卡广播出去等于替人做了公开的决定。
        *   二、收件人也得在森林里。撮合池取的是全表（没过 isListed），
        *       里面可能有 hidden 甚至 archived 的人——离开的人不该继续收社区信。
-       *   三、一个人只收一次。幂等键按「新人 × 收件人」，重试不会重复打扰。
+       *   三、收件人没退订过。notify_matches 缺失（迁移前的老行）当成 true，
+       *       判成 false 会让所有存量成员静默失联，那种 bug 没人会发现。
+       *   四、一个人只收一次。幂等键按「新人 × 收件人」，重试不会重复打扰。
        *
        * 发信不阻塞注册响应；单封失败只记日志，不影响其余几封。
        */
       if (isListed(newNode) && matches.length > 0) {
-        const peers = matches.filter(m => isListed(m) && (m.email || '').trim());
+        const peers = matches.filter(
+          m => isListed(m) && (m.email || '').trim() && m.notify_matches !== false,
+        );
         if (peers.length > 0) {
+          // 理由是按注册者的语言算的，收件人语言不同时 notify 会先转换一次
+          const reasonLocale = await getLocale();
           after(async () => {
             for (const peer of peers) {
               const result = await notifyPeerNewNode(newNode, peer, {
@@ -346,6 +370,7 @@ export async function POST(request: NextRequest) {
                 aiSummary: peer.aiSummary,
                 aiCoCreate: peer.aiCoCreate,
                 reasons: peer.reasons,
+                reasonLocale,
               });
               if (!result.ok) {
                 console.error('[api/join] peer intro not accepted', {

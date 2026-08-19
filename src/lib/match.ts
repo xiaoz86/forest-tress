@@ -318,3 +318,68 @@ ${candidateLines}
       matchType: x.matchType,
     }));
 }
+
+/**
+ * 把撮合理由转成另一种语言。
+ *
+ * 为什么需要：撮合是在**注册者**的语言下算的，而「有新成员和你同频」那封信
+ * 发给的是**别人**。中文用户注册、英文用户收信时，照原样塞进去就是一封英文信
+ * 里夹着整段中文。
+ *
+ * 只转这三段短文本，不重算撮合——重算要把整个候选池再喂一遍模型，为一封通知
+ * 邮件不值得，而且会让同一对人在两边看到不同的理由。
+ *
+ * 失败一律返回原文：宁可夹一段外语，也不能把「为什么推荐」整块丢掉，
+ * 那是这封信存在的理由。超时定在 6 秒——它跑在 after() 里，不占用户等待，
+ * 但也不能让一个卡住的请求把整个函数生命周期拖到超时。
+ */
+export async function translateMatchReason<
+  T extends { aiSummary?: string; aiCoCreate?: string; reasons?: string[] },
+>(why: T, target: Locale): Promise<T> {
+  if (!getLLMConfig()) return why;
+
+  const payload = {
+    summary: why.aiSummary || '',
+    coCreate: why.aiCoCreate || '',
+    reasons: (why.reasons || []).filter(r => r && r.trim()).slice(0, 3),
+  };
+  if (!payload.summary && !payload.coCreate && payload.reasons.length === 0) return why;
+
+  const targetName = target === 'en' ? '英文' : '简体中文';
+  try {
+    const raw = await createChatCompletion({
+      messages: [
+        {
+          role: 'system',
+          content:
+            `把下面 JSON 里的文本翻成${targetName}，保持原意和语气，不要增删信息、不要加解释。` +
+            `人名、机构名、专有名词保持原样。原样返回同结构 JSON：` +
+            `{"summary":"…","coCreate":"…","reasons":["…"]}`,
+        },
+        { role: 'user', content: JSON.stringify(payload) },
+      ],
+      temperature: 0.2,
+      responseFormat: { type: 'json_object' },
+      timeoutMs: 6_000,
+    });
+    if (!raw) return why;
+
+    const parsed = JSON.parse(raw) as {
+      summary?: unknown;
+      coCreate?: unknown;
+      reasons?: unknown;
+    };
+    return {
+      ...why,
+      aiSummary: typeof parsed.summary === 'string' && parsed.summary ? parsed.summary : why.aiSummary,
+      aiCoCreate:
+        typeof parsed.coCreate === 'string' && parsed.coCreate ? parsed.coCreate : why.aiCoCreate,
+      reasons: Array.isArray(parsed.reasons)
+        ? parsed.reasons.filter((r): r is string => typeof r === 'string' && !!r.trim())
+        : why.reasons,
+    };
+  } catch {
+    // 翻译是锦上添花，任何失败都不该让这封信发不出去
+    return why;
+  }
+}

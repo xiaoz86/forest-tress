@@ -467,3 +467,17 @@ alter table login_codes enable row level security;
 -- 邮箱是否验证过。验证码登录或注册成功即盖章——它本身就证明了这个人
 -- 能收到这个邮箱，也是后续判断邮箱归属的唯一凭据。
 alter table node_cards add column if not exists email_verified_at timestamptz;
+
+-- ============================================================
+-- 2026-08-16 撮合通知：收件人的语言，和「别再发给我」的开关
+-- ============================================================
+
+-- 这个人上次在站上看到的是哪种语言。发给本人的信按它走，而不是按发信
+-- 那一刻触发者的语言——A 注册触发了给 B 的介绍信，语言该随 B，不随 A。
+-- 空字符串 = 不知道（迁移前建的老行），按中文处理，和 getLocale 的默认一致。
+alter table node_cards add column if not exists locale text default '';
+
+-- 还想不想收「有新成员可能和你同频」这类撮合通知。
+-- 默认 true：这是社区连接的主路径，不是营销。想清静的人自己关。
+-- 只管撮合通知——验证码、欢迎信这些事务性邮件不受它影响，那些是本人主动触发的。
+alter table node_cards add column if not exists notify_matches boolean not null default true;

@@ -1,11 +1,16 @@
 // 不要加 as const：那会把每个值锁成字面量类型，英文字典就一个字都赋不进去。
 //
-// 只收**发给用户本人**的两封信：注册后的欢迎信、重新申请的登录链接。
+// 只收**发给用户本人**的信：注册后的欢迎信、登录/注册验证码、
+// 以及「有新成员可能和你同频」那封撮合介绍信。
 // 其余几封（新成员通知、投稿待审、phil-coach 反馈、付款截图）都是发给主理人的，
 // 收件人只有中文使用者，一律留在 notify.ts 里写死中文，不进这里。
 //
 // 语言按发信那一刻的 locale 走（cookie 优先，其次来源国家）——
 // 也就是这个人当时在站上看到的语言，收到的信就是哪种语言。
+//
+// 撮合介绍信是个例外，它的语言不能这么定：那封信由**别人注册**触发，
+// 发信那一刻的 locale 是注册者的，不是收件人的。所以它读收件人自己存下来的
+// node_cards.locale——信随收件人走，不随触发者走。
 export const email = {
   welcome: {
     subject: '🌱 欢迎加入附近森林',
@@ -65,5 +70,48 @@ export const email = {
     /** 两个场景共用 */
     textCode: (code: string) => `验证码：${code}`,
     textExpiry: '10 分钟内有效，只能用一次。',
+  },
+
+  /**
+   * 「有新成员可能和你同频」。由别人注册触发，收件人没主动要过这封信——
+   * 所以它必须先说清楚为什么来，再给名片，末尾还要给一条随时能关掉的路。
+   */
+  peerIntro: {
+    subject: (name: string) => `🌱 ${name} 来到了森林，可能和你同频`,
+    eyebrow: '附近森林 · 可能值得认识',
+    heading: (name: string) => `🌱 ${name} 来到了森林`,
+    /** 抬头下面那行，带上收件人自己的名字 */
+    lead: (peerName: string) => `${peerName}，这是我们觉得你可能会想认识的人`,
+    whyTitle: (name: string) => `为什么把 ${name} 介绍给你`,
+    coCreateLabel: '可能一起做的事：',
+    cardTitle: 'TA 的节点卡',
+    cta: (name: string) => `去看看 ${name} 的主页`,
+    /** 为什么不在邮件里直接给微信——口径要和 /creators/[id] 一致 */
+    contactNote: '联系方式在 TA 的主页上，登录后可见——我们不在邮件里直接给出别人的微信。',
+    whyYou: '你收到这封信，是因为你和 TA 被判断为可能同频。',
+    unsubscribe: '不想再收到这类推荐',
+
+    // 卡片字段标签
+    fields: {
+      name: '名字',
+      city: '城市',
+      doing: '在做',
+      topics: '关注议题',
+      experience: '经验与独特性',
+      offer: '可以提供',
+      seeking: '寻找的连接',
+      product: '产品/项目',
+    },
+
+    // 纯文本版
+    textTitle: '附近森林 · 可能值得认识的人',
+    textLead: (peerName: string, name: string) =>
+      `${peerName}，${name} 来到了森林，我们觉得你可能会想认识 TA。`,
+    textMatchType: (v: string) => `匹配类型：${v}`,
+    textWhy: (v: string) => `为什么推荐：${v}`,
+    textCoCreate: (v: string) => `可能一起做的事：${v}`,
+    textCardTitle: '── TA 的节点卡 ──',
+    textCta: (url: string) => `去看看 TA 的主页：${url}`,
+    textUnsubscribe: (url: string) => `不想再收到这类推荐：${url}`,
   },
 };
