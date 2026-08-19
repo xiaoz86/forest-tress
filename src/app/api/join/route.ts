@@ -6,7 +6,8 @@ import { consumeCode, issueCode } from '@/lib/loginCodeStore';
 import { notifyLoginCode } from '@/lib/notify';
 import { matchNodesAI, type MatchedNode } from '@/lib/match';
 import { generateKeywordsAI } from '@/lib/keywords';
-import { notifyNewNode, notifyWelcome, getSiteOrigin } from '@/lib/notify';
+import { notifyNewNode, notifyPeerNewNode, notifyWelcome, getSiteOrigin } from '@/lib/notify';
+import { isListed } from '@/lib/nodeVisibility';
 import { getLocale } from '@/lib/locale';
 import {
   signLoginToken,
@@ -319,6 +320,42 @@ export async function POST(request: NextRequest) {
           .eq('id', newNode.id);
         if (recErr && !/ai_recommendations/i.test(recErr.message)) {
           console.error('[api/join] recommendations save failed', recErr.message);
+        }
+      }
+
+      /**
+       * 把新成员也介绍给被匹配到的那几位——原来只有主理人知道有新人来，
+       * 被推荐的 B、C 自己毫不知情，连接就断在这里。
+       *
+       * 三道闸，缺一不可：
+       *   一、新人自己得在森林里。轻登记落在 draft，那是「还没准备好露面」，
+       *       把这种卡广播出去等于替人做了公开的决定。
+       *   二、收件人也得在森林里。撮合池取的是全表（没过 isListed），
+       *       里面可能有 hidden 甚至 archived 的人——离开的人不该继续收社区信。
+       *   三、一个人只收一次。幂等键按「新人 × 收件人」，重试不会重复打扰。
+       *
+       * 发信不阻塞注册响应；单封失败只记日志，不影响其余几封。
+       */
+      if (isListed(newNode) && matches.length > 0) {
+        const peers = matches.filter(m => isListed(m) && (m.email || '').trim());
+        if (peers.length > 0) {
+          after(async () => {
+            for (const peer of peers) {
+              const result = await notifyPeerNewNode(newNode, peer, {
+                matchType: peer.matchType,
+                aiSummary: peer.aiSummary,
+                aiCoCreate: peer.aiCoCreate,
+                reasons: peer.reasons,
+              });
+              if (!result.ok) {
+                console.error('[api/join] peer intro not accepted', {
+                  peerId: peer.id,
+                  reason: result.reason,
+                  status: result.status,
+                });
+              }
+            }
+          });
         }
       }
     }

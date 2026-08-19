@@ -1,4 +1,5 @@
 import type { NodeCard } from './supabase';
+import { toPublicNode, type PublicNode } from '@/lib/publicNode';
 import { EMAIL_FONT } from '@/lib/emailTheme';
 import { dict } from '@/i18n';
 import type { Locale } from '@/lib/locale';
@@ -31,7 +32,13 @@ export type EmailSendResult =
       status?: number;
     };
 
-type CriticalEmailKind = 'new-node' | 'welcome' | 'login-link' | 'login-code' | 'program-claim';
+type CriticalEmailKind =
+  | 'new-node'
+  | 'new-node-peer'
+  | 'welcome'
+  | 'login-link'
+  | 'login-code'
+  | 'program-claim';
 
 type ResendMessage = {
   from: string;
@@ -177,8 +184,28 @@ function row(label: string, value: string | null | undefined): string {
     </tr>`;
 }
 
-function buildHtml(node: NodeCard): string {
+/**
+ * 卡片正文那几行——**不含任何联系方式**。
+ *
+ * 参数类型故意收成 PublicNode：这段 HTML 会同时用在发给主理人的信
+ * 和发给同频伙伴的信里，后者绝不能带上微信和邮箱。把「不能带」变成
+ * 类型上不可达，比靠记性在两个模板里各删一遍可靠。
+ * 主理人版要联系方式，自己在外面另加两行。
+ */
+function buildCardRows(node: PublicNode): string {
   const topics = (node.topics || []).join('、');
+  return `
+      ${row('名字', node.name)}
+      ${row('城市', node.city)}
+      ${row('在做', node.doing)}
+      ${topics ? row('关注议题', topics) : ''}
+      ${row('经验与独特性', node.experience)}
+      ${row('可以提供', node.offer)}
+      ${row('寻找的连接', node.seeking)}
+      ${row('产品/项目', node.product)}`;
+}
+
+function buildHtml(node: NodeCard): string {
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><title>新成员加入 · 附近森林</title></head>
@@ -199,14 +226,7 @@ function buildHtml(node: NodeCard): string {
       </td></tr>
     </table>
     <table style="width:100%;border-collapse:collapse;">
-      ${row('名字', node.name)}
-      ${row('城市', node.city)}
-      ${row('在做', node.doing)}
-      ${topics ? row('关注议题', topics) : ''}
-      ${row('经验与独特性', node.experience)}
-      ${row('可以提供', node.offer)}
-      ${row('寻找的连接', node.seeking)}
-      ${row('产品/项目', node.product)}
+      ${buildCardRows(toPublicNode(node))}
       ${row('微信号', node.wechat)}
       ${row('邮箱', node.email)}
     </table>
@@ -237,6 +257,173 @@ function buildText(node: NodeCard): string {
     `请尽快联系 TA，欢迎加入社区群。`,
   ];
   return lines.filter(Boolean).join('\n');
+}
+
+/** 撮合理由。字段名对齐 lib/match.ts 的 MatchedNode，调用方直接把匹配结果传进来即可。 */
+export type PeerMatchReason = {
+  /** 「同频」「互补」「同城」——数据里的固定取值 */
+  matchType?: string;
+  /** 为何匹配，一句话 */
+  aiSummary?: string;
+  /** 可能共创什么，一句话 */
+  aiCoCreate?: string;
+  /** 规则或 AI 给的短理由，≤3 条 */
+  reasons?: string[];
+};
+
+/**
+ * 「为什么把这个人推给你」那一块。
+ *
+ * 没有它，这封信对收件人来说就只是一张陌生人的名片，看完不知道为何而来。
+ * 所以它排在卡片**前面**：先给理由，再给人。
+ * 撮合信息缺失时整块不渲染——宁可不解释，也不要挂一句空洞的「你们很匹配」。
+ */
+function buildWhyBlock(why: PeerMatchReason | undefined, name: string): string {
+  if (!why) return '';
+  const reasons = (why.reasons || []).filter(r => r && r.trim()).slice(0, 3);
+  if (!why.aiSummary && !why.aiCoCreate && reasons.length === 0) return '';
+
+  const chip = why.matchType
+    ? `<span style="display:inline-block;padding:3px 10px;background:#e8ecd8;color:#4a7c4a;border-radius:999px;font-size:12px;font-weight:600;margin-bottom:10px;">${escape(why.matchType)}</span><br>`
+    : '';
+  const summary = why.aiSummary
+    ? `<p style="margin:0 0 10px;font-size:15px;line-height:1.8;color:#2a2a2a;">${escape(why.aiSummary)}</p>`
+    : '';
+  const coCreate = why.aiCoCreate
+    ? `<p style="margin:0 0 10px;font-size:14px;line-height:1.8;color:#5a5a5a;"><strong style="color:#2d4a2d;">可能一起做的事：</strong>${escape(why.aiCoCreate)}</p>`
+    : '';
+  const list = reasons.length
+    ? `<div style="font-size:13px;line-height:1.9;color:#6b8f5e;">${reasons
+        .map(r => `· ${escape(r)}`)
+        .join('<br>')}</div>`
+    : '';
+
+  return `
+    <tr><td style="padding:24px 32px 0;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr><td bgcolor="#faf8f2" style="background-color:#faf8f2;border:1px solid #e8ecd8;border-radius:12px;padding:18px 20px;">
+          ${chip}
+          <div style="font-size:12px;letter-spacing:1px;color:#8a8a8a;margin-bottom:8px;">为什么把 ${escape(name)} 介绍给你</div>
+          ${summary}
+          ${coCreate}
+          ${list}
+        </td></tr>
+      </table>
+    </td></tr>`;
+}
+
+/**
+ * 发给同频伙伴的「有新成员和你可能对得上」。
+ *
+ * 和主理人那封是两封信，不是同一封换收件人：
+ *   一、**没有联系方式**。参数收 PublicNode，微信和邮箱在类型上就取不到。
+ *       想认识对方要去 TA 的主页，那里对已登录成员才显示联系方式——
+ *       和 /creators/[id] 现有的口径一致，不在邮件里开一道后门。
+ *   二、先讲理由再给名片。收件人没主动要这封信，得先知道它为何而来。
+ */
+function buildPeerHtml(
+  node: PublicNode,
+  peerName: string,
+  why: PeerMatchReason | undefined,
+  profileUrl: string,
+): string {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>森林里来了一位可能和你同频的人</title></head>
+<body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(26,46,26,0.08);">
+    <!-- 深绿抬头的 Outlook 处理同新成员通知，见上面那段注释 -->
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr><td bgcolor="#2d4a2d" style="padding:28px 32px;background-color:#2d4a2d;background-image:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#ffffff;">
+        <div style="font-size:13px;color:#d7e5d2;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · 可能值得认识</div>
+        <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">🌱 ${escape(node.name)} 来到了森林</h1>
+        <div style="margin-top:6px;font-size:14px;color:#e3eede;">${escape(peerName)}，这是我们觉得你可能会想认识的人</div>
+      </td></tr>
+    </table>
+    <table style="width:100%;border-collapse:collapse;">
+      ${buildWhyBlock(why, node.name)}
+    </table>
+    <div style="padding:22px 32px 6px;font-size:12px;letter-spacing:1px;color:#8a8a8a;">TA 的节点卡</div>
+    <table style="width:100%;border-collapse:collapse;">
+      ${buildCardRows(node)}
+    </table>
+    <div style="padding:24px 32px 8px;text-align:center;">
+      <a href="${profileUrl}" style="display:inline-block;padding:11px 24px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">去看看 ${escape(node.name)} 的主页 →</a>
+    </div>
+    <div style="padding:14px 32px 24px;background:#faf8f2;font-size:12px;color:#8a8a8a;text-align:center;line-height:1.8;">
+      联系方式在 TA 的主页上，登录后可见——我们不在邮件里直接给出别人的微信。<br>
+      你收到这封信，是因为你和 TA 被判断为可能同频。
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function buildPeerText(
+  node: PublicNode,
+  peerName: string,
+  why: PeerMatchReason | undefined,
+  profileUrl: string,
+): string {
+  const reasons = (why?.reasons || []).filter(r => r && r.trim()).slice(0, 3);
+  const lines = [
+    `附近森林 · 可能值得认识的人`,
+    `─────────────────────`,
+    `${peerName}，${node.name} 来到了森林，我们觉得你可能会想认识 TA。`,
+    ``,
+    why?.matchType ? `匹配类型：${why.matchType}` : '',
+    why?.aiSummary ? `为什么推荐：${why.aiSummary}` : '',
+    why?.aiCoCreate ? `可能一起做的事：${why.aiCoCreate}` : '',
+    reasons.length ? reasons.map(r => `· ${r}`).join('\n') : '',
+    ``,
+    `── TA 的节点卡 ──`,
+    `名字：${node.name || ''}`,
+    node.city ? `城市：${node.city}` : '',
+    node.doing ? `在做：${node.doing}` : '',
+    node.topics?.length ? `关注议题：${node.topics.join('、')}` : '',
+    node.experience ? `经验与独特性：${node.experience}` : '',
+    node.offer ? `可以提供：${node.offer}` : '',
+    node.seeking ? `寻找的连接：${node.seeking}` : '',
+    node.product ? `产品/项目：${node.product}` : '',
+    ``,
+    `去看看 TA 的主页：${profileUrl}`,
+    `联系方式在主页上，登录后可见——我们不在邮件里直接给出别人的微信。`,
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+
+/**
+ * 把新成员介绍给一位可能同频的伙伴。
+ *
+ * 一次只发一个人：收件人的名字要出现在信里，而且幂等键得按「新人 × 收件人」
+ * 分开——合并成一次群发就没法分辨谁收到过。
+ */
+export async function notifyPeerNewNode(
+  newNode: NodeCard,
+  peer: Pick<NodeCard, 'id' | 'name' | 'email'>,
+  why?: PeerMatchReason,
+): Promise<EmailSendResult> {
+  const to = (peer.email || '').trim();
+  if (!to || !newNode.id || !peer.id) return { ok: false, reason: 'skipped' };
+  // 自己不介绍给自己
+  if (peer.id === newNode.id) return { ok: false, reason: 'skipped' };
+
+  const from = process.env.NOTIFY_FROM?.trim() || '';
+  const publicNode = toPublicNode(newNode);
+  const profileUrl = `${getSiteOrigin()}/creators/${newNode.id}`;
+  const peerName = (peer.name || '').trim() || '你好';
+
+  return sendCriticalEmail(
+    'new-node-peer',
+    {
+      from,
+      to: [to],
+      subject: `🌱 ${newNode.name || '一位新成员'} 来到了森林，可能和你同频`,
+      html: buildPeerHtml(publicNode, peerName, why, profileUrl),
+      text: buildPeerText(publicNode, peerName, why, profileUrl),
+    },
+    `new-node-peer/${newNode.id}/${peer.id}`,
+  );
 }
 
 /**
