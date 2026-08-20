@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { XiaoyaShell } from "@/components/xiaoya/XiaoyaShell";
 import { dict } from "@/i18n";
 import { getLocale } from "@/lib/locale";
+import { isXiaoyaEnabled } from "@/lib/xiaoya/flags";
 import "./globals.css";
 
 /**
@@ -40,7 +43,14 @@ export default async function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {isXiaoyaEnabled() && (
+          <Suspense fallback={null}>
+            <XiaoyaShell locale={locale} />
+          </Suspense>
+        )}
+      </body>
     </html>
   );
 }

@@ -1,0 +1,30 @@
+.sproutIdle,
+.sproutThinking {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.sproutIdle {
+  animation: xiaoya-breathe 5.5s ease-in-out infinite;
+}
+
+.sproutThinking {
+  animation: xiaoya-think 1.8s ease-in-out infinite;
+}
+
+@keyframes xiaoya-breathe {
+  0%, 100% { transform: rotate(-1deg) scale(1); }
+  50% { transform: rotate(1deg) scale(1.025); }
+}
+
+@keyframes xiaoya-think {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(3deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sproutIdle,
+  .sproutThinking {
+    animation: none;
+  }
+}
