@@ -2,7 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { MeditationCategory, MeditationContent, MeditationTrack, TrackMood } from '@/lib/meditations';
+import type {
+  MeditationCategory,
+  MeditationContent,
+  MeditationKind,
+  MeditationTrack,
+  TrackMood,
+} from '@/lib/meditations';
 
 type Props = {
   initialContent: MeditationContent;
@@ -16,6 +22,17 @@ const MOOD_OPTIONS: { value: TrackMood; label: string }[] = [
   { value: 'healing', label: '疗愈 / 自由' },
   { value: 'body', label: '身体 / 觉知' },
   { value: 'kindness', label: '慈心 / 祝福' },
+];
+
+/**
+ * 专题的形态，决定前台用哪套版式。
+ * 括号里是代码里的名字，前台不会显示——人看到的始终是专题自己的名字。
+ */
+const KIND_OPTIONS: { value: MeditationKind; label: string }[] = [
+  { value: 'guided', label: '引导冥想（按主题挑一段）' },
+  { value: 'program', label: '陪伴营（有阶段、要解锁）' },
+  { value: 'ambient', label: '纯声音（没有引导，可循环）' },
+  { value: 'film', label: '影像（有画面，一支一支放）' },
 ];
 
 function makeId(prefix: string): string {
@@ -261,6 +278,25 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
                     ))}
                   </select>
                 </Field>
+                <Field label="形态">
+                  <select
+                    value={category.kind || 'guided'}
+                    onChange={e => updateCategory(category.id, { kind: e.target.value as MeditationKind })}
+                    className={inputCls}
+                  >
+                    {KIND_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="专题封面（图片地址）">
+                  <input
+                    value={category.coverUrl || ''}
+                    onChange={e => updateCategory(category.id, { coverUrl: e.target.value })}
+                    placeholder="https://…"
+                    className={inputCls}
+                  />
+                </Field>
                 <Field label="专题说明">
                   <textarea
                     value={category.description || ''}
@@ -316,7 +352,12 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
         </div>
 
         <div className="space-y-5">
-          {content.tracks.map(track => (
+          {content.tracks.map(track => {
+          // 影片地址、节气序号这些只有影像专题用得上。挂在所有条目上，
+          // 引导冥想那边会多出两个永远填不了的框。
+          const isFilm =
+            (content.categories.find(c => c.id === track.categoryId)?.kind || 'guided') === 'film';
+          return (
             <article key={track.id} className="rounded-lg border border-white/10 bg-black/12 p-5">
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
@@ -375,6 +416,42 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
                     <div className="mt-2 text-xs text-white/40">上传中...</div>
                   )}
                 </Field>
+                {isFilm && (
+                  <>
+                    <Field label="节气序号（立春 1 … 处暑 14 … 大寒 24）">
+                      <input
+                        type="number"
+                        min={1}
+                        max={24}
+                        value={track.seq ?? ''}
+                        onChange={e => updateTrack(track.id, {
+                          seq: e.target.value ? Number(e.target.value) : undefined,
+                        })}
+                        className={inputCls}
+                      />
+                    </Field>
+                    <Field label="影片封面（图片地址）">
+                      <input
+                        value={track.posterUrl || ''}
+                        onChange={e => updateTrack(track.id, { posterUrl: e.target.value })}
+                        placeholder="https://…"
+                        className={inputCls}
+                      />
+                    </Field>
+                    <Field label="影片地址" className="col-span-2 max-md:col-span-1">
+                      <input
+                        value={track.videoUrl || ''}
+                        onChange={e => updateTrack(track.id, { videoUrl: e.target.value })}
+                        placeholder="https://…"
+                        className={inputCls}
+                      />
+                      {/* 几十兆的文件走不了这个页面，得从命令行传 */}
+                      <div className="mt-2 text-xs text-white/40">
+                        影片文件用 scripts/upload-film.mjs 传，传完这里会自动填好。手动粘地址也可以。
+                      </div>
+                    </Field>
+                  </>
+                )}
                 <Field label="说明" className="col-span-2 max-md:col-span-1">
                   <textarea
                     value={track.intention}
@@ -393,8 +470,21 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
                   className="mt-4 w-full"
                 />
               )}
+
+              {isFilm && track.videoUrl && (
+                <video
+                  controls
+                  playsInline
+                  preload="none"
+                  poster={track.posterUrl}
+                  controlsList="nodownload"
+                  src={track.videoUrl}
+                  className="mt-4 aspect-video w-full rounded-lg bg-black"
+                />
+              )}
             </article>
-          ))}
+          );
+          })}
         </div>
       </section>
 

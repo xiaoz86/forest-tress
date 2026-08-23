@@ -23,6 +23,7 @@ function kindGroups(t: Dictionary['meditations']) {
     { kind: 'guided' as MeditationKind, ...t.grove.guided },
     { kind: 'program' as MeditationKind, ...t.grove.program },
     { kind: 'ambient' as MeditationKind, ...t.grove.ambient },
+    { kind: 'film' as MeditationKind, ...t.grove.film },
   ];
 }
 
@@ -74,6 +75,8 @@ const MOOD_INK: Record<TrackMood, { text: string; rule: string; wash: string }> 
 const GLYPH: Record<string, string> = {
   'walk-in': '入', 'mindful-life': '常', 'emotion': '绪',
   'self-care': '柔', 'inner-freedom': '松', 'sleep': '眠', 'ambient': '声',
+  // 物候——二十四节气看的就是草木鸟兽随时序变化的那些迹象
+  'solar-terms': '候',
 };
 
 export default function MeditationGrove({ content, counts, t }: Props) {
@@ -111,25 +114,37 @@ export default function MeditationGrove({ content, counts, t }: Props) {
 
               {/*
                 只有一条的时候用宽卡。三列格子里孤零零摆一张、右边空掉三分之二，
-                看着像出了错——纯声音现在就是这个情况。
+                看着像出了错——纯声音、睡眠系列就是这个情况：它们本来就是
+                「一整件东西」，占满一行是对的。
+
+                「看见」是例外，永远走网格。它是一个会长出很多专题的模块
+                （人物、自然、练习、创作、节气、社区纪录），拿宽卡去撑，
+                等于把此刻唯一的那个专题说成整个模块本身；右边再压一张
+                影片封面，就更像「这里有个视频」而不是「这里有一扇窗」。
+                空着的两格是诚实的：那是还没长出来的位置。
               */}
-              <div
-                className={
-                  items.length === 1
-                    ? 'grid grid-cols-1 gap-5'
-                    : 'grid grid-cols-3 gap-5 max-lg:grid-cols-2 max-md:grid-cols-1'
-                }
-              >
-                {items.map(category => (
-                  <PathCard
-                    key={category.id}
-                    category={category}
-                    count={counts[category.id] || 0}
-                    wide={items.length === 1}
-                    t={t}
-                  />
-                ))}
-              </div>
+              {(() => {
+                const wide = group.kind !== 'film' && items.length === 1;
+                return (
+                  <div
+                    className={
+                      wide
+                        ? 'grid grid-cols-1 gap-5'
+                        : 'grid grid-cols-3 gap-5 max-lg:grid-cols-2 max-md:grid-cols-1'
+                    }
+                  >
+                    {items.map(category => (
+                      <PathCard
+                        key={category.id}
+                        category={category}
+                        count={counts[category.id] || 0}
+                        wide={wide}
+                        t={t}
+                      />
+                    ))}
+                  </div>
+                );
+              })()}
             </section>
           );
         })}
@@ -187,6 +202,8 @@ function PathCard({
 }) {
   const ink = MOOD_INK[category.mood || 'forest'];
   const glyph = GLYPH[category.id] || '声';
+  // 影像论「支」不论「段」。用一句话顶着两种量词会两边都别扭。
+  const isFilm = (category.kind || 'guided') === 'film';
 
   return (
     <Link
@@ -247,7 +264,9 @@ function PathCard({
 
           <div className="mt-7 flex items-center gap-3">
             <span className="rounded-full border border-forest/15 bg-white/70 px-3.5 py-1.5 text-[12px] font-medium text-forest">
-              {count > 0 ? t.soundCount(count) : t.soundsComing}
+              {count > 0
+                ? (isFilm ? t.filmCount(count) : t.soundCount(count))
+                : (isFilm ? t.filmsComing : t.soundsComing)}
             </span>
             <span
               aria-hidden="true"

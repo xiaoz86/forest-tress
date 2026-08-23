@@ -14,6 +14,9 @@ export const meditations = {
   soundCount: (count: number) => `${count} 段声音`,
   /** 一段都还没有时，胶囊里换成这句 */
   soundsComing: '声音开放中',
+  /** 影像专题下面有几支。量词不一样，不能拿 soundCount 顶着用。 */
+  filmCount: (count: number) => `${count} 支影片`,
+  filmsComing: '影像开放中',
 
   // 声音林（/meditations 不带参数时的列表页）
   grove: {
@@ -32,6 +35,13 @@ export const meditations = {
       eyebrow: 'Ambient',
       title: '声音',
       note: '没有引导。手碟、颂钵、雨声，放着就好。',
+    },
+    film: {
+      eyebrow: 'Seeing',
+      title: '看见',
+      // 这一组不是「视频区」，也不专属节气：人物、自然、练习、创作、
+      // 社区纪录都会往里放。所以这句话说的是「用影像看」，不是「有视频」。
+      note: '用影像看人和世界。人物、自然、练习、创作、节气、社区纪录。',
     },
   },
 
@@ -92,6 +102,36 @@ export const meditations = {
     looping: '循环播放中',
     once: '播完即停',
     loopToggle: '∞ 循环',
+  },
+
+  // 影像（kind === 'film'）。有画面，所以看法和听不一样：
+  // 一支一支放，配一条完整一年的节气路线。
+  film: {
+    eyebrow: 'Seeing',
+    /** 影片列表上方那个衬线小标题，对应引导冥想那屏的「具体的声音」 */
+    listTitle: '具体的影像',
+    empty: '这个专题的影像还在做。第一支放进来的时候，会安静地出现在这里。',
+    /** 选中的这支正好是此刻的节气时，标一下 */
+    thisTerm: '本期',
+    /** 播放器下面那条节气路线 */
+    termsEyebrow: 'Twenty-four terms',
+    termsTitle: '一整年的路线',
+    /** 节气条上标当下位置的那个点 */
+    now: '此刻',
+    /** 还没做的那些节气，停上去说这句 */
+    notYet: '还没到',
+    /** 影片还没传上来 */
+    coming: '影像开放中',
+    /** 只给读屏用，标题本身还是后台存的中文 */
+    watch: (title: string) => `播放${title}`,
+    videoFailed: '这支影像暂时没能打开，刷新页面再试一次',
+    // 分享。手机上先叫系统面板，叫不出来就退成复制链接
+    share: '分享',
+    shareCopied: '链接已复制',
+    /** 剪贴板也用不了时（微信里常见），把链接摆出来让人自己长按复制 */
+    shareManual: '复制不了，长按下面这行自己复制',
+    /** 节气条左边那一列 */
+    season: { spring: '春', summer: '夏', autumn: '秋', winter: '冬' },
   },
 
   // 引导冥想卡片底下的播放器

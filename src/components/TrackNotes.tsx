@@ -185,9 +185,11 @@ export default function TrackNotes({trackId, loggedIn, dark = false, onCountChan
       )}
 
       {loading ? (
-        <p className={`text-[12.5px] ${tone.empty}`}>正在读…</p>
+        <p className={`text-[12.5px] ${tone.empty}`}>{t.loading}</p>
       ) : notes.length === 0 ? (
-        <p className={`text-[12.5px] ${tone.empty}`}>{tone.empty}</p>
+        /* 这里原来写的是 {tone.empty}——把配色的类名当文案渲染，
+           页面上直接显示出「text-ink-soft/70」这串字。 */
+        <p className={`text-[12.5px] ${tone.empty}`}>{t.empty}</p>
       ) : (
         <ul className="flex list-none flex-col gap-3.5 p-0">
           {notes.map(note => (

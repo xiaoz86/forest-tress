@@ -11,6 +11,9 @@ export const meditations: typeof zhMeditations = {
   soundCount: (count: number) => `${count} sound${count !== 1 ? 's' : ''}`,
   /** 一段都还没有时，胶囊里换成这句 */
   soundsComing: 'More sounds on the way',
+  /** 影像专题下面有几支。量词不一样，不能拿 soundCount 顶着用。 */
+  filmCount: (count: number) => `${count} film${count !== 1 ? 's' : ''}`,
+  filmsComing: 'Films on the way',
 
   // 声音林（/meditations 不带参数时的列表页）
   grove: {
@@ -29,6 +32,13 @@ export const meditations: typeof zhMeditations = {
       eyebrow: 'Ambient',
       title: 'Sounds',
       note: 'No guidance. Handpan, singing bowls, rain. Just let it play.',
+    },
+    film: {
+      eyebrow: 'Seeing',
+      title: 'Films',
+      // 这一组不是「视频区」，也不专属节气：人物、自然、练习、创作、
+      // 社区纪录都会往里放。所以这句话说的是「用影像看」，不是「有视频」。
+      note: 'Looking at people and the world through moving images. Portraits, nature, practice, making, seasons, community.',
     },
   },
 
@@ -89,6 +99,36 @@ export const meditations: typeof zhMeditations = {
     looping: 'Looping',
     once: 'Play once',
     loopToggle: '∞ Loop',
+  },
+
+  // 影像（kind === 'film'）。有画面，所以看法和听不一样：
+  // 一支一支放，配一条完整一年的节气路线。
+  film: {
+    eyebrow: 'Seeing',
+    /** 影片列表上方那个衬线小标题，对应引导冥想那屏的「具体的声音」 */
+    listTitle: 'Films in this path',
+    empty: 'The films for this path are still being made. The first one will appear here quietly.',
+    /** 选中的这支正好是此刻的节气时，标一下 */
+    thisTerm: 'This term',
+    /** 播放器下面那条节气路线 */
+    termsEyebrow: 'Twenty-four terms',
+    termsTitle: 'The whole year',
+    /** 节气条上标当下位置的那个点 */
+    now: 'Now',
+    /** 还没做的那些节气，停上去说这句 */
+    notYet: 'Not yet',
+    /** 影片还没传上来 */
+    coming: 'Opening soon',
+    /** 只给读屏用，标题本身还是后台存的中文 */
+    watch: (title: string) => `Play ${title}`,
+    videoFailed: 'Couldn\u2019t load this film. Refresh the page and try again.',
+    // 分享。手机上先叫系统面板，叫不出来就退成复制链接
+    share: 'Share',
+    shareCopied: 'Link copied',
+    /** 剪贴板也用不了时（微信里常见），把链接摆出来让人自己长按复制 */
+    shareManual: 'Couldn\u2019t copy — press and hold the link below',
+    /** 节气条左边那一列 */
+    season: { spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' },
   },
 
   // 引导冥想卡片底下的播放器

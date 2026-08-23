@@ -4,6 +4,7 @@ import Nav from '@/components/Nav';
 import MeditationTrackCard from '@/components/MeditationTrackCard';
 import MeditationProgram from '@/components/MeditationProgram';
 import MeditationAmbient from '@/components/MeditationAmbient';
+import MeditationFilms from '@/components/MeditationFilms';
 import MeditationGrove from '@/components/MeditationGrove';
 import { dict, type Dictionary } from '@/i18n';
 import { isAdminId } from '@/lib/admin';
@@ -11,6 +12,7 @@ import { getLocale } from '@/lib/locale';
 import { fetchNoteCounts } from '@/lib/meditationNotes';
 import { findLatestOrder } from '@/lib/programOrders';
 import { getAuthenticatedMemberId } from '@/lib/session';
+import { currentSolarTermSeq } from '@/lib/solarTerms';
 import {
   fetchMeditationContent,
   fetchPaidPrograms,
@@ -20,14 +22,46 @@ import {
   type TrackMood,
 } from '@/lib/meditations';
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = dict(await getLocale()).meditations;
-  return { title: t.metaTitle, description: t.metaDescription };
-}
-
 type Props = {
   searchParams: Promise<{ category?: string }>;
 };
+
+/**
+ * 分享出去之后长什么样。
+ *
+ * 影像是拿来发给人的，链接被贴进微信、发给朋友时，对方先看到的是这张卡片。
+ * 不给 og 就只剩一句「林间呼吸 · 附近森林」——每一条分享都长得一模一样，
+ * 看不出发过来的是哪一支。所以带上专题名、简介和一张封面。
+ *
+ * 只能做到「专题」这一层：锚点（#solar-chushu）不会发到服务端，
+ * 服务器无从知道分享的是哪一支影片。
+ */
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const [{ category }, locale] = await Promise.all([searchParams, getLocale()]);
+  const t = dict(locale).meditations;
+  const fallback: Metadata = { title: t.metaTitle, description: t.metaDescription };
+  if (!category) return fallback;
+
+  const content = prepareClientContent(await fetchMeditationContent(), locale);
+  const active = content.categories.find(item => item.id === category);
+  if (!active) return fallback;
+
+  const title = active.heroTitle || active.label;
+  const description = active.heroSubtitle || active.description || t.metaDescription;
+  // 专题自己的封面优先；没上传就拿第一支影片的封面顶上
+  const image = active.coverUrl
+    || content.tracks.find(track => track.categoryId === active.id && track.posterUrl)?.posterUrl;
+
+  return {
+    title: `${title} · ${t.metaTitle}`,
+    description,
+    openGraph: {
+      title,
+      description,
+      ...(image ? { images: [{ url: image }] } : {}),
+    },
+  };
+}
 
 /** 这一屏的文案。分类名和音频标题不在这里——那些存在 Supabase，翻不了。 */
 type T = Dictionary['meditations'];
@@ -108,6 +142,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
   const kind = activeCategory.kind || 'guided';
   const isProgram = kind === 'program';
   const isAmbient = kind === 'ambient';
+  const isFilm = kind === 'film';
   // 一次把当前分类所有段落的感悟条数取回来，省掉一段一次的往返
   const noteCounts = await fetchNoteCounts(tracks.map(t => t.id));
 
@@ -166,7 +201,7 @@ export default async function MeditationsPage({ searchParams }: Props) {
 
           {/* 陪伴营自带头部（封面 + 金句 + 导师），不再套这一层通用大标题 */}
           {!isProgram && (
-            <CategoryHero category={activeCategory} count={tracks.length} />
+            <CategoryHero category={activeCategory} count={tracks.length} t={t} />
           )}
 
           <section className="mt-14 grid grid-cols-[220px_1fr] gap-10 max-lg:grid-cols-1 max-lg:mt-8">
@@ -226,6 +261,20 @@ export default async function MeditationsPage({ searchParams }: Props) {
                 noteCounts={noteCounts}
                 loggedIn={Boolean(memberId)}
               />
+            ) : isFilm ? (
+              <div>
+                {/* 二十四节气那条把「为什么跟着节气走」说清楚了，值得留在影片上面 */}
+                <CategoryNotes category={activeCategory} t={t} />
+                <MeditationFilms
+                  locale={locale}
+                  content={content}
+                  category={activeCategory}
+                  noteCounts={noteCounts}
+                  loggedIn={Boolean(memberId)}
+                  /* 按北京时间在服务端算好。交给浏览器算会在跨日那几个小时里水合不一致 */
+                  currentTermSeq={currentSolarTermSeq()}
+                />
+              </div>
             ) : (
             <div>
             <CategoryNotes category={activeCategory} t={t} />
@@ -337,8 +386,13 @@ function CategoryNotes({ category, t }: { category: MeditationCategory; t: T }) 
           <div className="mb-4 text-[11px] font-bold uppercase tracking-[0.2em] text-clay">
             {t.category.sourceEyebrow}
           </div>
+          {/*
+            保留后台填的换行。带出处的引文要把「——《书名》」放到自己一行，
+            跑在正文末尾会读成正文的一部分。断在哪里交给主理人自己决定，
+            比在这里写规则去猜哪一段是出处可靠得多。
+          */}
           {category.sourceNote && (
-            <p className="text-[14px] leading-[2] text-ink-soft">
+            <p className="whitespace-pre-line text-[14px] leading-[2] text-ink-soft">
               {category.sourceNote}
             </p>
           )}
@@ -394,15 +448,19 @@ const MOOD_GLYPH_INK: Record<TrackMood, string> = {
 const CATEGORY_GLYPH: Record<string, string> = {
   'walk-in': '入', 'mindful-life': '常', 'emotion': '绪',
   'self-care': '柔', 'inner-freedom': '松', 'sleep': '眠',
+  // 物候——二十四节气看的就是草木鸟兽随时序变化的那些迹象
+  'solar-terms': '候',
 };
 
 function CategoryHero({
-  category, count,
+  category, count, t,
 }: {
   category: MeditationCategory;
   count: number;
+  t: T;
 }) {
   const aura = MOOD_AURA[category.mood || 'forest'];
+  const isFilmCategory = (category.kind || 'guided') === 'film';
   return (
     <section className="relative">
       <div
@@ -432,7 +490,12 @@ function CategoryHero({
         </p>
         <div className="mt-8 flex items-center gap-4 text-[12.5px] text-ink-soft">
           <span className="h-px w-10 bg-forest/20" />
-          <span>{count > 0 ? `${count} 段声音` : '声音开放中'}</span>
+          {/* 影像的量词不一样，而且这行原来是写死的中文，英文界面下会漏出来 */}
+          <span>
+            {count > 0
+              ? (isFilmCategory ? t.filmCount(count) : t.soundCount(count))
+              : (isFilmCategory ? t.filmsComing : t.soundsComing)}
+          </span>
         </div>
       </div>
     </section>

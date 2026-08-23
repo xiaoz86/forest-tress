@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { trDeep } from '@/lib/contentTranslate';
 import type { Locale } from '@/lib/locale';
@@ -6,13 +7,14 @@ export type TrackMood =
   | 'forest' | 'daily' | 'emotion' | 'care' | 'healing' | 'body' | 'kindness' | 'sleep';
 
 /**
- * 声音的形态，决定这个分类用哪套版式渲染：
+ * 内容的形态，决定这个分类用哪套版式渲染：
  * - guided  按主题浏览，随时挑一段（原来的样子）
  * - program 有阶段、按周解锁、要付费的陪伴营
  * - ambient 没有引导的纯声音，可循环
+ * - film    有画面的影像，一支一支放，跟着节气走
  * 这是给代码看的，用户在侧栏看到的始终是状态名（「改善睡眠」而不是「陪伴营」）。
  */
-export type MeditationKind = 'guided' | 'program' | 'ambient';
+export type MeditationKind = 'guided' | 'program' | 'ambient' | 'film';
 
 export type ProgramPhase = {
   id: string;
@@ -70,6 +72,16 @@ export type MeditationTrack = {
   phaseId?: string;
   /** ambient：可以一直循环放着 */
   loopable?: boolean;
+  /**
+   * film：影片地址。
+   *
+   * 和音频不一样，这里存的是完整的公开地址，不是对象路径——影像是免费公开的，
+   * 没有资格要校验，再套一层 /api/.../stream 去换签名链接只是白白多一次跳转，
+   * 还让 CDN 缓存不住。哪天要设门槛，照 audioPath 那套改回来即可。
+   */
+  videoUrl?: string;
+  /** film：封面图。没有的话播放器在点开之前是一块黑的。 */
+  posterUrl?: string;
 };
 
 export type MeditationContent = {
@@ -219,6 +231,19 @@ export const DEFAULT_MEDITATION_CONTENT: MeditationContent = {
       heroSubtitle: '没有人说话，只有声音本身',
       mood: 'body',
     },
+    {
+      // 这一条要和 SOLAR_TERMS_CATEGORY_ID 对上，节气条认的是这个 id
+      id: 'solar-terms',
+      label: '四时身心',
+      kind: 'film',
+      description: '一年有二十四次转身。跟着节气，把身与心慢下来一些——该收的时候收，该藏的时候藏。',
+      heroTitle: '四时身心',
+      heroSubtitle: '顺着时令走，一年有二十四次慢下来的机会',
+      mood: 'body',
+      sourceNote:
+        '静心体会自身己心，感受天地四季变化，花鸟鱼虫浮沉，意气神体互感，远取诸物，近取诸身。答案在这里。\n——《经典中医启蒙》',
+      benefits: ['顺应时节', '身心慢下来', '收敛与储藏', '身体感知', '与自然同步'],
+    },
   ],
   tracks: [
     {
@@ -290,13 +315,28 @@ export const DEFAULT_MEDITATION_CONTENT: MeditationContent = {
       mood: 'forest',
       loopable: true,
     },
+    // 二十四节气的第一支。seq 是节气序号（立春 1 … 处暑 14 … 大寒 24），
+    // 不是「第几支影片」——这样后做的节气插进来时不用重排。
+    // 影片地址由 scripts/upload-film.mjs 传完之后写回，这里先留空。
+    {
+      id: 'solar-chushu',
+      // 标题带上这一期的一句话。节气条上的「处暑」来自 solarTerms.ts 那张表，
+      // 不受这里影响，所以两边不会打架。
+      title: '处暑｜慢下来，开始收藏能量',
+      intention: '顺应时节，处暑过后附近森林陪伴大家有意识地让身与心慢下来一些，开始进入能量储藏状态。',
+      duration: '16 分钟',
+      stage: '秋',
+      categoryId: 'solar-terms',
+      mood: 'body',
+      seq: 14,
+    },
   ],
 };
 
 const MOODS: TrackMood[] = [
   'forest', 'daily', 'emotion', 'care', 'healing', 'body', 'kindness', 'sleep',
 ];
-const KINDS: MeditationKind[] = ['guided', 'program', 'ambient'];
+const KINDS: MeditationKind[] = ['guided', 'program', 'ambient', 'film'];
 
 function cleanText(value: unknown, fallback: string, max: number): string {
   if (typeof value !== 'string') return fallback;
@@ -397,7 +437,9 @@ export function normalizeMeditationContent(input: unknown): MeditationContent {
       priceCents: cleanInt(r.priceCents, fallbackCategory.priceCents, 0, 10_000_00),
       payQrUrl: cleanOptional(r.payQrUrl, fallbackCategory.payQrUrl || '', 800),
     });
-    if (categories.length >= 8) break;
+    // 上限只是防一份坏 payload 把页面撑爆，不是产品限制。
+    // 加上影像专题已经是第 6 条小径，8 太贴脸了。
+    if (categories.length >= 12) break;
   }
   if (categories.length === 0) categories.push(...fallback.categories);
   const categoryIds = new Set(categories.map(c => c.id));
@@ -419,6 +461,15 @@ export function normalizeMeditationContent(input: unknown): MeditationContent {
     const audioPath = typeof r.audioPath === 'string' && r.audioPath.trim()
       ? r.audioPath.trim().replace(/^\/+/, '').slice(0, 400)
       : undefined;
+    // 影像的两个地址：只收 http(s) 的完整地址，别的一律当没填。
+    // 存进来的东西会直接进 <video src>，不挡一下的话 javascript: 这类
+    // 也能被后台一路写到页面上。
+    const videoUrl = typeof r.videoUrl === 'string' && /^https?:\/\//i.test(r.videoUrl.trim())
+      ? r.videoUrl.trim().slice(0, 900)
+      : undefined;
+    const posterUrl = typeof r.posterUrl === 'string' && /^https?:\/\//i.test(r.posterUrl.trim())
+      ? r.posterUrl.trim().slice(0, 900)
+      : undefined;
     const seq = cleanInt(r.seq, undefined, 1, 999);
     const phaseId = typeof r.phaseId === 'string' ? cleanId(r.phaseId, '') : '';
     tracks.push({
@@ -435,8 +486,11 @@ export function normalizeMeditationContent(input: unknown): MeditationContent {
       ...(seq === undefined ? {} : { seq }),
       ...(phaseId ? { phaseId } : {}),
       ...(r.loopable === true ? { loopable: true } : {}),
+      ...(videoUrl ? { videoUrl } : {}),
+      ...(posterUrl ? { posterUrl } : {}),
     });
-    if (tracks.length >= 64) break;
+    // 二十四节气一支一条，做满就要 24 条；64 会在一年之内顶到。
+    if (tracks.length >= 128) break;
   }
 
   return {
@@ -651,7 +705,12 @@ export async function fetchPaidPrograms(memberId: string): Promise<Set<string>> 
   );
 }
 
-export async function fetchMeditationContent(): Promise<MeditationContent> {
+/**
+ * 用 cache() 包一层：同一次请求里 generateMetadata 和页面本体都要这份内容，
+ * 不包的话一次页面访问要查两遍库。cache 只在一次请求内有效，
+ * 不会把内容缓存到下一个访客那里——主理人在后台改完刷新就能看到。
+ */
+export const fetchMeditationContent = cache(async function fetchMeditationContent(): Promise<MeditationContent> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) return DEFAULT_MEDITATION_CONTENT;
@@ -664,4 +723,4 @@ export async function fetchMeditationContent(): Promise<MeditationContent> {
     .maybeSingle();
   if (error || !data?.payload) return DEFAULT_MEDITATION_CONTENT;
   return normalizeMeditationContent(data.payload);
-}
+});
