@@ -485,11 +485,12 @@
 .sky-content .sky-note { pointer-events: auto; width: auto; }
 
 .sky-hero {
+  position: relative;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0 clamp(24px, 6vw, 88px) 200px;
+  padding: 0 clamp(24px, 6vw, 88px) 160px;
   max-width: 660px;
 }
 .sky-eyebrow {
@@ -523,7 +524,10 @@
   color: #eae6d9;
   font-weight: 400;
   letter-spacing: 0.01em;
-  max-width: 18em;
+  max-width: 15em;
+  /* balance 让两行长度接近，避免末行只剩「人。」这样的孤字。
+     中文没有连字符，一个字掉到第二行会特别扎眼。 */
+  text-wrap: balance;
 }
 /* 副句退一档：它是补充说明，不该和主句一样重 */
 .sky-lead-sub {
@@ -567,12 +571,21 @@
 /* 搜索是工具，权重必须低于两个 CTA。原来那颗独立的大胶囊离按钮太远、
    自己占一块，读起来像第三个平级控件。改成贴着按钮的下划线输入框：
    看得见、但不再和 CTA 抢。 */
+/* 贴着地平线放。原来堆在 CTA 底下，和文案挤成六层的一摞，
+   而它离地平线还有 240px——悬在半空，既不属于文案块也不属于地面。
+   搜索是「站在地上做的事」，放到地平线上方，文案块也跟着松一口气。
+   §3.8.4 本来就写着「搜索栏融入地平线」。 */
 .sky-search {
-  margin-top: 22px;
+  position: absolute;
+  left: clamp(24px, 6vw, 88px);
+  bottom: 236px;
+  margin-top: 0;
+  /* 绝对定位之后脱离了 hero 的 flex 约束，宽度会塌成内容宽，
+     placeholder 被截成「寻找一颗星、名字、城…」。给一个明确宽度。 */
+  width: min(340px, calc(100vw - 2 * clamp(24px, 6vw, 88px)));
   display: flex;
   align-items: center;
   gap: 9px;
-  max-width: 300px;
   padding: 7px 2px;
   border-radius: 0;
   border: 0;
@@ -593,7 +606,12 @@
 }
 .sky-search input::placeholder { color: rgba(160, 174, 158, 0.45); }
 /* 搜不到时要给出口。只让星空静静暗着，人会以为页面坏了。 */
-.sky-qmsg { margin: 14px 0 0; font-size: 13px; color: rgba(200, 212, 196, 0.7); min-height: 1.3em; }
+.sky-qmsg {
+  position: absolute;
+  left: clamp(24px, 6vw, 88px);
+  bottom: 202px;
+  margin: 0;
+  font-size: 13px; color: rgba(200, 212, 196, 0.7); min-height: 1.3em; }
 .sky-qmsg button {
   font: inherit; font-size: 13px; background: none; border: 0;
   padding: 0 0 1px; margin-left: 6px; cursor: pointer;
@@ -602,7 +620,14 @@
 }
 
 /* 镜头区：夜色连续，不回到纸白 */
+/* 整屏一幕，内容垂直居中。原来内容顶对齐、下面空掉一大片，
+   读起来像「一段没排完的文字」而不是一个独立的段落。
+   首屏、镜头、结尾各占一屏，翻页的节奏才立得住。 */
 .sky-lens {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   padding: 112px clamp(24px, 6vw, 88px) 130px;
   background: linear-gradient(
     180deg,
@@ -850,7 +875,10 @@
     justify-content: flex-end;
     padding-top: 46svh;
   }
-  .sky-search { max-width: 100%; }
+  /* 窄屏地平线离文案很近，绝对定位会和 CTA 打架，回到常规流 */
+  .sky-search { position: static; max-width: 100%; margin-top: 20px; }
+  .sky-qmsg { position: static; margin-top: 12px; }
+  .sky-lens { min-height: auto; }
   .sky-lens { padding-top: 80px; }
   .sky-see { width: 100%; margin-bottom: 12px; }
   /* 星光卡改 Bottom Sheet */
