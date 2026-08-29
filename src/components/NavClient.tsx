@@ -68,7 +68,7 @@ export default function NavClient({ locale, t }: Props) {
     { href: '/meditations', label: t.links.meditations, type: 'route', icon: '息' },
     { href: '/phil-coach', label: t.links.philCoach, type: 'route', icon: '伴' },
     { href: '/shares', label: t.links.shares, type: 'route', icon: '创' },
-    { href: '/creators', label: t.links.creators, type: 'route', icon: '见' },
+    { href: '/sky', label: t.links.creators, type: 'route', icon: '见' },
     { href: '/about', label: t.links.about, type: 'route', icon: '林' },
   ];
 

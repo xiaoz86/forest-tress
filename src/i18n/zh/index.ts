@@ -6,6 +6,7 @@ import { shares } from '@/i18n/zh/shares';
 import { creators } from '@/i18n/zh/creators';
 import { login } from '@/i18n/zh/login';
 import { creatorDetail } from '@/i18n/zh/creatorDetail';
+import { sky } from '@/i18n/zh/sky';
 import { email } from '@/i18n/zh/email';
 
 // about 切片（zh/about.ts、en/about.ts）已经译好，但先不接进来：
@@ -34,6 +35,7 @@ export const zh = {
   shares,
   creators,
   creatorDetail,
+  sky,
   login,
   email,
 };

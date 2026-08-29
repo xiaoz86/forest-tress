@@ -13,7 +13,7 @@ export const nav: typeof zhNav = {
     meditations: 'Explore',
     philCoach: 'Within',
     shares: 'Create',
-    creators: 'Nearby',
+    creators: 'Sky',
     about: 'About',
     contact: 'Contact us',
   },

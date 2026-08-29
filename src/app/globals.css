@@ -290,3 +290,549 @@
   .launch-prose table { font-size: 13.5px; }
   .launch-prose th, .launch-prose td { padding: 0.55em 0.6em; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   遇见星空 · Creator Sky
+   规格见 遇见星空-V6.1-设计与实现规格.md。每个属性只有一个生效值。
+   ══════════════════════════════════════════════════════════════ */
+
+/* 固定夜空：整页共用一片，内容从它上面滚过。
+   这是「同一片星空」最直接的实现，也是它和「三个区各画一片」的根本区别。 */
+.sky-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 70% 36%, rgba(53, 72, 56, 0.11), transparent 34%),
+    radial-gradient(circle at 55% 104%, rgba(178, 142, 75, 0.1), transparent 27%),
+    linear-gradient(180deg, #010504 0%, #020a07 34%, #06120d 68%, #0a1b12 100%);
+}
+
+/* 银河只作为空气：暖灰绿，绝不蓝 */
+.sky-milkyway {
+  position: absolute;
+  left: -10%;
+  top: 6%;
+  width: 120%;
+  height: 52%;
+  pointer-events: none;
+  filter: blur(38px);
+  background: linear-gradient(
+    104deg,
+    transparent 0%,
+    rgba(226, 232, 214, 0.035) 38%,
+    rgba(238, 229, 203, 0.05) 52%,
+    rgba(210, 220, 205, 0.03) 64%,
+    transparent 100%
+  );
+}
+
+.sky-bg {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: var(--o);
+  animation: skyTwinkle var(--d) ease-in-out var(--delay) infinite;
+}
+.sky-still { animation: none; }
+
+/* 不等间隔多阶段，不是暗→亮→暗的正弦呼吸 */
+@keyframes skyTwinkle {
+  0%   { opacity: calc(var(--o) * 0.34); }
+  11%  { opacity: calc(var(--o) * 0.62); }
+  23%  { opacity: calc(var(--o) * 0.4); }
+  38%  { opacity: calc(var(--o) * 0.95); }
+  49%  { opacity: calc(var(--o) * 0.55); }
+  63%  { opacity: calc(var(--o) * 0.72); }
+  71%  { opacity: calc(var(--o) * 1); }
+  84%  { opacity: calc(var(--o) * 0.45); }
+  100% { opacity: calc(var(--o) * 0.34); }
+}
+
+.sky-horizon {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 210px;
+  pointer-events: none;
+}
+.sky-horizon svg { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; }
+
+/* 地平线余光。站上有九种暖色，星空一种都没用会冷得像另一个品牌；
+   暖光同时让山从黑里浮出来——你不是漂在太空，你站在森林里抬头。 */
+.sky-glow {
+  position: absolute;
+  left: 0; right: 0; bottom: 78px;
+  height: 168px;
+  background:
+    radial-gradient(ellipse 62% 100% at 48% 104%, rgba(201, 168, 76, 0.11), transparent 66%),
+    radial-gradient(ellipse 38% 84% at 76% 106%, rgba(232, 201, 160, 0.055), transparent 60%);
+}
+
+/* ── Creator 五角星 ── */
+.sky-star {
+  position: absolute;
+  width: 46px; height: 46px;
+  margin: -23px 0 0 -23px;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity 0.9s ease;
+}
+.sky-body {
+  width: var(--size);
+  height: var(--size);
+  background: #f2e8cb;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  transform: rotate(var(--rot));
+  opacity: var(--peak);
+  animation: skyStarTwinkle var(--d) ease-in-out var(--delay) infinite;
+}
+/* 一轮里两次不同强度的亮起，避免机械正弦 */
+@keyframes skyStarTwinkle {
+  0%   { opacity: var(--dim); transform: rotate(var(--rot)) scale(0.9); }
+  14%  { opacity: var(--mid); transform: rotate(var(--rot)) scale(0.98); }
+  26%  { opacity: var(--low); transform: rotate(var(--rot)) scale(0.93); }
+  41%  { opacity: var(--peak); transform: rotate(var(--rot)) scale(1.07); }
+  55%  { opacity: var(--low); transform: rotate(var(--rot)) scale(0.95); }
+  68%  { opacity: var(--mid); transform: rotate(var(--rot)) scale(1.01); }
+  79%  { opacity: calc(var(--peak) * 0.88); transform: rotate(var(--rot)) scale(1.04); }
+  90%  { opacity: var(--low); transform: rotate(var(--rot)) scale(0.94); }
+  100% { opacity: var(--dim); transform: rotate(var(--rot)) scale(0.9); }
+}
+/* 光晕独立、更慢——光从星里透出来，不是 UI 呼吸按钮 */
+.sky-halo {
+  position: absolute;
+  width: calc(var(--size) * 2.7);
+  height: calc(var(--size) * 2.7);
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(242, 232, 203, 0.3), rgba(242, 232, 203, 0.07) 44%, transparent 68%);
+  animation: skyHalo var(--hd) ease-in-out var(--hdelay) infinite;
+}
+@keyframes skyHalo {
+  0%   { opacity: 0.16; transform: scale(0.86); }
+  33%  { opacity: 0.42; transform: scale(1.06); }
+  58%  { opacity: 0.22; transform: scale(0.95); }
+  77%  { opacity: 0.5;  transform: scale(1.12); }
+  100% { opacity: 0.16; transform: scale(0.86); }
+}
+
+.sky-layer[data-dim] .sky-star { opacity: 0.26; }
+.sky-layer[data-dim] .sky-star.is-on { opacity: 1; }
+.sky-star.is-on .sky-body {
+  width: calc(var(--size) * 1.13);
+  height: calc(var(--size) * 1.13);
+  background: #f4e7c4;
+}
+.sky-star.is-on .sky-halo {
+  background: radial-gradient(circle, rgba(244, 231, 196, 0.44), rgba(150, 190, 150, 0.1) 46%, transparent 70%);
+}
+.sky-star:hover { opacity: 1 !important; z-index: 5; }
+.sky-star:focus-visible {
+  outline: 1px solid rgba(242, 232, 203, 0.5);
+  outline-offset: 6px;
+  border-radius: 50%;
+}
+
+.sky-label {
+  position: absolute;
+  top: calc(50% + 21px);
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.55s ease;
+}
+.sky-nm { display: block; font-size: 12.5px; color: rgba(240, 236, 222, 0.88); letter-spacing: 0.04em; }
+.sky-ct { display: block; font-size: 8.5px; color: rgba(190, 200, 186, 0.5); letter-spacing: 0.12em; margin-top: 2px; }
+.sky-star.is-resident .sky-label { opacity: 1; }
+.sky-star.is-resident .sky-label.is-quiet { opacity: 0; }
+.sky-star:hover .sky-label,
+.sky-star:focus-visible .sky-label { opacity: 1 !important; }
+
+.sky-lines { position: absolute; inset: 0; pointer-events: none; }
+.sky-lines line {
+  stroke: rgba(228, 224, 200, 0.38);
+  stroke-width: 0.9;
+  stroke-dasharray: var(--len);
+  stroke-dashoffset: var(--len);
+  animation: skyDraw 1.6s ease forwards;
+}
+@keyframes skyDraw { to { stroke-dashoffset: 0; } }
+
+/* ── 内容层 ──
+   盖在星空上面，所以空白区域必须让点击穿透，否则星星一颗都点不到。
+   ⚠️ 这个 bug 用 el.click() 测不出来——那会绕过命中测试。 */
+.sky-content { position: relative; z-index: 2; pointer-events: none; }
+.sky-content button,
+.sky-content a,
+.sky-content input,
+.sky-content label,
+.sky-content .sky-tabs { pointer-events: auto; }
+/* 文字要能选中，但块级盒子横跨整行会挡住后面的星；fit-content 让盒子只包住文字。
+   带背景的块必须排除，否则背景在文字末尾断掉，星空从断口露出来。 */
+.sky-content h1,
+.sky-content h2,
+.sky-content h3,
+.sky-content p:not(.sky-note),
+.sky-content dl { pointer-events: auto; width: fit-content; max-width: 100%; }
+.sky-content .sky-note { pointer-events: auto; width: auto; }
+
+.sky-hero {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 clamp(24px, 6vw, 88px) 200px;
+  max-width: 660px;
+}
+.sky-eyebrow {
+  font-size: 10.5px;
+  letter-spacing: 0.32em;
+  color: rgba(180, 192, 178, 0.62);
+  margin: 0 0 22px;
+  font-weight: 500;
+}
+.sky-h1 {
+  font-family: var(--font-serif);
+  font-size: clamp(38px, 6.4vw, 62px);
+  line-height: 1.16;
+  margin: 0 0 26px;
+  color: #f4f1e6;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+.sky-lead {
+  margin: 0 0 9px;
+  font-size: 15.5px;
+  line-height: 1.95;
+  color: rgba(206, 216, 203, 0.78);
+  max-width: 27em;
+}
+/* 「低存在感」不该低到读不清：0.44 的对比度约 2.5:1，低于 AA 的 4.5:1 */
+.sky-status {
+  margin: 26px 0 0;
+  font-size: 12.5px;
+  color: rgba(186, 198, 183, 0.66);
+  letter-spacing: 0.04em;
+}
+.sky-ctas { display: flex; gap: 14px; margin-top: 34px; flex-wrap: wrap; }
+.sky-btn {
+  display: inline-block;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 10px 24px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition: background 0.4s ease, border-color 0.4s ease, color 0.4s ease;
+}
+.sky-btn-1 { background: rgba(242, 232, 203, 0.92); color: #0a1b12; border: 1px solid transparent; }
+.sky-btn-1:hover { background: #f7f0dc; }
+.sky-btn-2 { background: transparent; color: rgba(224, 231, 218, 0.85); border: 1px solid rgba(200, 212, 196, 0.26); }
+.sky-btn-2:hover { border-color: rgba(226, 232, 214, 0.5); color: #f1eee2; }
+.sky-btn:focus-visible { outline: 2px solid rgba(242, 232, 203, 0.6); outline-offset: 3px; }
+
+/* 搜索是工具，权重必须低于两个 CTA */
+.sky-search {
+  margin-top: 40px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 330px;
+  padding: 9px 15px;
+  border-radius: 999px;
+  border: 1px solid rgba(190, 204, 188, 0.14);
+  background: rgba(228, 236, 222, 0.03);
+}
+.sky-search svg { flex: none; opacity: 0.34; }
+.sky-search input {
+  flex: 1;
+  background: none;
+  border: 0;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  color: rgba(226, 232, 214, 0.85);
+}
+.sky-search input::placeholder { color: rgba(160, 174, 158, 0.45); }
+/* 搜不到时要给出口。只让星空静静暗着，人会以为页面坏了。 */
+.sky-qmsg { margin: 14px 0 0; font-size: 13px; color: rgba(200, 212, 196, 0.7); min-height: 1.3em; }
+.sky-qmsg button {
+  font: inherit; font-size: 13px; background: none; border: 0;
+  padding: 0 0 1px; margin-left: 6px; cursor: pointer;
+  color: rgba(242, 232, 203, 0.88);
+  border-bottom: 1px solid rgba(242, 232, 203, 0.4);
+}
+
+/* 镜头区：夜色连续，不回到纸白 */
+.sky-lens {
+  padding: 112px clamp(24px, 6vw, 88px) 130px;
+  background: linear-gradient(
+    180deg,
+    rgba(3, 14, 11, 0) 0%,
+    rgba(3, 14, 11, 0.5) 14%,
+    rgba(4, 17, 13, 0.66) 42%,
+    rgba(5, 21, 16, 0.6) 100%
+  );
+}
+.sky-lens-intro { max-width: 560px; margin-bottom: 64px; }
+/* Lens Intro 不是第二个 Hero：主句 26~28px，不用 36~40 的大标题 */
+.sky-lens-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 27px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+  color: #edeade;
+}
+.sky-lens-sub { margin: 0; font-size: 14.5px; color: rgba(202, 212, 198, 0.72); line-height: 1.9; }
+
+.sky-tabs { display: flex; align-items: baseline; flex-wrap: wrap; margin-bottom: 44px; }
+.sky-see { font-size: 12px; color: rgba(160, 174, 158, 0.5); letter-spacing: 0.18em; margin-right: 22px; }
+.sky-tab {
+  font: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-size: 15px;
+  color: rgba(190, 202, 188, 0.5);
+  padding: 6px 0;
+  margin-right: 30px;
+  border-bottom: 1px solid transparent;
+  transition: color 0.45s ease, border-color 0.45s ease;
+  letter-spacing: 0.03em;
+}
+.sky-tab:hover { color: rgba(226, 232, 214, 0.8); }
+.sky-tab[aria-selected='true'] { color: #f2eddf; border-bottom-color: rgba(242, 232, 203, 0.5); }
+.sky-tab:focus-visible { outline: 2px solid rgba(242, 232, 203, 0.5); outline-offset: 4px; }
+
+.sky-lens-body { min-height: 104px; max-width: 460px; }
+.sky-lens-body h3 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 21px;
+  margin: 0 0 12px;
+  color: #eae7da;
+}
+.sky-lens-body p { margin: 0; font-size: 14.5px; line-height: 1.95; color: rgba(202, 212, 198, 0.74); }
+
+/* 结尾：整页唯一一次让「树」和「星」同框 */
+.sky-closing {
+  position: relative;
+  overflow: hidden;
+  padding: 120px clamp(24px, 6vw, 88px) 0;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(5, 21, 16, 0.6) 0%, rgba(7, 23, 16, 0.86) 60%, rgba(8, 26, 18, 0.95) 100%);
+}
+.sky-closing-inner { position: relative; z-index: 1; padding-bottom: 260px; }
+.sky-closing-inner > * { margin-left: auto; margin-right: auto; }
+.sky-quote {
+  font-family: var(--font-serif);
+  font-size: 19px;
+  color: rgba(214, 222, 208, 0.66);
+  margin: 0 0 30px;
+  line-height: 1.8;
+}
+.sky-closing-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(27px, 4.4vw, 36px);
+  margin: 0 0 18px;
+  color: #f2efe4;
+}
+.sky-closing-body { margin: 0 auto 34px; font-size: 15px; color: rgba(198, 208, 194, 0.7); max-width: 26em; line-height: 1.95; }
+.sky-toforest { margin: 26px auto 0; font-size: 13.5px; }
+.sky-toforest a { color: rgba(198, 212, 194, 0.6); text-decoration: none; }
+.sky-toforest a:hover { color: rgba(226, 232, 214, 0.9); }
+
+.sky-tree {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: min(560px, 92vw);
+  height: 300px;
+  pointer-events: none;
+  opacity: 0.92;
+}
+.sky-treestar { animation: skyTreeStar var(--d) ease-in-out var(--delay) infinite; }
+@keyframes skyTreeStar {
+  0%   { opacity: 0.22; }
+  30%  { opacity: 0.72; }
+  46%  { opacity: 0.34; }
+  68%  { opacity: 0.9; }
+  84%  { opacity: 0.4; }
+  100% { opacity: 0.22; }
+}
+
+.sky-note {
+  padding: 26px clamp(24px, 6vw, 88px) 60px;
+  font-size: 11.5px;
+  color: rgba(140, 154, 140, 0.45);
+  line-height: 1.9;
+  background: rgba(8, 26, 18, 0.95);
+  margin: 0;
+}
+
+/* ── 星光卡 ──
+   米白纸色，不继续深色：这是「走近一个人」的时刻，应当从夜空里被捧到眼前。 */
+.sky-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(2, 8, 6, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+  backdrop-filter: blur(2px);
+}
+.sky-scrim.is-open { opacity: 1; pointer-events: auto; }
+
+.sky-panel {
+  position: fixed;
+  z-index: 61;
+  top: 0; right: 0;
+  width: 440px;
+  max-width: 92vw;
+  height: 100%;
+  background: #f5f1e8;
+  color: #23302a;
+  overflow-y: auto;
+  transform: translateX(102%);
+  transition: transform 0.52s cubic-bezier(0.22, 0.75, 0.3, 1);
+  box-shadow: -24px 0 60px rgba(0, 0, 0, 0.4);
+  padding: 34px 34px 40px;
+}
+.sky-panel.is-open { transform: none; }
+.sky-close {
+  position: absolute;
+  top: 22px; right: 22px;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(35, 48, 42, 0.18);
+  background: none;
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+  color: #4a564c;
+}
+.sky-close:hover { background: rgba(35, 48, 42, 0.06); }
+.sky-mark {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  background: #2f513d;
+  display: grid;
+  place-items: center;
+  margin-bottom: 22px;
+}
+.sky-mark span {
+  width: 24px; height: 24px;
+  background: #f2e8cb;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+.sky-pname { font-family: var(--font-serif); font-weight: 400; font-size: 31px; margin: 0 0 6px; color: #1c2a23; }
+.sky-pmeta { font-size: 13.5px; color: #6e7a6c; margin: 0 0 20px; letter-spacing: 0.02em; }
+.sky-rows { margin: 14px 0 0; }
+.sky-rows > div { border-top: 1px solid rgba(35, 48, 42, 0.12); padding: 16px 0; }
+.sky-rows dt { font-size: 12.5px; color: #7c8879; margin-bottom: 5px; letter-spacing: 0.04em; }
+.sky-rows dd { margin: 0; font-size: 14.5px; line-height: 1.8; color: #2c3830; }
+
+.sky-why { border-top: 1px solid rgba(35, 48, 42, 0.12); padding: 16px 0; }
+.sky-why dt { font-size: 12.5px; color: #5d7a55; margin-bottom: 7px; letter-spacing: 0.04em; }
+.sky-why p { margin: 0 0 6px; font-size: 14px; line-height: 1.8; color: #3a4a3c; }
+
+/* 全库唯一无法被同质化的内容，所以给它明确不同的视觉重量 */
+.sky-human { margin: 20px 0 4px; }
+.sky-human > div {
+  background: #edf1e6;
+  border-left: 2px solid #7e9b72;
+  padding: 14px 16px;
+  margin-bottom: 9px;
+}
+.sky-human > div:last-child { margin-bottom: 0; }
+.sky-human dt { font-size: 12px; color: #5f7357; margin-bottom: 6px; letter-spacing: 0.04em; }
+.sky-human p { margin: 0; font-size: 15px; line-height: 1.85; color: #26332a; font-family: var(--font-serif); }
+
+.sky-orbit-label { font-size: 12.5px; color: #7c8879; margin: 22px 0 0; letter-spacing: 0.04em; }
+.sky-orbit { position: relative; height: 210px; display: grid; place-items: center; }
+.sky-ring { position: absolute; border: 1px solid rgba(47, 81, 61, 0.16); border-radius: 50%; }
+.sky-r1 { width: 126px; height: 126px; }
+.sky-r2 { width: 198px; height: 198px; }
+.sky-core {
+  width: 78px; height: 78px;
+  border-radius: 50%;
+  background: #2f513d;
+  color: #f1eee2;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  z-index: 1;
+}
+.sky-kw {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 11.5px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: #e9efe2;
+  color: #3d5540;
+  border: 1px solid rgba(47, 81, 61, 0.14);
+  white-space: nowrap;
+}
+.sky-actions { display: flex; gap: 11px; margin-top: 26px; flex-wrap: wrap; }
+.sky-pbtn {
+  flex: 1 1 150px;
+  font: inherit;
+  font-size: 14.5px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: background 0.35s ease;
+}
+.sky-ghost { background: none; border: 1px solid rgba(35, 48, 42, 0.22); color: #2c3830; }
+.sky-ghost:hover { background: rgba(35, 48, 42, 0.05); }
+.sky-solid { background: #2f513d; border: 1px solid #2f513d; color: #f2efe4; }
+.sky-solid:hover { background: #3b6349; }
+
+@media (max-width: 640px) {
+  /* 窄屏上 hero 文字会盖掉大半个天空，星星点不到也看不见。
+     把文案压到下半屏，上半屏完整留给星空——手机上「抬头看」比读字重要。 */
+  .sky-hero {
+    padding-bottom: 150px;
+    justify-content: flex-end;
+    padding-top: 46svh;
+  }
+  .sky-search { max-width: 100%; }
+  .sky-lens { padding-top: 80px; }
+  .sky-see { width: 100%; margin-bottom: 12px; }
+  /* 星光卡改 Bottom Sheet */
+  .sky-panel {
+    top: auto; bottom: 0; right: 0; left: 0;
+    width: auto; max-width: none;
+    height: auto; max-height: 86svh;
+    border-radius: 22px 22px 0 0;
+    transform: translateY(102%);
+    padding: 28px 22px 34px;
+    box-shadow: 0 -20px 50px rgba(0, 0, 0, 0.42);
+  }
+  .sky-pname { font-size: 27px; }
+  .sky-tree { height: 220px; }
+  .sky-closing-inner { padding-bottom: 190px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sky-bg, .sky-body, .sky-halo, .sky-lines line, .sky-treestar { animation: none !important; }
+  .sky-body { opacity: var(--peak); }
+  .sky-lines line { stroke-dashoffset: 0; }
+  .sky-panel, .sky-scrim { transition: none; }
+}

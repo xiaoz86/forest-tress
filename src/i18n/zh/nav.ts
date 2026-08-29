@@ -6,7 +6,8 @@ export const nav = {
     meditations: '林间探索',
     philCoach: '回到自己',
     shares: '个体创造',
-    creators: '遇见附近',
+    /** 「遇见」是用户动作，延续原来的认知；进去之后看到的世界叫「创造者星空」 */
+    creators: '遇见星空',
     about: '生态社区',
     /** 指向 /about 里那块二维码，不是新页面 */
     contact: '联系我们',
