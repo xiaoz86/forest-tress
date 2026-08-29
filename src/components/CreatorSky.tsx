@@ -504,8 +504,10 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
         <section className="sky-hero">
           <p className="sky-eyebrow">{t.hero.eyebrow}</p>
           <h1 className="sky-h1">{t.hero.title}</h1>
-          <p className="sky-lead">{t.hero.lead1}</p>
-          <p className="sky-lead">{t.hero.lead2}</p>
+          {/* 去掉 h1 之后首屏没有锚点了：第一句升为主句，第二句退成补充。
+              一句「每一颗星，都代表一个正在生长的人」比页面名更该被看见。 */}
+          <p className="sky-lead-main">{t.hero.lead1}</p>
+          <p className="sky-lead-sub">{t.hero.lead2}</p>
           <p className="sky-status">{stars.length ? fill(t.hero.status, { n: stars.length }) : t.hero.empty}</p>
 
           <div className="sky-ctas">
@@ -588,15 +590,15 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
             ))}
           </div>
 
-          <div className="sky-lens-body" role="tabpanel">
-            <h3>{lensBody.title}</h3>
+          {/* 不再重复镜头名——tab 上已经写着，隔 100px 再写一遍是冗余。
+              文档也说「每个镜头只回答一个问题」，那就只留那一句回答。 */}
+          <div className="sky-lens-body" role="tabpanel" aria-label={lensBody.title}>
             <p>{lensBody.body}</p>
           </div>
         </section>
 
         <section className="sky-closing">
           <div className="sky-closing-inner">
-            <p className="sky-quote">{t.closing.quote}</p>
             <h2 className="sky-closing-title">{t.closing.title}</h2>
             <p className="sky-closing-body">{t.closing.body}</p>
             <Link href="/#join" className="sky-btn sky-btn-1">
@@ -605,6 +607,9 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
             <p className="sky-toforest">
               <Link href="/creators">{t.closing.toForest}</Link>
             </p>
+            {/* 「树向下扎根，星向上发光」挪到树的正上方——
+                这句话是被下面那棵树illustrate 的，隔着一整块 CTA 就读不到关系了。 */}
+            <p className="sky-quote">{t.closing.quote}</p>
           </div>
 
           <svg className="sky-tree" viewBox="0 0 560 300" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
