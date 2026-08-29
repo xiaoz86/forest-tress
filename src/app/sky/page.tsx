@@ -50,7 +50,8 @@ export default async function SkyPage() {
 
   return (
     <>
-      <Nav />
+      {/* 反相导航：米白胶囊压在夜空上会比星还亮 */}
+      <Nav night />
       <CreatorSky
         stars={stars}
         meId={me?.id ?? null}

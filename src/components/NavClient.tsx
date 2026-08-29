@@ -27,6 +27,8 @@ type Props = {
    * 真要加函数，先把这里改成只收 locale、在客户端自己 dict(locale)。
    */
   t: Dictionary['nav'];
+  /** 深色页面（星空）用的反相导航 */
+  night?: boolean;
 };
 
 /**
@@ -52,7 +54,7 @@ async function fetchSession(): Promise<Session> {
   }
 }
 
-export default function NavClient({ locale, t }: Props) {
+export default function NavClient({ locale, t, night = false }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
@@ -159,7 +161,7 @@ export default function NavClient({ locale, t }: Props) {
 
   return (
     <div
-      className={`fixed left-1/2 top-4 z-[100] w-[min(calc(100%-28px),1220px)] -translate-x-1/2 border border-white/50 bg-paper/[0.82] shadow-[0_12px_38px_rgba(31,48,37,0.07)] backdrop-blur-[18px] max-md:top-2 max-md:w-[calc(100%-24px)] ${
+      className={`${night ? 'nav-night ' : ''}fixed left-1/2 top-4 z-[100] w-[min(calc(100%-28px),1220px)] -translate-x-1/2 border border-white/50 bg-paper/[0.82] shadow-[0_12px_38px_rgba(31,48,37,0.07)] backdrop-blur-[18px] max-md:top-2 max-md:w-[calc(100%-24px)] ${
         // 展开后容器变高，999px 圆角会把它撑成一个盖住半屏的巨大椭圆
         menuOpen ? 'rounded-[26px]' : 'rounded-[999px]'
       }`}
@@ -169,7 +171,7 @@ export default function NavClient({ locale, t }: Props) {
           href="/"
           className="flex shrink-0 items-center gap-2.5 font-display text-[21px] font-light tracking-[0.18em] text-forest-dark no-underline"
         >
-          <ForestLogo size={26} className="shrink-0" />
+          <ForestLogo size={26} className="shrink-0" onDark={night} />
           {t.brand}
         </Link>
 

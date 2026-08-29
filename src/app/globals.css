@@ -902,3 +902,59 @@
   .sky-lines line { stroke-dashoffset: 0; }
   .sky-panel, .sky-scrim { transition: none; }
 }
+
+/* ══════ 夜间导航（只在 /sky）══════
+   米白胶囊压在夜空上会成为全页最亮的元素——比任何一颗星都抢眼，
+   而星空页的视觉权重顺序是「星空第一，导航靠后」。
+   这里把它反相成一片深色玻璃：看得清、但不再和星争。
+   用 !important 是因为要压掉 Tailwind 生成的原子类，
+   那些类和这里特异性相同、且在样式表更前面。 */
+.nav-night {
+  background: rgba(7, 20, 14, 0.52) !important;
+  border-color: rgba(226, 232, 214, 0.14) !important;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.34) !important;
+  backdrop-filter: blur(20px) saturate(1.1);
+}
+
+/* 链接与语言键：暖白，不用纯白——纯白在暖调夜空上会显冷 */
+.nav-night a,
+.nav-night button,
+.nav-night span { color: rgba(230, 235, 224, 0.82); }
+.nav-night a:hover,
+.nav-night button:hover { color: #f2efe4; }
+
+/* 品牌名比链接再亮一档，保持它是导航里的锚点 */
+.nav-night a[href="/"] { color: rgba(240, 243, 234, 0.94) !important; }
+
+/* 描边类控件（联系我们 / 语言）：换成暖白细线 */
+.nav-night a[class*="border-forest"],
+.nav-night button[class*="border-forest"] {
+  border-color: rgba(226, 232, 214, 0.22) !important;
+  color: rgba(226, 232, 214, 0.8) !important;
+}
+.nav-night a[class*="border-forest"]:hover,
+.nav-night button[class*="border-forest"]:hover {
+  border-color: rgba(238, 242, 230, 0.45) !important;
+  color: #f2efe4 !important;
+}
+
+/* 主 CTA 反过来：深绿底在深色导航上会糊掉，换成米白底深绿字，
+   和星空里那颗「漫游星空」按钮同一套语言。 */
+.nav-night a[class*="bg-forest"],
+.nav-night span[class*="bg-forest"] {
+  background: rgba(242, 232, 203, 0.92) !important;
+  color: #0f2318 !important;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32) !important;
+}
+.nav-night a[class*="bg-forest"]:hover { background: #f7f0dc !important; }
+
+/* 语言下拉浮层同样反相，否则点开是一块白板 */
+.nav-night [class*="bg-white"] {
+  background: rgba(12, 26, 19, 0.96) !important;
+  border-color: rgba(226, 232, 214, 0.14) !important;
+}
+
+/* 移动端汉堡键 */
+.nav-night button[class*="hover:bg-forest"]:hover {
+  background: rgba(226, 232, 214, 0.12) !important;
+}
