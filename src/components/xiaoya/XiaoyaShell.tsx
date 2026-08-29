@@ -124,6 +124,12 @@ export function XiaoyaShell({ locale }: XiaoyaShellProps) {
   const suggestions = responseSuggestions?.length ? responseSuggestions : pageSuggestions;
   const hiddenRoute = pathname === "/meditations/orders" || pathname.includes("/admin");
   const compactLauncher = pathname === "/phil-coach";
+  /**
+   * 星空页是深色的：米白按钮压在夜空上会成为全页最亮的元素，
+   * 比任何一颗星都抢眼，而那一页的视觉权重顺序是「星空第一」。
+   * 挂一个类，反相交给 CSS 处理（和导航的 nav-night 同一套做法）。
+   */
+  const nightLauncher = pathname === "/sky";
 
   const stopStream = useCallback(() => {
     activeRequestRef.current?.controller.abort();
@@ -339,7 +345,7 @@ export function XiaoyaShell({ locale }: XiaoyaShellProps) {
         aria-label={copy.launcher}
         tabIndex={isOpen ? -1 : undefined}
         onClick={() => setIsOpen(true)}
-        className={`fixed right-4 z-[80] flex h-14 items-center justify-center gap-2.5 rounded-full border border-[#91aa91]/55 bg-[#f7f4eb]/95 px-3 text-[#244a35] shadow-[0_12px_38px_rgba(18,47,31,0.22)] backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#315d43] motion-reduce:transform-none motion-reduce:transition-none sm:bottom-6 sm:right-6 ${compactLauncher ? "w-14" : "sm:h-[58px] sm:px-4"} ${isOpen ? "pointer-events-none invisible" : ""} bottom-[max(1rem,env(safe-area-inset-bottom))]`}
+        className={`${nightLauncher ? "xy-night " : ""}fixed right-4 z-[80] flex h-14 items-center justify-center gap-2.5 rounded-full border border-[#91aa91]/55 bg-[#f7f4eb]/95 px-3 text-[#244a35] shadow-[0_12px_38px_rgba(18,47,31,0.22)] backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#315d43] motion-reduce:transform-none motion-reduce:transition-none sm:bottom-6 sm:right-6 ${compactLauncher ? "w-14" : "sm:h-[58px] sm:px-4"} ${isOpen ? "pointer-events-none invisible" : ""} bottom-[max(1rem,env(safe-area-inset-bottom))]`}
       >
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#315d43] text-[#dbead3]">
           <XiaoyaSprout className="h-7 w-7" />

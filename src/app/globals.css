@@ -958,3 +958,20 @@
 .nav-night button[class*="hover:bg-forest"]:hover {
   background: rgba(226, 232, 214, 0.12) !important;
 }
+
+/* ══════ 星空页的小芽按钮 ══════
+   和 nav-night 同一个理由：米白底压在夜空上会比星还亮。
+   反相成深色玻璃，但把小芽自己那颗绿色圆标留亮——
+   她是这颗按钮的识别点，全部压暗就认不出是谁了。 */
+.xy-night {
+  background: rgba(9, 24, 17, 0.62) !important;
+  border-color: rgba(226, 232, 214, 0.18) !important;
+  color: rgba(232, 238, 226, 0.9) !important;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.42) !important;
+}
+.xy-night:hover { background: rgba(14, 34, 24, 0.82) !important; }
+/* 绿色圆标提亮一档，在深色底上才立得住 */
+.xy-night > span:first-child {
+  background: #3d7050 !important;
+  color: #e8f2e0 !important;
+}
