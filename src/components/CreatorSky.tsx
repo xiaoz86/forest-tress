@@ -37,6 +37,22 @@ type Props = {
 const AMBIENT_COLORS = ['#F7F0DC', '#ECEFE4', '#FFF2D1', '#E4E9DC', '#F0E5CE'];
 const AMBIENT_COUNT = 168;
 
+/**
+ * 导航安全区。导航栏是固定高度的像素条，压在星空最上层——
+ * 落进这条带的星既看不清也点不到（实测「John」就被 h-[72px] 那层挡住）。
+ * 底部同样留一点，避免星贴在山林里。
+ * 星的纵向位置是 0~1 的比例，这里换算成实际像素范围。
+ */
+const NAV_SAFE = 126;
+const BOTTOM_SAFE = 96;
+
+/** 比例 → CSS top。视口多高都不会撞导航，因为安全区是像素不是百分比。 */
+const starTop = (ratio: number) =>
+  `calc(${NAV_SAFE}px + (100% - ${NAV_SAFE + BOTTOM_SAFE}px) * ${ratio.toFixed(4)})`;
+
+/** 比例 → 像素。星座连线要和星的实际位置对齐，必须用同一套换算。 */
+const starY = (ratio: number, h: number) => NAV_SAFE + (h - NAV_SAFE - BOTTOM_SAFE) * ratio;
+
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /**
@@ -217,7 +233,8 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
         const color = AMBIENT_COLORS[Math.floor(skyHash(seed, 17) * 5)];
         return {
           x: halton(i, 2) * 100,
-          y: halton(i, 3) * 88,
+          // 环境星也避开导航条：不然那一带的小点同样被盖住
+          y: 4 + halton(i, 3) * 92,
           size,
           base,
           color,
@@ -309,7 +326,7 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
       let pts = group.ids
         .map(id => stars.find(s => s.id === id))
         .filter(Boolean)
-        .map(s => ({ x: ((s as SkyStar).x / 100) * w, y: ((s as SkyStar).y / 100) * h }));
+        .map(s => ({ x: ((s as SkyStar).x / 100) * w, y: starY((s as SkyStar).y, h) }));
       if (pts.length < 2) return;
 
       // 找到同伴最多的那颗，只保留它半径内的成员
@@ -447,7 +464,7 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
               style={
                 {
                   left: `${s.x.toFixed(2)}%`,
-                  top: `${s.y.toFixed(2)}%`,
+                  top: starTop(s.y),
                   '--size': `${lerp(11.6, 15.4, skyHash(s.id, 43)).toFixed(2)}px`,
                   '--rot': `${lerp(-6, 6, skyHash(s.id, 47)).toFixed(1)}deg`,
                   '--peak': peak.toFixed(3),

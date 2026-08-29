@@ -32,8 +32,16 @@ export type SkyStar = {
   create: string;
   /** 第 5 步「心里的那颗种子」 */
   seed: string;
-  /** 天球坐标，百分比。由 id + 序号稳定生成，刷新不跳动 */
+  /** 横向位置，百分比。由 id + 序号稳定生成，刷新不跳动 */
   x: number;
+  /**
+   * 纵向位置，**0~1 的比例**，不是百分比。
+   *
+   * 为什么不用百分比：导航栏是固定高度的像素条，而百分比在矮屏上会缩水——
+   * 8% 在 900px 高时是 72px，刚好压在导航底下点不到。
+   * 改成比例之后，客户端用 `calc(安全区 + (100% - 上下安全区) * ratio)` 换算，
+   * 无论视口多高，星都不会落进导航那条带。
+   */
   y: number;
   /** 近 30 天更新过。只用来让呼吸略快一点，不进入任何排序 */
   recent: boolean;
@@ -117,7 +125,7 @@ export function toSkyStars(nodes: NodeCard[], now: number = Date.now()): SkyStar
       seed: (node.seed || '').trim(),
       // Halton 铺开 + id 抖动：既均匀又自然，且刷新不变
       x: 6 + halton(i, 2) * 86 + (skyHash(id, 3) - 0.5) * 7,
-      y: 8 + halton(i, 3) * 68 + (skyHash(id, 5) - 0.5) * 7,
+      y: Math.min(0.98, Math.max(0.02, halton(i, 3) * 0.92 + (skyHash(id, 5) - 0.5) * 0.07)),
       recent: Number.isFinite(updated) ? now - updated <= 30 * DAY : false,
       age: Number.isFinite(created) ? Math.floor((now - created) / DAY) : 9999,
     };
