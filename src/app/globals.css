@@ -686,7 +686,30 @@
   overflow: hidden;
   padding: 120px clamp(24px, 6vw, 88px) 0;
   text-align: center;
-  background: linear-gradient(180deg, rgba(5, 21, 16, 0.6) 0%, rgba(7, 23, 16, 0.86) 60%, rgba(8, 26, 18, 0.95) 100%);
+  background: linear-gradient(180deg, rgba(5, 21, 16, 0.6) 0%, rgba(7, 23, 16, 0.84) 55%, rgba(9, 28, 20, 0.92) 100%);
+}
+
+/* 地平线上的月光。
+   夜空真实的样子是**越靠近地平线越亮**，天顶才最深。
+   没有这层光，#04100B 的剪影就是黑压在黑上——树和树下的两个人
+   一起被暗掉，只剩一团说不清的形状。
+   它排在树之前，所以只从背后托起剪影，不会糊在剪影上面。 */
+.sky-closing::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -60px;
+  width: min(1180px, 160vw);
+  height: 460px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: radial-gradient(
+    58% 100% at 50% 100%,
+    rgba(228, 234, 214, 0.20) 0%,
+    rgba(178, 208, 184, 0.13) 28%,
+    rgba(116, 162, 140, 0.06) 55%,
+    transparent 78%
+  );
 }
 /* padding 必须大于树的高度（300px）。树是绝对定位贴底的，
    inner 的底部留白不够时，最后一行文字会直接压在树冠上。 */
@@ -723,7 +746,8 @@
   width: min(560px, 92vw);
   height: 300px;
   pointer-events: none;
-  opacity: 0.92;
+  /* 不再降透明度：背后有月光时，半透明会让光从剪影里透出来，边缘发灰 */
+  opacity: 1;
 }
 .sky-treestar { animation: skyTreeStar var(--d) ease-in-out var(--delay) infinite; }
 @keyframes skyTreeStar {

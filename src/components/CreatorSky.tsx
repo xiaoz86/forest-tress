@@ -110,6 +110,56 @@ function ridgePath(seed: number, baseY: number, amp: number, step: number, jag: 
   return `${d} L${W},${H} L0,${H} Z`;
 }
 
+
+/**
+ * 树下坐着的两个人，仰头看星。
+ *
+ * 为什么是两个人：站上的 logo 本来就是「树 + 两个人 + 根系 + 开放圆环」，
+ * 树已经在结尾出现了，人是缺的那一半。
+ * 「树向下扎根，星向上发光」——扎根的、发光的、和看见的人，
+ * 这里是整页唯一一次三样同框。
+ *
+ * 尺寸刻意压得很小（约 34px，树高 165px）。真实的树远大于人，
+ * 人画大了就成了插画主角，而这一幕的主角始终是那片星空。
+ * 两个人挨得近但不重叠——附近森林讲的是连接，不是合为一体。
+ */
+type Bone = [x1: number, y1: number, x2: number, y2: number, w: number];
+
+/**
+ * 树下抱膝蹲坐、仰头看星的人。
+ *
+ * 不用「一条外轮廓画完整个人」的办法——试过三版，出来的都是钟形罩子加一个球：
+ * 一条平滑的轮廓没有脖子的收口，也没有膝盖的凸起，而这两处恰恰是
+ * 「蹲坐的人」在小尺寸下唯一还读得出来的特征。
+ *
+ * 改成**带圆端的骨架**：躯干、大腿、小腿、环着小腿的手臂各是一段有粗细的骨，
+ * 同色并起来自然就有关节的鼓和关节之间的凹。手臂那一段还顺便把
+ * 肩和膝之间的空填掉一半，剩下的那点凹口正好是抱膝的形。
+ *
+ * 坐标以**臀部着地处为原点**，y 向上为负。
+ */
+function seatedWatcher(x: number, y: number, k: number, tilt: number) {
+  const bones: Bone[] = [
+    [-3.0, -3.2, 1.5, -3.2, 6.2],    // 臀，压在地上
+    [0.0, -4.0, 3.4, -14.0, 6.4],    // 躯干，向前收着
+    [0.5, -4.0, 9.0, -8.4, 5.0],     // 大腿，屈起来朝前上
+    [9.0, -8.4, 11.0, -1.5, 3.6],    // 小腿，落回地面
+    [2.8, -12.8, 8.8, -8.6, 2.5],    // 环着小腿的手臂
+    // 脖子**往回仰**：起点在肩前(2.8)，终点反而更靠后(1.9-tilt)。
+    // 前倾的身体配上后仰的头，才是「抬头看天」；两者同向就成了低头坐着。
+    [2.8, -14.6, 1.9 - tilt * 0.5, -17.6 - tilt * 0.4, 2.4],
+  ];
+  // tilt 让两个人抬头的角度不同：头越靠后越高，下巴抬得越开
+  const head = { cx: 1.8 - tilt * 0.5, cy: -19.6 - tilt * 0.6, r: 2.85 };
+
+  return {
+    bones: bones.map(
+      b => [x + b[0] * k, y + b[1] * k, x + b[2] * k, y + b[3] * k, b[4] * k] as Bone,
+    ),
+    head: { cx: x + head.cx * k, cy: y + head.cy * k, r: head.r * k },
+  };
+}
+
 /** 结尾那棵树。递归分叉 + 打碎的树冠轮廓——整页唯一一次让星和树同框。 */
 function buildTree() {
   const INK = '#04100B';
@@ -191,7 +241,32 @@ function buildTree() {
     delay: -9 * skyHash(`k${i}`, 13),
   }));
 
-  return { INK, branches: branches.join(' '), canopy: canopy.join(' '), gapStars, skyStars };
+  // 坐在树右侧的两个人。头单独画成圆，微微后仰。
+  // 两人朝同一侧，因为他们在看**同一片**天。面对面就成了对话，不是共望。
+  // 挨得近但不重叠——附近森林讲的是连接，不是合为一体。
+  // 两人朝同一侧，因为他们在看**同一片**天。面对面就成了对话，不是共望。
+  // 挨得近但不重叠——附近森林讲的是连接，不是合为一体。
+  // 两人朝同一侧，因为他们在看**同一片**天。面对面就成了对话，不是共望。
+  // 挨得近但不重叠——附近森林讲的是连接，不是合为一体。
+  // 两人朝同一侧，因为他们在看**同一片**天。面对面就成了对话，不是共望。
+  // 挨得近但不重叠——附近森林讲的是连接，不是合为一体。
+  // 两人朝同一侧，因为他们在看**同一片**天。面对面就成了对话，不是共望。
+  // 挨得近但不重叠——附近森林讲的是连接，不是合为一体。
+  // 尺寸按**窄屏**定：整棵树在 375px 上只有 124px 高，人再按桌面尺寸画
+  // 到手机上就剩十几像素，看不出是人。
+  const watchers = [
+    { x: 340, y: 291, k: 1.46, tilt: 1.0 },
+    { x: 371, y: 292, k: 1.24, tilt: 0.2 },
+  ];
+
+  return {
+    INK,
+    branches: branches.join(' '),
+    canopy: canopy.join(' '),
+    gapStars,
+    skyStars,
+    watchers: watchers.map(w => seatedWatcher(w.x, w.y, w.k, w.tilt)),
+  };
 }
 
 export default function CreatorSky({ stars, meId, nearby, risingIds, constellations, t }: Props) {
@@ -722,6 +797,24 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
             <path fill={tree.INK} d={tree.canopy} />
             {/* 根部外扩：真实的树在地面处是喇叭状的 */}
             <path fill={tree.INK} d="M266,292 Q270,272 272,258 L288,258 Q290,272 294,292 Z" />
+            {/* 树下坐着的两个人，仰头看星 */}
+            {tree.watchers.map((w, i) => (
+              <g key={i}>
+                {w.bones.map((b, j) => (
+                  <line
+                    key={j}
+                    x1={b[0].toFixed(2)}
+                    y1={b[1].toFixed(2)}
+                    x2={b[2].toFixed(2)}
+                    y2={b[3].toFixed(2)}
+                    stroke={tree.INK}
+                    strokeWidth={b[4].toFixed(2)}
+                    strokeLinecap="round"
+                  />
+                ))}
+                <circle cx={w.head.cx.toFixed(2)} cy={w.head.cy.toFixed(2)} r={w.head.r.toFixed(2)} fill={tree.INK} />
+              </g>
+            ))}
             <path
               fill={tree.INK}
               opacity=".85"
