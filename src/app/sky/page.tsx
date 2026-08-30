@@ -60,7 +60,7 @@ export default async function SkyPage() {
       <CreatorSky
         stars={stars}
         meId={me?.id ?? null}
-        nearbyIds={pickNearby(stars, me)}
+        nearby={pickNearby(stars, me)}
         risingIds={pickRising(stars)}
         constellations={constellations}
         t={t}

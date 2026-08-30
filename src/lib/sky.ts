@@ -188,25 +188,76 @@ export function scoreAffinity(me: SkyStar | null, other: SkyStar): number {
   return score;
 }
 
+/**
+ * 「今夜与你靠近」的结果 + **为什么**。
+ *
+ * 原来只返回 id，文案是一句跟高亮的是谁完全无关的模板——
+ * 换成任何人都是那句话，等于什么都没说。而星座那边已经有具体的理由了，
+ * 这个镜头不该更弱。
+ *
+ * 理由用规则算，不走大模型：这是**每个访客各不相同**的结果，
+ * 没法像星座那样预生成一份缓存，而每次请求调一次模型太贵。
+ * 好在信号本来就是明确的——共同议题、能力互补、同城，说出来就够具体。
+ */
+export type NearbyResult = {
+  ids: string[];
+  /** 和「我」共同关注的议题，最多 2 个 */
+  sharedTopics: string[];
+  /** 其中有几位「可以提供」的正好对上我「在寻找」的 */
+  complementary: number;
+  /** 其中有几位和我同城 */
+  sameCity: number;
+  /** 我所在的城市，用于文案 */
+  city: string;
+  /** 未登录时为 false：那时挑的是「今夜最密的一簇」，不是「与你靠近」 */
+  personal: boolean;
+};
+
+/** 「可以提供」是否对上了「在寻找」。和 scoreAffinity 用同一套判断，保持一致。 */
+function isComplementary(me: SkyStar, other: SkyStar): boolean {
+  if (!me.seeking || !other.offer) return false;
+  return other.topics.some(t => me.seeking.includes(t.split(' / ')[0]));
+}
+
 /** 今夜与你靠近的 3~6 颗。没有「我」时按共同议题最多的挑，保证首次访问也有内容。 */
-export function pickNearby(stars: SkyStar[], me: SkyStar | null, count = 4): string[] {
+export function pickNearby(stars: SkyStar[], me: SkyStar | null, count = 4): NearbyResult {
   const pool = stars.filter(s => s.id !== me?.id);
+  const empty = { sharedTopics: [], complementary: 0, sameCity: 0, city: '', personal: false };
+
   if (me) {
-    return pool
+    const picked = pool
       .map(s => ({ s, score: scoreAffinity(me, s) }))
       .filter(x => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, count)
-      .map(x => x.s.id);
+      .map(x => x.s);
+
+    // 统计这一簇里最常和我重合的议题
+    const topicHits = new Map<string, number>();
+    picked.forEach(s =>
+      s.topics.filter(t => me.topics.includes(t)).forEach(t => topicHits.set(t, (topicHits.get(t) || 0) + 1)),
+    );
+
+    return {
+      ids: picked.map(s => s.id),
+      sharedTopics: [...topicHits.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]),
+      complementary: picked.filter(s => isComplementary(me, s)).length,
+      sameCity: me.city ? picked.filter(s => s.city === me.city).length : 0,
+      city: me.city,
+      personal: true,
+    };
   }
-  // 未登录：挑议题重叠度最高的一簇，而不是随机
+
+  // 未登录：挑议题重叠度最高的一簇。这时说「与你靠近」是不成立的，
+  // 所以 personal=false，文案换成另一套说法。
   const topicCount = new Map<string, number>();
   pool.forEach(s => s.topics.forEach(t => topicCount.set(t, (topicCount.get(t) || 0) + 1)));
   const hottest = [...topicCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-  return pool
-    .filter(s => (hottest ? s.topics.includes(hottest) : true))
-    .slice(0, count)
-    .map(s => s.id);
+  return {
+    ...empty,
+    ids: pool.filter(s => (hottest ? s.topics.includes(hottest) : true)).slice(0, count).map(s => s.id),
+    sharedTopics: hottest ? [hottest] : [],
+  };
 }
 
 /** 新升起的星：近 25 天加入的。一个都没有时退回最近 3 位，保证这个镜头不空。 */

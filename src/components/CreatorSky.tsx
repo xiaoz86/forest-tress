@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { Dictionary } from '@/i18n';
-import { skyHash, type SkyStar } from '@/lib/sky';
+import { skyHash, type NearbyResult, type SkyStar } from '@/lib/sky';
 
 /**
  * 创造者星空。
@@ -27,7 +27,7 @@ type Props = {
   stars: SkyStar[];
   /** 当前登录成员的 id，用于「找到我的星」和靠近理由 */
   meId: string | null;
-  nearbyIds: string[];
+  nearby: NearbyResult;
   risingIds: string[];
   constellations: { id: string; name: string; note: string; memberIds: string[] }[];
   t: Dictionary['sky'];
@@ -194,7 +194,7 @@ function buildTree() {
   return { INK, branches: branches.join(' '), canopy: canopy.join(' '), gapStars, skyStars };
 }
 
-export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constellations, t }: Props) {
+export default function CreatorSky({ stars, meId, nearby, risingIds, constellations, t }: Props) {
   const [lens, setLens] = useState<Lens>('near');
   const [lensActive, setLensActive] = useState(false);
   const [query, setQuery] = useState('');
@@ -303,10 +303,10 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
   const lensIds = useMemo(() => {
     if (searching) return matchIds;
     if (!lensActive) return null;
-    if (lens === 'near') return new Set(nearbyIds);
+    if (lens === 'near') return new Set(nearby.ids);
     if (lens === 'rising') return new Set(risingIds);
     return new Set(constellations.flatMap(c => c.memberIds));
-  }, [searching, matchIds, lensActive, lens, nearbyIds, risingIds, constellations]);
+  }, [searching, matchIds, lensActive, lens, nearby, risingIds, constellations]);
 
   const dimming = lensIds !== null;
 
@@ -390,9 +390,28 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
     setOpenId(id);
   }, []);
 
+  /**
+   * 「今夜与你靠近」那一句。按实际命中的信号拼，最多两个从句——
+   * 一句换谁都成立的模板等于什么都没说，而星座那边已经有具体理由了。
+   * 未登录时挑的是「今夜最密的一簇」，那时说「与你」是不成立的，换一套说法。
+   */
+  const nearBody = (() => {
+    const n = t.lens.near;
+    const topics = nearby.sharedTopics.join('、');
+    if (!nearby.personal) {
+      return topics ? fill(n.bodyGuest, { topics }) : n.bodyGuestPlain;
+    }
+    const parts: string[] = [];
+    if (topics) parts.push(fill(n.bodyTopics, { topics }));
+    if (nearby.complementary > 0) parts.push(fill(n.bodyComplement, { n: nearby.complementary }));
+    else if (nearby.sameCity > 0 && nearby.city)
+      parts.push(fill(n.bodySameCity, { n: nearby.sameCity, city: nearby.city }));
+    return parts.length ? parts.slice(0, 2).join('') : n.bodyPlain;
+  })();
+
   const lensBody =
     lens === 'near'
-      ? { title: t.lens.near.title, body: t.lens.near.body, names: [] as string[] }
+      ? { title: t.lens.near.title, body: nearBody, names: [] as string[] }
       : lens === 'rising'
         ? { title: t.lens.rising.title, body: t.lens.rising.body, names: [] as string[] }
         : {
@@ -408,7 +427,7 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
             names: constellations.map(c => c.name).filter(Boolean),
           };
 
-  const nearbySet = useMemo(() => new Set(nearbyIds), [nearbyIds]);
+  const nearbySet = useMemo(() => new Set(nearby.ids), [nearby]);
   const showWhy = open && lensActive && lens === 'near' && !searching && nearbySet.has(open.id);
   const sharedTopic = open && me ? open.topics.find(x => me.topics.includes(x)) : undefined;
 
@@ -605,6 +624,9 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
               </p>
             )}
             <p>{lensBody.body}</p>
+            {lens === 'near' && !nearby.personal && (
+              <p className="sky-guest-hint">{t.lens.near.guestHint}</p>
+            )}
           </div>
         </section>
 

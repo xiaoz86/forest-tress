@@ -33,7 +33,13 @@ export const sky: typeof zhSky = {
     near: {
       tab: 'Close to you tonight',
       title: 'Close to you tonight',
-      body: 'What you care about is drifting together. Tonight, these few are worth a second look.',
+      bodyTopics: 'You’re all paying attention to {topics}.',
+      bodyComplement: '{n} of them offer exactly what you’re looking for.',
+      bodySameCity: '{n} are right here in {city}.',
+      bodyPlain: 'These few are heading in a direction close to yours.',
+      bodyGuest: 'These stars sit closest together tonight, all drawn to {topics}.',
+      bodyGuestPlain: 'These stars sit closest together tonight.',
+      guestHint: 'Light your own star, and this becomes the people closest to you.',
     },
     constellation: {
       tab: 'Constellations forming',

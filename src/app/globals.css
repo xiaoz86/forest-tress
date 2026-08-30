@@ -994,3 +994,12 @@
   background: rgba(226, 232, 214, 0.07);
   border: 1px solid rgba(226, 232, 214, 0.16);
 }
+
+/* 未登录时的那句邀请。比正文更轻——它是补充说明，不是这个镜头的答案。 */
+.sky-guest-hint {
+  margin: 10px 0 0 !important;
+  padding-left: 14px;
+  font-size: 13px !important;
+  color: rgba(196, 208, 192, 0.5) !important;
+  line-height: 1.85;
+}
