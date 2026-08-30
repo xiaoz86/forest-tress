@@ -29,7 +29,7 @@ type Props = {
   meId: string | null;
   nearbyIds: string[];
   risingIds: string[];
-  constellations: { label: string; ids: string[] }[];
+  constellations: { id: string; name: string; note: string; memberIds: string[] }[];
   t: Dictionary['sky'];
 };
 
@@ -305,7 +305,7 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
     if (!lensActive) return null;
     if (lens === 'near') return new Set(nearbyIds);
     if (lens === 'rising') return new Set(risingIds);
-    return new Set(constellations.flatMap(c => c.ids));
+    return new Set(constellations.flatMap(c => c.memberIds));
   }, [searching, matchIds, lensActive, lens, nearbyIds, risingIds, constellations]);
 
   const dimming = lensIds !== null;
@@ -323,7 +323,7 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
     const out: { x1: number; y1: number; x2: number; y2: number; len: number; delay: number }[] = [];
 
     constellations.forEach((group, gi) => {
-      let pts = group.ids
+      let pts = group.memberIds
         .map(id => stars.find(s => s.id === id))
         .filter(Boolean)
         .map(s => ({ x: ((s as SkyStar).x / 100) * w, y: starY((s as SkyStar).y, h) }));
@@ -392,16 +392,20 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
 
   const lensBody =
     lens === 'near'
-      ? { title: t.lens.near.title, body: t.lens.near.body }
+      ? { title: t.lens.near.title, body: t.lens.near.body, names: [] as string[] }
       : lens === 'rising'
-        ? { title: t.lens.rising.title, body: t.lens.rising.body }
+        ? { title: t.lens.rising.title, body: t.lens.rising.body, names: [] as string[] }
         : {
             title: t.lens.constellation.title,
-            body: constellations.length
-              ? fill(t.lens.constellation.body, {
-                  labels: constellations.map(c => c.label).join('、'),
-                })
-              : t.lens.constellation.bodyFallback,
+            /* AI 聚出来的星座自带一句「是什么在把他们拉近」，
+               那句比我写的模板具体得多，有就用它。 */
+            body: constellations.find(c => c.note)?.note
+              ?? (constellations.length
+                ? fill(t.lens.constellation.body, {
+                    labels: constellations.map(c => c.name).join('、'),
+                  })
+                : t.lens.constellation.bodyFallback),
+            names: constellations.map(c => c.name).filter(Boolean),
           };
 
   const nearbySet = useMemo(() => new Set(nearbyIds), [nearbyIds]);
@@ -593,6 +597,13 @@ export default function CreatorSky({ stars, meId, nearbyIds, risingIds, constell
           {/* 不再重复镜头名——tab 上已经写着，隔 100px 再写一遍是冗余。
               文档也说「每个镜头只回答一个问题」，那就只留那一句回答。 */}
           <div className="sky-lens-body" role="tabpanel" aria-label={lensBody.title}>
+            {lensBody.names.length > 0 && (
+              <p className="sky-const-names">
+                {lensBody.names.map(n => (
+                  <span key={n}>{n}</span>
+                ))}
+              </p>
+            )}
             <p>{lensBody.body}</p>
           </div>
         </section>

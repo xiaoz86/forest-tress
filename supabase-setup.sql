@@ -481,3 +481,21 @@ alter table node_cards add column if not exists locale text default '';
 -- 默认 true：这是社区连接的主路径，不是营销。想清静的人自己关。
 -- 只管撮合通知——验证码、欢迎信这些事务性邮件不受它影响，那些是本人主动触发的。
 alter table node_cards add column if not exists notify_matches boolean not null default true;
+
+-- ============================================================
+-- 2026-08-31 「正在形成的星座」的聚类缓存
+-- ============================================================
+
+-- 星座由大模型从成员的 keywords 里聚出来，结果存这里，页面只读缓存。
+-- 两个原因不能现算：模型调用有延迟和成本；而且每次输出不完全一致，
+-- 会违背「刷新不跳动」。重算由 scripts/generate-sky-constellations.mjs 触发。
+--
+-- 单行表（id 固定为 'sky-constellations'），和 meditation_content 同一个模式。
+create table if not exists sky_constellations (
+  id text primary key,
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz default now()
+);
+
+-- 和 program_orders 一样：开 RLS 不加 policy = 只有服务端能读写。
+alter table sky_constellations enable row level security;

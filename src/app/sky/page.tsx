@@ -6,7 +6,8 @@ import { dict } from '@/i18n';
 import { getLocale } from '@/lib/locale';
 import { fetchListedNodes } from '@/lib/nodeVisibility';
 import { getAuthenticatedMemberId } from '@/lib/session';
-import { buildConstellations, pickNearby, pickRising, toSkyStars } from '@/lib/sky';
+import { pickNearby, pickRising, toSkyStars } from '@/lib/sky';
+import { resolveConstellations } from '@/lib/skyConstellations';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,6 +47,10 @@ export default async function SkyPage() {
   const stars = toSkyStars(ordered);
   const me = stars.find(s => s.id === meId) || null;
 
+  // 星座读缓存（由 scripts/generate-sky-constellations.mjs 生成）；
+  // 没缓存就退回按关键词的规则聚类，这个镜头不会空掉
+  const constellations = await resolveConstellations(stars);
+
   const t = dict(locale).sky;
 
   return (
@@ -57,7 +62,7 @@ export default async function SkyPage() {
         meId={me?.id ?? null}
         nearbyIds={pickNearby(stars, me)}
         risingIds={pickRising(stars)}
-        constellations={buildConstellations(stars)}
+        constellations={constellations}
         t={t}
       />
     </>

@@ -975,3 +975,22 @@
   background: #3d7050 !important;
   color: #e8f2e0 !important;
 }
+
+/* 星座名。AI 聚出来的名字比「健康 / 身心」这种固定议题具体，
+   值得单独露出来——但仍然是标签，不能比那句说明还重。 */
+.sky-const-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px !important;
+  padding-left: 14px;
+}
+.sky-const-names span {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  padding: 3px 11px;
+  border-radius: 999px;
+  color: rgba(226, 232, 214, 0.78);
+  background: rgba(226, 232, 214, 0.07);
+  border: 1px solid rgba(226, 232, 214, 0.16);
+}
