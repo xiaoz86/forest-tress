@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { createChatCompletion, getLLMConfig } from '@/lib/llm';
 import type { SkyStar } from '@/lib/sky';
+import type { NodeCard } from '@/lib/supabase';
 
 /**
  * 「正在形成的星座」的聚类。
@@ -79,41 +80,61 @@ export function buildFallbackConstellations(stars: SkyStar[]): Constellation[] {
     .map(([key, v]) => ({ id: `kw-${key}`, name: v.label, note: '', memberIds: [...v.ids] }))
     .filter(c => c.memberIds.length >= 3)
     .sort((a, b) => b.memberIds.length - a.memberIds.length)
-    .slice(0, 2);
+    .slice(0, 3);
 }
 
-const AI_SYSTEM = `你在为一个叫「附近森林」的创造者社区，从成员的关键词里看出**正在形成的星座**。
+const AI_SYSTEM = `你在为一个叫「附近森林」的创造者社区，从成员资料里看出**正在形成的星座**。
 
-星座不是固定分类，也不是标签墙。它回答的是：
-「哪些共同关注，正在让这些人慢慢靠近？」
+先理解什么不算星座：
+「正念冥想」「AI 应用」「教练」——这些是**类目**，不是星座。
+把所有做正念的人圈在一起，等于什么都没说：他们本来就在同一个标签下。
+
+星座是更具体的东西。它可能是：
+- **一段共同的处境**：都在从某个行业转身，都在把练习带进一个不接纳它的场域；
+- **一种能互相接住的组合**：A「可以提供」的，正好是 B「在寻找」的；
+- **同一件事的不同侧面**：一个做团体引导、一个做一对一、一个在做空间。
+
+优先找**互补**，其次找共同处境，最后才是共同话题。
+纯话题相似的组，除非特别紧密，否则宁可不给。
 
 规则：
-1. 给出 2~4 个星座，每个至少 3 人。
-2. 一个人可以同时属于多个星座——人本来就不只有一面。
-3. 星座名 2~8 个字，落在**共同关心的那件事**上，不要用「小组」「联盟」「圈」这类组织词，
-   也不要用「顶级」「资深」「核心」这类分级词。
-4. note 一句话，20~40 字，说清楚**是什么在把他们拉近**。
-   可以具体到他们共同的做法或处境，但不要断言关系（不要说「你们很匹配」「天生一对」）。
-5. 只用给你的关键词和自我介绍做判断，**不要脑补没写出来的信息**。
-6. 宁可少给一个星座，也不要把关系不明显的人硬凑成一组。
+1. 给出 3~6 个星座，每个 **3~5 人**。超过 5 人几乎一定是类目，请拆开或缩小。
+2. 一个人可以属于多个星座——人本来就不只有一面。
+3. 星座名 4~10 个字，落在**那件具体的事**上，不是领域名。
+   反例：「正念冥想」「AI 探索」「教练成长」（都是类目）
+   正例：「把练习带回职场的人」「从大厂转身之后」「一对一之外的可能」
+   不要用「小组」「联盟」「圈」这类组织词，不要用「顶级」「核心」这类分级词。
+4. note 一句话 25~45 字，必须**引用至少两个人资料里的具体内容**
+   （具体的经历、能提供的东西、在找的东西），不能只写抽象的共同点。
+5. 只用给你的资料判断，**不要脑补没写出来的信息**。
+6. 不要断言关系——不说「你们很匹配」「天生一对」「一定合得来」。
+7. 宁可少给一个星座，也不要把关系不明显的人硬凑成一组。
 
 只返回 JSON，不要任何解释：
 {"constellations":[{"name":"…","note":"…","memberIds":["id1","id2","id3"]}]}`;
 
 /**
- * 用大模型聚类。失败一律返回 null，调用方退回规则聚类——
- * 星空不该因为模型不可用而空掉一个镜头。
+ * 用大模型聚类。**只在服务端调用**——参数收的是原始节点卡，
+ * 里面有 experience 这类不下发给浏览器的字段。
+ * 失败一律返回 null，调用方退回规则聚类，星空不该因为模型不可用而空掉一个镜头。
  */
 export async function generateConstellationsAI(
-  stars: SkyStar[],
+  nodes: NodeCard[],
 ): Promise<Constellation[] | null> {
-  if (!getLLMConfig() || stars.length < 6) return null;
+  if (!getLLMConfig() || nodes.length < 6) return null;
 
-  const roster = stars.map(s => ({
-    id: s.id,
-    name: s.name,
-    keywords: s.keywords.length ? s.keywords : s.topics,
-    doing: s.doing.slice(0, 40),
+  // 和脚本喂一样的材料。只给 keywords 的话，模型只能聚出类目——
+  // keywords 本身已经是「把一个人压缩成 6 个话题词」的结果。
+  const clip = (v: string, n: number) => v.replace(/\s+/g, ' ').trim().slice(0, n);
+  const roster = nodes.map(n => ({
+    id: n.id || '',
+    name: n.name || '',
+    city: n.city || '',
+    doing: clip(n.doing || '', 60),
+    优势与独特性: clip(n.experience || '', 150),
+    可以提供: clip(n.offer || '', 150),
+    在寻找: clip(n.seeking || '', 120),
+    keywords: (n.keywords?.length ? n.keywords : n.topics) || [],
   }));
 
   try {
@@ -131,7 +152,7 @@ export async function generateConstellationsAI(
     const parsed = JSON.parse(raw) as {
       constellations?: { name?: unknown; note?: unknown; memberIds?: unknown }[];
     };
-    const valid = new Set(stars.map(s => s.id));
+    const valid = new Set(nodes.map(n => n.id).filter(Boolean));
 
     const out = (parsed.constellations || [])
       .map((c, i) => ({
@@ -143,7 +164,8 @@ export async function generateConstellationsAI(
           ? [...new Set(c.memberIds.filter((x): x is string => typeof x === 'string' && valid.has(x)))]
           : [],
       }))
-      .filter(c => c.name && c.memberIds.length >= 3);
+      // 超过 6 人几乎一定是类目，模型没听话就丢掉
+      .filter(c => c.name && c.memberIds.length >= 3 && c.memberIds.length <= 6);
 
     return out.length ? out : null;
   } catch {
@@ -210,7 +232,8 @@ export async function resolveConstellations(stars: SkyStar[]): Promise<Constella
     const usable = cached.constellations
       .map(c => ({ ...c, memberIds: c.memberIds.filter(id => valid.has(id)) }))
       .filter(c => c.memberIds.length >= 3)
-      .slice(0, 2);
+      // 3~5 人的组比原来的 11 人组小得多，显示三个仍留得住「其余退暗」那层意思
+      .slice(0, 3);
     if (usable.length) return usable;
   }
   return buildFallbackConstellations(stars);
