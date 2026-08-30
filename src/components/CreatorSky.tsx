@@ -196,6 +196,9 @@ function buildTree() {
 
 export default function CreatorSky({ stars, meId, nearby, risingIds, constellations, t }: Props) {
   const [lens, setLens] = useState<Lens>('near');
+  /** 当前选中的星座。三个标签一次只看一组——同时亮三组会亮掉 10/17 颗星，
+      「其余退暗但不消失」那层意思就被冲淡了。 */
+  const [activeConst, setActiveConst] = useState(0);
   const [lensActive, setLensActive] = useState(false);
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
@@ -305,8 +308,8 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
     if (!lensActive) return null;
     if (lens === 'near') return new Set(nearby.ids);
     if (lens === 'rising') return new Set(risingIds);
-    return new Set(constellations.flatMap(c => c.memberIds));
-  }, [searching, matchIds, lensActive, lens, nearby, risingIds, constellations]);
+    return new Set(constellations[activeConst]?.memberIds ?? []);
+  }, [searching, matchIds, lensActive, lens, nearby, risingIds, constellations, activeConst]);
 
   const dimming = lensIds !== null;
 
@@ -315,60 +318,58 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
    * 单边有上限管不住整条链——上一版走出过一条从右上角折到左下角的折线，
    * 那不是星座，是路径图。先把范围收成一簇，再连。
    */
+  /**
+   * 星座连线。只画**当前选中的那一组**。
+   *
+   * 这里的规则改过一次，原因值得记下来：
+   * 最早星座来自「共同议题」，一组能有 11 人、而且同时画三组，
+   * 所以加了空间聚类（只留最密的一簇）和 23% 屏宽的单边上限来防蛛网。
+   *
+   * 现在星座由 AI 按**互补**挑出来，每组只有 3~5 人，而且一次只显示一组。
+   * 互补意味着他们本来就分散在天上——那两条规则于是同时出问题：
+   *   一、聚类会把够不着的成员从连线里剔掉，但高亮用的是全部成员，
+   *       结果就是「4 颗星亮着、0 条线」，两套成员集合对不上；
+   *   二、23% 的上限对分散的小组太紧，实测最近的两颗都隔了 27.5%。
+   *
+   * 所以去掉聚类、放宽上限：3~5 个点的最小生成树最多 4 条线，
+   * 画不成蛛网。上限只留一个防极端的兜底。
+   */
   const lines = useMemo(() => {
     if (searching || !lensActive || lens !== 'const') return [];
+    const group = constellations[activeConst];
+    if (!group) return [];
+
     const { w, h } = dims;
-    const MAX = w * 0.23;
-    const R = w * 0.3;
+    const MAX = w * 0.55; // 只防跨屏的极端边，不再用来做筛选
+    const pts = group.memberIds
+      .map(id => stars.find(s => s.id === id))
+      .filter((s): s is SkyStar => Boolean(s))
+      .map(s => ({ x: (s.x / 100) * w, y: starY(s.y, h) }));
+    if (pts.length < 2) return [];
+
     const out: { x1: number; y1: number; x2: number; y2: number; len: number; delay: number }[] = [];
+    const inTree = [0];
+    const rest = pts.map((_, i) => i).slice(1);
+    let step = 0;
 
-    constellations.forEach((group, gi) => {
-      let pts = group.memberIds
-        .map(id => stars.find(s => s.id === id))
-        .filter(Boolean)
-        .map(s => ({ x: ((s as SkyStar).x / 100) * w, y: starY((s as SkyStar).y, h) }));
-      if (pts.length < 2) return;
-
-      // 找到同伴最多的那颗，只保留它半径内的成员
-      let best: { p: (typeof pts)[0]; n: number } | null = null;
-      pts.forEach(p => {
-        const n = pts.filter(o => Math.hypot(o.x - p.x, o.y - p.y) <= R).length;
-        if (!best || n > best.n) best = { p, n };
-      });
-      const anchor = best as unknown as { p: { x: number; y: number } } | null;
-      if (!anchor) return;
-      pts = pts.filter(o => Math.hypot(o.x - anchor.p.x, o.y - anchor.p.y) <= R);
-      if (pts.length < 2) return;
-
-      const inTree = [0];
-      const rest = pts.map((_, i) => i).slice(1);
-      let step = 0;
-      while (rest.length) {
-        let pick: { r: number; tIdx: number; d: number } | null = null;
-        for (const r of rest) {
-          for (const ti of inTree) {
-            const d = Math.hypot(pts[r].x - pts[ti].x, pts[r].y - pts[ti].y);
-            if (!pick || d < pick.d) pick = { r, tIdx: ti, d };
-          }
+    while (rest.length) {
+      let pick: { r: number; t: number; d: number } | null = null;
+      for (const r of rest) {
+        for (const ti of inTree) {
+          const d = Math.hypot(pts[r].x - pts[ti].x, pts[r].y - pts[ti].y);
+          if (!pick || d < pick.d) pick = { r, t: ti, d };
         }
-        if (!pick || pick.d > MAX) break;
-        const a = pts[pick.tIdx];
-        const b = pts[pick.r];
-        out.push({
-          x1: a.x,
-          y1: a.y,
-          x2: b.x,
-          y2: b.y,
-          len: pick.d,
-          delay: gi * 0.18 + step * 0.1,
-        });
-        inTree.push(pick.r);
-        rest.splice(rest.indexOf(pick.r), 1);
-        step += 1;
       }
-    });
+      if (!pick || pick.d > MAX) break;
+      const a = pts[pick.t];
+      const b = pts[pick.r];
+      out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, len: pick.d, delay: step * 0.12 });
+      inTree.push(pick.r);
+      rest.splice(rest.indexOf(pick.r), 1);
+      step += 1;
+    }
     return out;
-  }, [searching, lensActive, lens, dims, constellations, stars]);
+  }, [searching, lensActive, lens, dims, constellations, stars, activeConst]);
 
   // 首屏常驻姓名 ≤ 3 个
   const residents = useMemo(
@@ -411,20 +412,19 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
 
   const lensBody =
     lens === 'near'
-      ? { title: t.lens.near.title, body: nearBody, names: [] as string[] }
+      ? { title: t.lens.near.title, body: nearBody }
       : lens === 'rising'
-        ? { title: t.lens.rising.title, body: t.lens.rising.body, names: [] as string[] }
+        ? { title: t.lens.rising.title, body: t.lens.rising.body }
         : {
             title: t.lens.constellation.title,
             /* AI 聚出来的星座自带一句「是什么在把他们拉近」，
                那句比我写的模板具体得多，有就用它。 */
-            body: constellations.find(c => c.note)?.note
+            body: constellations[activeConst]?.note
               ?? (constellations.length
                 ? fill(t.lens.constellation.body, {
                     labels: constellations.map(c => c.name).join('、'),
                   })
                 : t.lens.constellation.bodyFallback),
-            names: constellations.map(c => c.name).filter(Boolean),
           };
 
   const nearbySet = useMemo(() => new Set(nearby.ids), [nearby]);
@@ -616,12 +616,20 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
           {/* 不再重复镜头名——tab 上已经写着，隔 100px 再写一遍是冗余。
               文档也说「每个镜头只回答一个问题」，那就只留那一句回答。 */}
           <div className="sky-lens-body" role="tabpanel" aria-label={lensBody.title}>
-            {lensBody.names.length > 0 && (
-              <p className="sky-const-names">
-                {lensBody.names.map(n => (
-                  <span key={n}>{n}</span>
+            {lens === 'const' && constellations.length > 0 && (
+              <div className="sky-const-names" role="group" aria-label={t.lens.constellation.title}>
+                {constellations.map((c, i) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={i === activeConst ? 'is-on' : ''}
+                    aria-pressed={i === activeConst}
+                    onClick={() => setActiveConst(i)}
+                  >
+                    {c.name}
+                  </button>
                 ))}
-              </p>
+              </div>
             )}
             <p>{lensBody.body}</p>
             {lens === 'near' && !nearby.personal && (

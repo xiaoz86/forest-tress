@@ -985,14 +985,33 @@
   margin: 0 0 12px !important;
   padding-left: 14px;
 }
-.sky-const-names span {
+/* 可点。原来是不可点的 span，长得像控件却什么都不做——是个假承诺。
+   一次只看一组：三组同时亮会亮掉 10/17 颗星，「其余退暗」就读不出来了。 */
+.sky-const-names button {
+  font: inherit;
   font-size: 12px;
   letter-spacing: 0.06em;
-  padding: 3px 11px;
+  padding: 4px 12px;
   border-radius: 999px;
-  color: rgba(226, 232, 214, 0.78);
-  background: rgba(226, 232, 214, 0.07);
-  border: 1px solid rgba(226, 232, 214, 0.16);
+  cursor: pointer;
+  color: rgba(226, 232, 214, 0.55);
+  background: rgba(226, 232, 214, 0.04);
+  border: 1px solid rgba(226, 232, 214, 0.12);
+  transition: color 0.35s ease, background 0.35s ease, border-color 0.35s ease;
+}
+.sky-const-names button:hover {
+  color: rgba(238, 242, 230, 0.85);
+  border-color: rgba(226, 232, 214, 0.28);
+}
+/* 选中态要明显——它决定了天上正在看哪一组 */
+.sky-const-names button.is-on {
+  color: #14261b;
+  background: rgba(242, 232, 203, 0.88);
+  border-color: rgba(242, 232, 203, 0.9);
+}
+.sky-const-names button:focus-visible {
+  outline: 2px solid rgba(242, 232, 203, 0.6);
+  outline-offset: 3px;
 }
 
 /* 未登录时的那句邀请。比正文更轻——它是补充说明，不是这个镜头的答案。 */
