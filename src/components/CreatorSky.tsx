@@ -204,6 +204,14 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
   const [openId, setOpenId] = useState<string | null>(null);
   const [hovering, setHovering] = useState(false);
   const [dims, setDims] = useState({ w: 1440, h: 900 });
+  /**
+   * 流星。一次只有一颗，间隔 9~26 秒——这是「偶尔抬头刚好看见」的频率。
+   * 再密就成了粒子特效，而规格明确禁止把夜空做成装饰特效。
+   * 服务端首帧不渲染（初始 null），所以不会有 hydration 不一致。
+   */
+  const [meteor, setMeteor] = useState<{
+    key: number; top: number; left: number; ang: number; len: number; dist: number; dur: number;
+  } | null>(null);
 
   const skyRef = useRef<HTMLDivElement>(null);
   const lensRef = useRef<HTMLElement>(null);
@@ -249,6 +257,32 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
       }),
     [],
   );
+
+  useEffect(() => {
+    // 减弱动态时一颗都不放，也不必空转定时器
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+
+    let timer: ReturnType<typeof setTimeout>;
+    const rand = (a: number, b: number) => a + Math.random() * (b - a);
+    const schedule = () => {
+      timer = setTimeout(() => {
+        // 一半从左上往右下，一半从右上往左下，避免总是同一个方向
+        const toLeft = Math.random() < 0.5;
+        setMeteor({
+          key: Date.now(),
+          top: rand(4, 42),
+          left: toLeft ? rand(52, 92) : rand(6, 46),
+          ang: toLeft ? rand(148, 166) : rand(14, 32),
+          len: rand(64, 132),
+          dist: rand(260, 520),
+          dur: rand(0.9, 1.5),
+        });
+        schedule();
+      }, rand(9000, 26000));
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const onResize = () =>
@@ -456,6 +490,25 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
             }
           />
         ))}
+
+        {meteor && (
+          <span
+            key={meteor.key}
+            className="sky-meteor"
+            aria-hidden="true"
+            onAnimationEnd={() => setMeteor(null)}
+            style={
+              {
+                left: `${meteor.left}%`,
+                top: `${meteor.top}%`,
+                '--len': `${meteor.len.toFixed(0)}px`,
+                '--ang': `${meteor.ang.toFixed(1)}deg`,
+                '--dist': `${meteor.dist.toFixed(0)}px`,
+                '--dur': `${meteor.dur.toFixed(2)}s`,
+              } as React.CSSProperties
+            }
+          />
+        )}
 
         <svg className="sky-lines" viewBox={`0 0 ${dims.w} ${dims.h}`} preserveAspectRatio="none" aria-hidden="true">
           {lines.map((l, i) => (

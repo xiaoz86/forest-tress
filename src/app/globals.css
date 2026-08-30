@@ -1022,3 +1022,38 @@
   color: rgba(196, 208, 192, 0.5) !important;
   line-height: 1.85;
 }
+
+/* ══════ 流星 ══════
+   一条带渐变的细线：亮头在前、尾巴拖在后，飞完自己消失。
+   暖白，和环境星同一套色温——不要用纯白或蓝白，那会显冷。
+   pointer-events:none 是必须的：它横穿整片天空，
+   否则划过时会挡住底下的星，让人点不中。 */
+.sky-meteor {
+  position: absolute;
+  z-index: 1;
+  height: 1px;
+  width: var(--len);
+  pointer-events: none;
+  transform-origin: 0 50%;
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(247, 240, 220, 0.18) 42%,
+    rgba(252, 247, 232, 0.92) 96%,
+    rgba(252, 247, 232, 0) 100%
+  );
+  filter: drop-shadow(0 0 3px rgba(247, 240, 220, 0.5));
+  animation: skyMeteor var(--dur) cubic-bezier(0.3, 0.55, 0.4, 1) forwards;
+}
+@keyframes skyMeteor {
+  0%   { opacity: 0;   transform: rotate(var(--ang)) translateX(0) scaleX(0.25); }
+  14%  { opacity: 0.9; }
+  72%  { opacity: 0.7; transform: rotate(var(--ang)) translateX(calc(var(--dist) * 0.74)) scaleX(1); }
+  100% { opacity: 0;   transform: rotate(var(--ang)) translateX(var(--dist)) scaleX(0.9); }
+}
+
+/* 减弱动态时连出现都不出现——JS 那边也不会调度，这里只是双保险 */
+@media (prefers-reduced-motion: reduce) {
+  .sky-meteor { display: none; }
+}
