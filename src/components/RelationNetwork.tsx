@@ -5,11 +5,17 @@ import type { Locale } from '@/lib/locale';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Avatar from './Avatar';
-import type { RelationGraph } from '@/lib/network';
 import { layoutGraph } from '@/lib/network';
+import type { PublicGraph } from '@/lib/publicNode';
 
 type Props = {
-  graph: RelationGraph;
+  /**
+   * **只收白名单过的图**，不收 RelationGraph。
+   * 这个 props 是服务端到客户端的边界：类型写成 RelationGraph 就等于允许
+   * 整张 NodeCard 被序列化进 RSC payload——ai_recommendations 那次就是
+   * 这么漏出去的。见 lib/publicNode.ts。
+   */
+  graph: PublicGraph;
   isMember?: boolean;
   /** 浅色文字 + 浅色边线，用于深色底（如首页第 4 屏） */
   darkBg?: boolean;

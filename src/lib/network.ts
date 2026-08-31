@@ -129,8 +129,17 @@ export function buildRelationGraph(
  */
 export type LayoutPos = { id: string; x: number; y: number; isCenter: boolean };
 
+/**
+ * 布点。入参故意写成**结构最小集**而不是 RelationGraph：
+ * 这个函数只读 id 和 strength，收下整张 NodeCard 会让它成为
+ * 「完整节点必须传到客户端」的借口——而客户端只该拿到白名单里那几个字段。
+ * 见 lib/publicNode.ts 的 PublicGraph。
+ */
 export function layoutGraph(
-  graph: RelationGraph,
+  graph: {
+    center: { id?: string };
+    neighbors: { id?: string; strength: EdgeStrength }[];
+  },
   width: number,
   height: number,
 ): LayoutPos[] {
