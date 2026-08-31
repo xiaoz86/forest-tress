@@ -10,7 +10,7 @@ export const sky: typeof zhSky = {
     title: 'Creator Sky',
     lead1: 'Gathered together, we are a sky of stars.',
     lead2:
-      'Action and growth make you brighter; so does taking in the light and warmth of others. We shine on one another, each of us rising to light what is near.',
+      'We brighten through action and growth, and through the light and warmth of others — shining on one another, rising into a source of light for what is near.',
     status: 'Tonight, {n} stars are shining above Nearby Forest.',
     empty: 'The forest is just beginning. The first tree could be yours.',
     ctaRoam: 'Wander the sky',
