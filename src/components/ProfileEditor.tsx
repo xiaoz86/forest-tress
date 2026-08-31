@@ -4,6 +4,7 @@ import { dict } from '@/i18n';
 import type { Locale } from '@/lib/locale';
 import { KeyboardEvent, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { BEAUTY_PART_MAX, joinBeauty, splitBeauty } from '@/lib/beauty';
 import type { NodeCard } from '@/lib/supabase';
 
 type Props = {
@@ -43,7 +44,17 @@ type Form = {
   wechat: string;
   email: string;
   topics: string[];
-  /** 进不进「遇见星空」。缺失当 true——老行没有这个值，判 false 会让人凭空消失 */
+  /**
+   * 这三段原来在编辑器里根本没有——注册第 4、5 步填完就再也改不了了，
+   * 而它们恰恰是全站唯一无法被同质化的内容（星空的星光卡专门给了它们
+   * 米绿底和衬线体）。
+   * moment / create 在库里是**同一列 beauty**，靠前缀分隔；
+   * 拆和拼都走 lib/beauty.ts，这里只管编辑。
+   */
+  moment: string;
+  create: string;
+  seed: string;
+  /** 进不进「附近星空」。缺失当 true——老行没有这个值，判 false 会让人凭空消失 */
   inSky: boolean;
 };
 
@@ -61,6 +72,8 @@ function pickInitial(node: NodeCard): Form {
     email: node.email || '',
     topics: Array.isArray(node.topics) ? [...node.topics] : [],
     inSky: node.in_sky !== false,
+    ...splitBeauty(node.beauty),
+    seed: node.seed || '',
   };
 }
 
@@ -118,11 +131,23 @@ export default function ProfileEditor({ node, mode, locale }: Props) {
          * 每次保存都带上，会让还没跑迁移的库上**所有**资料编辑都失败。
          * 只有真正动了这个开关的人才该撞上「这一列还不存在」。
          */
-        body: JSON.stringify(
-          form.inSky === (base.in_sky !== false)
-            ? { ...form, inSky: undefined }
-            : { ...form, inSky: undefined, in_sky: form.inSky },
-        ),
+        body: JSON.stringify({
+          ...form,
+          // 表单里是拆开的两段，库里是一列。拼回去的格式由 lib/beauty.ts 定，
+          // 和注册时走的是同一个函数
+          moment: undefined,
+          create: undefined,
+          beauty: joinBeauty(form.moment, form.create, locale),
+          // 后端字段名是 in_sky，表单里叫 inSky，这里显式映射——
+          // 直接把 form 整个丢过去的话，inSky 会被后端当未知字段忽略，
+          // 表现是「开关点了没反应」而且不报错。
+          //
+          // 而且**只在它真的被改过时才发**：in_sky 这一列要迁移才有，
+          // 每次保存都带上，会让还没跑迁移的库上**所有**资料编辑都失败。
+          // 只有真正动了这个开关的人才该撞上「这一列还不存在」。
+          inSky: undefined,
+          ...(form.inSky === (base.in_sky !== false) ? {} : { in_sky: form.inSky }),
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -267,6 +292,36 @@ export default function ProfileEditor({ node, mode, locale }: Props) {
         <Field label={t.field.product}>
           <Textarea value={form.product} onChange={v => setForm(p => ({ ...p, product: v }))} rows={2} maxLength={600} />
         </Field>
+
+        {/* 这三段是全站唯一无法被同质化的内容，所以给它们一块米绿底，
+            和上面那些「资料」区分开——它们不是简历，是这个人本身。 */}
+        <div className="rounded-xl border border-[#2f513d]/10 bg-[#f3f6ef] p-4 grid gap-3.5">
+          <p className="text-[11.5px] leading-relaxed text-text-light">{t.field.humanHint}</p>
+          <Field label={t.field.moment}>
+            <Textarea
+              value={form.moment}
+              onChange={v => setForm(p => ({ ...p, moment: v }))}
+              rows={2}
+              maxLength={BEAUTY_PART_MAX}
+            />
+          </Field>
+          <Field label={t.field.create}>
+            <Textarea
+              value={form.create}
+              onChange={v => setForm(p => ({ ...p, create: v }))}
+              rows={2}
+              maxLength={BEAUTY_PART_MAX}
+            />
+          </Field>
+          <Field label={t.field.seed}>
+            <Textarea
+              value={form.seed}
+              onChange={v => setForm(p => ({ ...p, seed: v }))}
+              rows={2}
+              maxLength={800}
+            />
+          </Field>
+        </div>
 
         <div className="grid grid-cols-2 gap-3 max-md:grid-cols-1">
           <Field label={t.field.wechat}>

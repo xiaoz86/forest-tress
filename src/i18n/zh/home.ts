@@ -275,9 +275,9 @@ export const home = {
         createPlaceholder: '也许是一个产品、一种体验、一个空间、一种生活方式……',
         hobby: '兴趣爱好',
         hobbyPlaceholder: '工作之外让你心动的事，如:徒步、烘焙、爵士乐、独立电影……',
-        /** 提交时给两段回答各加的前缀，会跟着答案一起入库 */
-        momentPrefix: '「时刻」',
-        createPrefix: '「想创造或守护」',
+        // 「时刻」/「想创造或守护」两个前缀已移到 src/lib/beauty.ts。
+        // 它们不是给人看的文案，是**入库的格式**：放在 i18n 里意味着
+        // 改一次翻译就可能改掉存储格式，而拆它的 splitBeauty 在另一个文件里。
       },
 
       step5: {

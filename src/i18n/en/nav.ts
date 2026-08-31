@@ -13,7 +13,8 @@ export const nav: typeof zhNav = {
     meditations: 'Explore',
     philCoach: 'Within',
     shares: 'Create',
-    creators: 'Sky',
+    // 和 Nearby Forest 成对。原来是光秃秃的 'Sky'，没说这是谁的天
+    creators: 'Nearby Sky',
     about: 'About',
     contact: 'Contact us',
   },

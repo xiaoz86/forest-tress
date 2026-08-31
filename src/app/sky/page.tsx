@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 /**
- * 遇见星空。
+ * 附近星空。
  *
  * 和「创造者森林」（/creators）是同一批人的两种看法：
  * 森林回答「我如何生长」，星空回答「我能看见谁、谁正在靠近」。

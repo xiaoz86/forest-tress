@@ -137,7 +137,7 @@ export const creatorDetail = {
     cancel: '取消',
     save: '保存更改',
     saving: '保存中…',
-      skyTitle: '出现在「遇见星空」里',
+      skyTitle: '出现在「附近星空」里',
       skyHint:
         '星空把所有人放在同一屏，并且会用 AI 从「优势」「可以提供」「在寻找」里推断谁和谁可以一起做点什么，把结论连同名字一起展示出来。关掉之后你仍然在创造者森林里，只是不出现在那片天上，也不参与这项分析。',
       skyOn: '愿意',
@@ -155,6 +155,10 @@ export const creatorDetail = {
       product: '产品 / 项目（旧字段，建议改用作品书架）',
       wechat: '微信号',
       email: '邮箱 *',
+      humanHint: '下面三段只会出现在「附近星空」的星光卡上。它们是这张卡里唯一无法被同质化的部分——留白也没关系，但填了就会被看见。',
+      moment: '你生命里的一个美的时刻',
+      create: '你想创造或守护的美',
+      seed: '你心里的那颗种子',
     },
     error: {
       nameRequired: '名字不能为空',

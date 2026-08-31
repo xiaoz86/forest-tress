@@ -135,6 +135,10 @@ export const creatorDetail: typeof zhCreatorDetail = {
       product: 'Product / project (legacy field—use the work shelf instead)',
       wechat: 'WeChat ID',
       email: 'Email *',
+      humanHint: 'These three only appear on your star card in Creator Sky. They are the part of this card no one else can write — leaving them blank is fine, but if you fill them in, they will be seen.',
+      moment: 'A moment of beauty in your life',
+      create: 'The beauty you want to make or protect',
+      seed: 'The seed you are carrying',
     },
     error: {
       nameRequired: 'Name can’t be empty',

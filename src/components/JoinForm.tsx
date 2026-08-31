@@ -3,6 +3,7 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import MatchedNodes from './MatchedNodes';
 import { dict } from '@/i18n';
+import { joinBeauty } from '@/lib/beauty';
 import type { Locale } from '@/lib/locale';
 import type { MatchedNode } from '@/lib/match';
 
@@ -259,13 +260,10 @@ export default function JoinForm({ locale }: { locale: Locale }) {
     setStatus('submitting');
     setErrorMsg(null);
 
-    // beautyMoment + beautyCreate 合并进 beauty 列；空段自动跳过
-    const beauty = [
-      data.beautyMoment.trim() ? `${t.step4.momentPrefix}${data.beautyMoment.trim()}` : '',
-      data.beautyCreate.trim() ? `${t.step4.createPrefix}${data.beautyCreate.trim()}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n\n');
+    // beautyMoment + beautyCreate 合并进 beauty 列。
+    // 格式（前缀、分隔、空段跳过）统一由 lib/beauty.ts 负责——
+    // 拆它的是 splitBeauty，拼和拆必须同源，否则编辑一次就会把两段搅成一段。
+    const beauty = joinBeauty(data.beautyMoment, data.beautyCreate, locale);
 
     // 保留有 title 的作品；同时记录每条对应的封面文件（按入库后顺序索引）
     const worksForJson: { title: string; desc: string; url: string }[] = [];

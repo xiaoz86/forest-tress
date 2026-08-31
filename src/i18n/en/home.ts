@@ -269,8 +269,9 @@ export const home: typeof zhHome = {
         createPlaceholder: 'Maybe a product, an experience, a space, a way of living…',
         hobby: 'What you love doing',
         hobbyPlaceholder: 'What moves you outside of work—hiking, baking, jazz, independent film…',
-        momentPrefix: '[Moment] ',
-        createPrefix: '[Want to make or protect] ',
+        // 「时刻」/「想创造或守护」两个前缀已移到 src/lib/beauty.ts。
+        // 它们不是给人看的文案，是**入库的格式**：放在 i18n 里意味着
+        // 改一次翻译就可能改掉存储格式，而拆它的 splitBeauty 在另一个文件里。
       },
 
       step5: {

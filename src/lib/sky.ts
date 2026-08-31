@@ -1,3 +1,4 @@
+import { splitBeauty } from '@/lib/beauty';
 import { isInSky } from '@/lib/nodeVisibility';
 import type { NodeCard } from '@/lib/supabase';
 
@@ -78,23 +79,6 @@ function halton(index: number, base: number): number {
   return r;
 }
 
-/**
- * `beauty` 一列里存着两段带前缀的文本，前缀是提交时拼上去的。
- * 按前缀拆开就是两块内容，不需要改库结构。任一段缺失只渲染另一段。
- */
-export function splitBeauty(beauty: string | undefined): { moment: string; create: string } {
-  const raw = (beauty || '').trim();
-  if (!raw) return { moment: '', create: '' };
-
-  const momentMatch = raw.match(/「时刻」([\s\S]*?)(?=「想创造或守护」|$)/);
-  const createMatch = raw.match(/「想创造或守护」([\s\S]*)$/);
-  const moment = momentMatch ? momentMatch[1].trim() : '';
-  const create = createMatch ? createMatch[1].trim() : '';
-
-  // 两个前缀都没有：整段当作「时刻」，别把内容丢掉
-  if (!moment && !create) return { moment: raw, create: '' };
-  return { moment, create };
-}
 
 const DAY = 86_400_000;
 
