@@ -950,9 +950,43 @@
   /* 窄屏地平线离文案很近，绝对定位会和 CTA 打架，回到常规流 */
   .sky-search { position: static; max-width: 100%; margin-top: 20px; }
   .sky-qmsg { position: static; margin-top: 12px; }
-  .sky-lens { min-height: auto; }
-  .sky-lens { padding-top: 80px; }
-  .sky-see { width: 100%; margin-bottom: 12px; }
+  /* 窄屏上文字占满整幅，星座就没有能被看见的地方了——连线会从字里穿过去，
+     读起来是噪点而不是一个星座。桌面上文字只占左半边，右边那片空天是它被
+     看见的地方；手机上没有「右边」，只能改成「上边」。
+     所以内容压到下半屏，上面留出一片干净的天。
+     「同一片天，换一个角度看」这句话要成立，就得真的看得见那片天。 */
+  .sky-lens {
+    min-height: 100svh;
+    justify-content: flex-end;
+    padding-top: 38svh;
+    padding-bottom: 34px;
+    /* 渐变跟着走：上面几乎不压暗，星座才亮得出来；下半段压实，文字才有底 */
+    background: linear-gradient(
+      180deg,
+      rgba(3, 14, 11, 0) 0%,
+      rgba(3, 14, 11, 0) 28%,
+      rgba(4, 17, 13, 0.6) 46%,
+      rgba(5, 21, 16, 0.9) 100%
+    );
+  }
+  /* 「看见」原来 width:100% 会独占一行，加上三个镜头名一共折成四行、吃掉
+     101px——那正是上面那片天要用的高度。改成一行横向滚动。 */
+  .sky-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sky-tabs::-webkit-scrollbar { display: none; }
+  .sky-tabs > * { flex: 0 0 auto; }
+  .sky-tab:last-child { margin-right: 0; }
+  /* 三个镜头名 375px 上排不下，第三个会被切掉——而横向滚动在手机上没有任何
+     可见的提示，等于把「新升起的星」藏了起来。「看见」只是装饰性的引导词，
+     让它先走：tablist 上有 aria-label，读屏器那边一点不少。 */
+  .sky-see { display: none; }
+  .sky-tab { margin-right: 18px; }
+  /* 小芽的悬浮按钮压在最后一行说明上。它是 fixed 的，只能靠留白让开 */
+  .sky-lens { padding-bottom: 92px; }
   /* 星光卡改 Bottom Sheet */
   .sky-panel {
     top: auto; bottom: 0; right: 0; left: 0;
