@@ -683,6 +683,13 @@
 /* 结尾：整页唯一一次让「树」和「星」同框 */
 .sky-closing {
   position: relative;
+  /* ⚠️ z-index: 0 不能省。.sky-closing-sky 要用 z-index: -1 才能排到
+     ::before 月光之下，而负 z-index 后代只在**本元素是层叠上下文**时
+     才停在它自己的背景之上；否则它会一路掉到最近的层叠上下文
+     （.sky-content，z-index: 2）底下去，被这条背景渐变整个盖死。
+     用 z-index: 0 而不是 isolation: isolate——效果相同，兼容面更宽。
+     它不改变 .sky-closing 相对 .sky-hero 的绘制次序：两者同属树序那一步。 */
+  z-index: 0;
   overflow: hidden;
   padding: 120px clamp(24px, 6vw, 88px) 0;
   text-align: center;
@@ -711,6 +718,31 @@
     transparent 78%
   );
 }
+/* 结尾屏自己的那片天。
+   它**随 section 滚动**，这和固定的 .sky-layer 不同，是刻意的：
+   固定层是「我们共享的那片天」，它不动，你从它下面滑过；
+   这一层是「你和另一个人坐下来一起看的那片天」，跟着你落座的那块地一起升上来。
+   星本体直接复用 .sky-bg / .sky-still，连 skyTwinkle 和
+   prefers-reduced-motion 里那条 animation:none 一起白拿。 */
+.sky-closing-sky {
+  position: absolute;
+  inset: 0;
+  z-index: -1;          /* section 背景之上，月光与树之下 */
+  pointer-events: none; /* .sky-content 已是 none 且可继承；显式写死，
+                           免得将来有人把这个 div 挪出去就出事 */
+}
+.sky-closing-field { position: absolute; inset: 0; }
+
+/* 窄屏减星。section 面积只有桌面的四分之一，44 颗放上去密度翻四倍，
+   「留白就是还有位置」这个论点会被整个抹掉。
+   Halton 是低差异序列，**前缀本身仍然是铺开的**，直接截尾不会留洞。 */
+@media (max-width: 980px) {
+  .sky-closing-field > span:nth-child(n + 33) { display: none; }
+}
+@media (max-width: 640px) {
+  .sky-closing-field > span:nth-child(n + 21) { display: none; }
+}
+
 /* padding 必须大于树的高度（300px）。树是绝对定位贴底的，
    inner 的底部留白不够时，最后一行文字会直接压在树冠上。 */
 .sky-closing-inner { position: relative; z-index: 1; padding-bottom: 342px; }
@@ -923,6 +955,11 @@
 @media (prefers-reduced-motion: reduce) {
   .sky-bg, .sky-body, .sky-halo, .sky-lines line, .sky-treestar { animation: none !important; }
   .sky-body { opacity: var(--peak); }
+  /* 这两条是补既有 bug：它们的亮度**只**由关键帧给，动画一停 opacity 就回落到 1，
+     比动画区间里任何一帧都亮（halo 区间 0.16~0.5、冠隙星 0.22~0.9）。
+     结果是「减弱动态」反而让光晕和树上的星刺眼。取各自区间的中段。 */
+  .sky-halo { opacity: 0.3; }
+  .sky-treestar { opacity: 0.58; }
   .sky-lines line { stroke-dashoffset: 0; }
   .sky-panel, .sky-scrim { transition: none; }
 }

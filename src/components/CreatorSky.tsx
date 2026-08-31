@@ -38,6 +38,25 @@ const AMBIENT_COLORS = ['#F7F0DC', '#ECEFE4', '#FFF2D1', '#E4E9DC', '#F0E5CE'];
 const AMBIENT_COUNT = 168;
 
 /**
+ * 结尾屏星场的数量。首屏 168 颗铺满一屏，这里只取约三成密度。
+ *
+ * 稀是论点本身，不是省事：这一屏写的是「这里也可以有你的光」。
+ * 如果最后一屏的天和首屏一样满，这句话在画面上就是被否定的——
+ * 天已经排满了，哪还有你的位置。留白就是「还有位置」。
+ * 窄屏再由 CSS 截到 32 / 20 颗（见 globals.css 的 .sky-closing-field）。
+ */
+const CLOSING_COUNT = 44;
+
+/**
+ * 给「还没被点亮的那一颗」留的空位，section 百分比坐标。
+ *
+ * 位置正在两个仰望者抬头的方向上，而 CTA「点亮属于我的星」就在它正下方。
+ * 结尾那颗流星是**反解**几何、终点固定落在这里的——一道光划过来，
+ * 在那个还空着的位置上熄灭，下面紧接着就是那句邀请。
+ */
+const CLOSING_VOID = { x: 57, y: 26, rx: 11, ry: 9 };
+
+/**
  * 导航安全区。导航栏是固定高度的像素条，压在星空最上层——
  * 落进这条带的星既看不清也点不到（实测「John」就被 h-[72px] 那层挡住）。
  * 底部同样留一点，避免星贴在山林里。
@@ -233,27 +252,19 @@ function buildTree() {
     };
   }).filter(Boolean) as { cx: number; cy: number; r: number; d: number; delay: number }[];
 
-  const skyStars = Array.from({ length: 10 }, (_, i) => ({
-    cx: 50 + skyHash(`k${i}`, 3) * 460,
-    cy: 12 + skyHash(`k${i}`, 5) * 90,
-    r: 0.7 + skyHash(`k${i}`, 7) * 1.2,
-    d: lerp(4.6, 9.8, skyHash(`k${i}`, 11)),
-    delay: -9 * skyHash(`k${i}`, 13),
-  }));
+  // 这里原本还有 10 颗 skyStars，已删。它们绑在树的坐标系里（cx 0~560），
+  // 会跟着树一起缩放——桌面上只占中间 560px，读起来像树自己结的星，
+  // 成了圣诞树的比喻；而这一屏的句子是「星向上发光」，星是另一个人，不是树的果实。
+  // 而且其中 3 颗一直落在不透明树冠底下，从来没被看见过。
+  // 现在整屏的天由 .sky-closing-field 负责，用 section 百分比、不随树缩放。
+  // gapStars 保留：它们的意义不是「天」，是**遮挡**——同一片天从冠隙里露出来。
 
-  // 坐在树右侧的两个人。头单独画成圆，微微后仰。
+  // 坐在树干右侧的两个人。
   // 两人朝同一侧，因为他们在看**同一片**天。面对面就成了对话，不是共望。
   // 挨得近但不重叠——附近森林讲的是连接，不是合为一体。
-  // 两人朝同一侧，因为他们在看**同一片**天。面对面就成了对话，不是共望。
-  // 挨得近但不重叠——附近森林讲的是连接，不是合为一体。
-  // 两人朝同一侧，因为他们在看**同一片**天。面对面就成了对话，不是共望。
-  // 挨得近但不重叠——附近森林讲的是连接，不是合为一体。
-  // 两人朝同一侧，因为他们在看**同一片**天。面对面就成了对话，不是共望。
-  // 挨得近但不重叠——附近森林讲的是连接，不是合为一体。
-  // 两人朝同一侧，因为他们在看**同一片**天。面对面就成了对话，不是共望。
-  // 挨得近但不重叠——附近森林讲的是连接，不是合为一体。
-  // 尺寸按**窄屏**定：整棵树在 375px 上只有 124px 高，人再按桌面尺寸画
-  // 到手机上就剩十几像素，看不出是人。
+  // 尺寸按**窄屏**定：375px 下 SVG 被宽度限死在 0.616 倍，整棵树只有约 152px 高
+  // （冠顶 y=45 到地面 y=292，共 247 个 viewBox 单位）。
+  // 人再按桌面尺寸画，到手机上就剩十几像素，看不出是人。
   const watchers = [
     { x: 340, y: 291, k: 1.46, tilt: 1.0 },
     { x: 371, y: 292, k: 1.24, tilt: 0.2 },
@@ -264,9 +275,51 @@ function buildTree() {
     branches: branches.join(' '),
     canopy: canopy.join(' '),
     gapStars,
-    skyStars,
     watchers: watchers.map(w => seatedWatcher(w.x, w.y, w.k, w.tilt)),
   };
+}
+
+/** 一颗流星。scope 决定它挂在固定星空层还是结尾屏自己的天里。 */
+type Shot = {
+  key: number;
+  scope: 'sky' | 'closing';
+  top: number;
+  left: number;
+  ang: number;
+  len: number;
+  dist: number;
+  dur: number;
+};
+
+/**
+ * 流星本体。两处共用。
+ *
+ * 除了 onAnimationEnd 还挂了一道定时兜底：**后台标签页里 animationend 可能不触发**，
+ * 那样这颗就会永远留在 DOM 里，把下一颗堵住（state 只存一颗）。
+ */
+function Meteor({ m, onEnd }: { m: Shot; onEnd: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onEnd, m.dur * 1000 + 400);
+    return () => clearTimeout(t);
+  }, [m.key, m.dur, onEnd]);
+
+  return (
+    <span
+      className="sky-meteor"
+      aria-hidden="true"
+      onAnimationEnd={onEnd}
+      style={
+        {
+          left: `${m.left.toFixed(2)}%`,
+          top: `${m.top.toFixed(2)}%`,
+          '--len': `${m.len.toFixed(0)}px`,
+          '--ang': `${m.ang.toFixed(1)}deg`,
+          '--dist': `${m.dist.toFixed(0)}px`,
+          '--dur': `${m.dur.toFixed(2)}s`,
+        } as React.CSSProperties
+      }
+    />
+  );
 }
 
 export default function CreatorSky({ stars, meId, nearby, risingIds, constellations, t }: Props) {
@@ -284,12 +337,15 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
    * 再密就成了粒子特效，而规格明确禁止把夜空做成装饰特效。
    * 服务端首帧不渲染（初始 null），所以不会有 hydration 不一致。
    */
-  const [meteor, setMeteor] = useState<{
-    key: number; top: number; left: number; ang: number; len: number; dist: number; dur: number;
-  } | null>(null);
+  const [meteor, setMeteor] = useState<Shot | null>(null);
+  /** 结尾屏是否已进入视野。流星在哪一层出现由它决定。 */
+  const [closingVisible, setClosingVisible] = useState(false);
+  /** 本次停留已经放了几颗。流星不是循环播放的特效。 */
+  const closingShots = useRef(0);
 
   const skyRef = useRef<HTMLDivElement>(null);
   const lensRef = useRef<HTMLElement>(null);
+  const closingRef = useRef<HTMLElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const lastFocus = useRef<HTMLElement | null>(null);
 
@@ -333,31 +389,156 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
     [],
   );
 
+  /**
+   * 结尾屏自己的那片天。
+   *
+   * 和固定层的区别是刻意的：这一层**随 section 一起滚动**。
+   * 固定层是「我们共享的那片天」，它不动，你从它下面滑过；
+   * 这一层是「你和另一个人坐下来一起看的那片天」，它跟着你落座的那块地一起升上来。
+   *
+   * 沿用同一套 AMBIENT_COLORS 色温、同一支 skyTwinkle、同一条幂律（只压低上限），
+   * 所以它仍然是同一片天，只是更少、更靠近地平线。
+   * 结尾层里**一颗创造者星都不放**——那 17 颗有名字的人属于共享的天；
+   * 这一屏说的是「还没被点亮的那一颗」，所以这里所有的光都是匿名的。
+   */
+  const closingSky = useMemo(() => {
+    const out: {
+      x: number; y: number; size: number; color: string;
+      o: number; still: boolean; glow: boolean; d: number; delay: number;
+    }[] = [];
+
+    // 多取候选，落进空位的直接跳过。固定上界，不做无界拒绝采样
+    for (let i = 0; out.length < CLOSING_COUNT && i < 96; i += 1) {
+      const seed = `cls${i}`; // ⚠️ 必须传字符串：skyHash 收到数字会静默返回常数
+      // +211 偏移不能省：环境星用了 halton(0..167)，创造者星用了 halton(0..16)，
+      // 不偏移就会和它们生成同一批坐标，两层叠起来看得出重复的格点。
+      const x = halton(i + 211, 2) * 100;
+      // ^1.35 把星压向上方，×70 收进树冠顶之上（冠顶约在 section 的 68%）
+      const y = halton(i + 211, 3) ** 1.35 * 70;
+
+      const dx = (x - CLOSING_VOID.x) / CLOSING_VOID.rx;
+      const dy = (y - CLOSING_VOID.y) / CLOSING_VOID.ry;
+      if (dx * dx + dy * dy < 1) continue; // 留给「你」的那块空位，一颗都不放
+
+      // 幂律，但上限只有 4.6px（环境星是 8.4px）：这片天不该盖过那 17 颗创造者星
+      const size = lerp(0.7, 4.6, skyHash(seed, 7) ** 3);
+      // 越靠近地平线越淡。月光会洗掉暗星，物理如此，构图上也让树冠边缘干净
+      const fall = 1 - 0.55 * (y / 70) ** 2;
+
+      out.push({
+        x,
+        y,
+        size,
+        color: AMBIENT_COLORS[Math.floor(skyHash(seed, 17) * 5)],
+        o: lerp(0.16, 0.78, skyHash(seed, 13)) * fall,
+        still: skyHash(seed, 29) > 0.7, // 三成静止，避免整片天同时呼吸
+        glow: size > 3.1,
+        d: lerp(3.4, 11.2, skyHash(seed, 19)),
+        delay: -12 * skyHash(seed, 23),
+      });
+    }
+    return out;
+  }, []);
+
+  // 结尾屏进入半屏才算「他们坐下来了」。0.18（镜头区那个阈值）太早，
+  // 那时树还没露出来，流星会放在一片还看不见的天上。
+  useEffect(() => {
+    const el = closingRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      es =>
+        es.forEach(e => {
+          if (e.isIntersecting) closingShots.current = 0; // 重新进入 = 重新给三颗
+          setClosingVisible(e.isIntersecting);
+        }),
+      { threshold: 0.45 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  /**
+   * 流星。**一个调度器，两个落点**。
+   *
+   * 结尾屏可见时不再往固定层放：那一层被 0.84~0.92 的渐变盖着，划了也看不见，
+   * 纯属浪费；而且天上同时两颗，「偶然一次」的读法立刻塌成粒子特效。
+   *
+   * 结尾那颗的意义不是许愿——许愿是「我想要」，主语错了。
+   * 文案是「也许**刚好**有人正在寻找这样的你」，流星是「刚好」的视觉形式：
+   * 一次抵达，恰好在他们抬头的时候。所以它必须绑在「被看见」上，
+   * 一颗没人在场时划过的流星，恰好就是整页在反对的那件事。
+   */
   useEffect(() => {
     // 减弱动态时一颗都不放，也不必空转定时器
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
 
     let timer: ReturnType<typeof setTimeout>;
     const rand = (a: number, b: number) => a + Math.random() * (b - a);
-    const schedule = () => {
-      timer = setTimeout(() => {
-        // 一半从左上往右下，一半从右上往左下，避免总是同一个方向
-        const toLeft = Math.random() < 0.5;
-        setMeteor({
-          key: Date.now(),
-          top: rand(4, 42),
-          left: toLeft ? rand(52, 92) : rand(6, 46),
-          ang: toLeft ? rand(148, 166) : rand(14, 32),
-          len: rand(64, 132),
-          dist: rand(260, 520),
-          dur: rand(0.9, 1.5),
-        });
-        schedule();
-      }, rand(9000, 26000));
+
+    /**
+     * 结尾那颗：几何是**反解**出来的——先定终点（那个留白的空位），再倒推起点。
+     * 不用手调的 left/top 区间，是因为按桌面定的 dist 到 375px 上必然失效，
+     * 流星会整个飞出屏幕左侧。这样写，无论多宽的屏它都在同一个位置熄灭。
+     */
+    const fireClosing = () => {
+      const w = window.innerWidth;
+      const h = closingRef.current?.offsetHeight || 793;
+      const toLeft = Math.random() < 0.5;
+      const ang = toLeft ? rand(153, 167) : rand(13, 27);
+      const rad = (ang * Math.PI) / 180;
+      const dxPct = rand(22, 30); // 横向恒定跨过约四分之一屏宽
+      const dist = ((dxPct / 100) * w) / Math.abs(Math.cos(rad));
+      const endX = CLOSING_VOID.x + rand(-3, 3); // 抖一下，免得看出是个固定靶子
+      const endY = CLOSING_VOID.y + rand(-3, 3);
+      setMeteor({
+        key: Date.now(),
+        scope: 'closing',
+        left: toLeft ? endX + dxPct : endX - dxPct,
+        top: Math.max(3, endY - ((dist * Math.sin(rad)) / h) * 100),
+        ang,
+        dist,
+        len: dist * 0.34, // 尾长恒为行程的三分之一，窄屏不会缩成一个点
+        dur: 0.55 + dist / 460, // 速度恒定：桌面约 1.4s，375px 约 0.8s
+      });
     };
-    schedule();
+
+    /** 固定层那颗：原样保留 */
+    const fireSky = () => {
+      // 一半从左上往右下，一半从右上往左下，避免总是同一个方向
+      const toLeft = Math.random() < 0.5;
+      setMeteor({
+        key: Date.now(),
+        scope: 'sky',
+        top: rand(4, 42),
+        left: toLeft ? rand(52, 92) : rand(6, 46),
+        ang: toLeft ? rand(148, 166) : rand(14, 32),
+        len: rand(64, 132),
+        dist: rand(260, 520),
+        dur: rand(0.9, 1.5),
+      });
+    };
+
+    const tick = () => {
+      if (closingVisible) {
+        // 上限三颗，之后这片天安静下来。流星不是循环播放的特效
+        if (closingShots.current >= 3) return;
+        fireClosing();
+        closingShots.current += 1;
+        // 结尾是最后一屏，停留短，间隔必须比首屏（9~26s）压紧一档，
+        // 否则第二颗永远等不到
+        timer = setTimeout(tick, rand(7000, 14000));
+      } else {
+        fireSky();
+        timer = setTimeout(tick, rand(9000, 26000));
+      }
+    };
+
+    // 第一颗的时机：读完「这里也可以有你的光」+ 副标题约 2~3s。
+    // 早于 2s 会和阅读抢注意力；2.6s 前后正是视线读完标题、正往下移到树的那一刻，
+    // 流星把视线拉回上方，正好是构图想要的眼动。
+    timer = setTimeout(tick, closingVisible ? rand(2200, 3400) : rand(9000, 26000));
     return () => clearTimeout(timer);
-  }, []);
+  }, [closingVisible]);
 
   useEffect(() => {
     const onResize = () =>
@@ -566,23 +747,8 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
           />
         ))}
 
-        {meteor && (
-          <span
-            key={meteor.key}
-            className="sky-meteor"
-            aria-hidden="true"
-            onAnimationEnd={() => setMeteor(null)}
-            style={
-              {
-                left: `${meteor.left}%`,
-                top: `${meteor.top}%`,
-                '--len': `${meteor.len.toFixed(0)}px`,
-                '--ang': `${meteor.ang.toFixed(1)}deg`,
-                '--dist': `${meteor.dist.toFixed(0)}px`,
-                '--dur': `${meteor.dur.toFixed(2)}s`,
-              } as React.CSSProperties
-            }
-          />
+        {meteor?.scope === 'sky' && (
+          <Meteor key={meteor.key} m={meteor} onEnd={() => setMeteor(null)} />
         )}
 
         <svg className="sky-lines" viewBox={`0 0 ${dims.w} ${dims.h}`} preserveAspectRatio="none" aria-hidden="true">
@@ -766,7 +932,38 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
           </div>
         </section>
 
-        <section className="sky-closing">
+        <section className="sky-closing" ref={closingRef}>
+          {/* 结尾屏自己的天。随 section 滚动，画在 section 背景之上、月光与树之下。
+              ⚠️ 流星必须放在 .sky-closing-field **外面**：窄屏减星是靠
+              nth-child 数序号的，条件挂载的流星混进去会让序号整体漂移。 */}
+          <div className="sky-closing-sky" aria-hidden="true">
+            <div className="sky-closing-field">
+              {closingSky.map((s2, i) => (
+                <span
+                  key={i}
+                  className={`sky-bg ${s2.still ? 'sky-still' : ''}`}
+                  style={
+                    {
+                      left: `${s2.x.toFixed(2)}%`,
+                      top: `${s2.y.toFixed(2)}%`,
+                      width: `${s2.size.toFixed(2)}px`,
+                      height: `${s2.size.toFixed(2)}px`,
+                      background: s2.color,
+                      boxShadow: s2.glow
+                        ? `0 0 ${(s2.size * 2.1).toFixed(1)}px ${(s2.size * 0.5).toFixed(1)}px ${s2.color}38`
+                        : undefined,
+                      '--o': s2.o.toFixed(3),
+                      '--d': `${s2.d.toFixed(2)}s`,
+                      '--delay': `${s2.delay.toFixed(2)}s`,
+                    } as React.CSSProperties
+                  }
+                />
+              ))}
+            </div>
+            {meteor?.scope === 'closing' && (
+              <Meteor key={meteor.key} m={meteor} onEnd={() => setMeteor(null)} />
+            )}
+          </div>
           <div className="sky-closing-inner">
             <h2 className="sky-closing-title">{t.closing.title}</h2>
             <p className="sky-closing-body">{t.closing.body}</p>
@@ -782,7 +979,7 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
           </div>
 
           <svg className="sky-tree" viewBox="0 0 560 300" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
-            {[...tree.skyStars, ...tree.gapStars].map((s, i) => (
+            {tree.gapStars.map((s, i) => (
               <circle
                 key={i}
                 className="sky-treestar"
