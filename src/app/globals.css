@@ -476,12 +476,19 @@
 .sky-content label,
 .sky-content .sky-tabs { pointer-events: auto; }
 /* 文字要能选中，但块级盒子横跨整行会挡住后面的星；fit-content 让盒子只包住文字。
-   带背景的块必须排除，否则背景在文字末尾断掉，星空从断口露出来。 */
+   带背景的块必须排除，否则背景在文字末尾断掉，星空从断口露出来。
+
+   ⚠️ 这里**不能**再写 max-width。这条选择器的特异性是 (0,2,1)，
+   会压过 .sky-lead-main / .sky-lead-sub 自己的 (0,1,0)——那两条
+   15em / 26em 的行宽限制曾经因此静默失效了很久，短文案时看不出来，
+   换成长文案才暴露：主句拉成一整行、补充句拖出一条只剩几个字的尾行。
+   而且它本来就是多余的：width: fit-content 的用值是
+   min(max-content, 可用宽度)，本身就不会超出容器。 */
 .sky-content h1,
 .sky-content h2,
 .sky-content h3,
 .sky-content p:not(.sky-note),
-.sky-content dl { pointer-events: auto; width: fit-content; max-width: 100%; }
+.sky-content dl { pointer-events: auto; width: fit-content; }
 .sky-content .sky-note { pointer-events: auto; width: auto; }
 
 /* 退出星空的那句。比正文再暗一档，但下划线保证它读得出是可点的——
@@ -538,9 +545,11 @@
   color: #eae6d9;
   font-weight: 400;
   letter-spacing: 0.01em;
-  max-width: 15em;
-  /* balance 让两行长度接近，避免末行只剩「人。」这样的孤字。
-     中文没有连字符，一个字掉到第二行会特别扎眼。 */
+  /* 17em 不是随手定的：主句现在是 16 个字，15em 下必然折行，而中文没有
+     词边界，balance 只按长度均分——断点会落在「聚在 / 一起」，把一个词劈开。
+     17em 让它在桌面上排成一整行。窄屏容器不够时仍会折成两行，
+     那时 balance 至少保证两行等长，不会掉出「辰。」这样的孤字。 */
+  max-width: 17em;
   text-wrap: balance;
 }
 /* 副句退一档：它是补充说明，不该和主句一样重 */
@@ -549,7 +558,14 @@
   font-size: 15px;
   line-height: 1.9;
   color: rgba(198, 210, 196, 0.62);
-  max-width: 26em;
+  /* 24em 是量出来的，不是估的：这句在分号处正好分成
+     「靠…；」+「彼此辉映，成为…」两段，24em 让断点**落在分号上**，
+     一行一个意群。26em 会断在「彼此 / 辉映」，把词劈开——
+     中文没有词边界，浏览器只按宽度断，靠行宽把断点顶到标点上是唯一的办法。
+     换文案时要重新量一次。 */
+  max-width: 24em;
+  /* 兜底：万一换了文案断点跑掉，至少不掉出只剩一两个字的尾行 */
+  text-wrap: pretty;
 }
 /* 「低存在感」不该低到读不清：0.44 的对比度约 2.5:1，低于 AA 的 4.5:1 */
 /* 全页唯一的实时数据。加一道细线把它和上面的文案隔开，

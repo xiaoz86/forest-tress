@@ -722,7 +722,59 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
 
   const nearbySet = useMemo(() => new Set(nearby.ids), [nearby]);
   const showWhy = open && lensActive && lens === 'near' && !searching && nearbySet.has(open.id);
-  const sharedTopic = open && me ? open.topics.find(x => me.topics.includes(x)) : undefined;
+  /**
+   * 「为什么你们可能会靠近」——**只说查得到的事**。
+   *
+   * 原来这里是 `TA 正在{doing 截前 24 字}。`，三重坏：
+   *   一、doing 是第一人称写的（「我是生活整理师…」），套进「TA 正在」
+   *       就成了「TA 正在我是生活整理师…」；
+   *   二、24 字硬切再补句号，切点落在词中间：「…摆脱那些不必。」；
+   *   三、doing 正上方那一栏已经完整显示过一遍了，这是重复，而且是坏掉的那份。
+   * 再加一句对所有人都一样的结尾，整块读下来等于什么也没说。
+   *
+   * 现在每条理由都由「我」和这颗星的真实字段算出来，一条都算不出就整块不显示——
+   * 和下面「美 / 种子」那块同一条纪律：绝不用生成的句子填空。
+   */
+  const why = useMemo(() => {
+    if (!open || !me) return null;
+    const p = t.panel;
+    /**
+     * 排版用：拉丁开头的词（「AI」这类）前面补一个窄空格，
+     * 否则嵌进中文句子会挤成「提供的AI，」。
+     *
+     * **只补前面，不补后面**：模板里 {topic} 后面跟的都是「，」「。」这类
+     * 中文全角标点，它们自带左侧边距，再加空格会变成「AI ，正是」。
+     */
+    const pad = (v: string) => (/^[A-Za-z0-9]/.test(v) ? '\u2009' + v : v);
+    const lines: string[] = [];
+
+    // 互补最强：一方写下的「可以提供」正好落在另一方的「在寻找」里
+    // ⚠️ 匹配用原值，排版才用 pad()——带了窄空格的字符串拿去 includes 会全部落空
+    const raw = (x: string) => x.split(' / ')[0].trim();
+    const give = open.offer ? open.topics.find(x => me.seeking.includes(raw(x))) : undefined;
+    const take = me.offer ? me.topics.find(x => open.seeking.includes(raw(x))) : undefined;
+    if (give) lines.push(fill(p.whyGive, { topic: pad(raw(give)) }));
+    if (take) lines.push(fill(p.whyTake, { topic: pad(raw(take)) }));
+
+    const shared = open.topics.filter(x => me.topics.includes(x)).slice(0, 2);
+    if (shared.length) lines.push(fill(p.whyShared, { topics: pad(shared.join('、')) }));
+
+    // 星轨是注册后 AI 抽的词，比议题细。已经有共同议题时不再叠这一层
+    const kw = shared.length ? [] : open.keywords.filter(k => me.keywords.includes(k)).slice(0, 2);
+    if (kw.length) lines.push(fill(p.whyOrbit, { keywords: pad(kw.join('、')) }));
+
+    const sameCity = Boolean(me.city && open.city && me.city === open.city);
+    if (sameCity) lines.push(fill(p.whyCity, { city: pad(open.city) }));
+
+    // 兜底：pickNearby 可能只因为「最近更新过」就选中了 TA，那也得说得出口
+    if (!lines.length && open.recent) lines.push(p.whyRecent);
+    if (!lines.length) return null;
+
+    // 结尾跟着最强的那条理由走，不再是所有人同一句
+    const end =
+      give || take ? p.endComplement : sameCity ? p.endCity : shared.length ? p.endShared : p.endDefault;
+    return { lines, end };
+  }, [open, me, t]);
 
   return (
     <>
@@ -1094,12 +1146,13 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
               )}
             </dl>
 
-            {showWhy && (
+            {showWhy && why && (
               <div className="sky-why">
                 <dt>{t.panel.whyTitle}</dt>
-                {sharedTopic && <p>{fill(t.panel.whyShared, { topic: sharedTopic })}</p>}
-                {open.doing && <p>{fill(t.panel.whyThem, { doing: open.doing.slice(0, 24) })}</p>}
-                <p>{t.panel.whyEnd}</p>
+                {why.lines.map((line, i) => (
+                  <p key={i}>{line}</p>
+                ))}
+                <p>{why.end}</p>
               </div>
             )}
 
