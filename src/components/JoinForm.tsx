@@ -792,7 +792,7 @@ export default function JoinForm({ locale }: { locale: Locale }) {
           </StepBody>
         )}
 
-        {step === 7 && (
+        {step === STEP_COUNT && (
           <StepBody title={t.step7.title} subtitle={t.step7.subtitle}>
             <Field label={t.step7.photo}>
               <div className="flex items-center gap-4">
@@ -852,6 +852,15 @@ export default function JoinForm({ locale }: { locale: Locale }) {
               <p className="text-[13px] text-coral mt-2 text-center">{errorMsg}</p>
             )}
           </StepBody>
+        )}
+
+        {/* 最后一步才出现的告知：「会出现在哪里」是按下那一刻才真正发生的事，
+            而星空会用 AI 读你的资料并把结论公开，那不该是事后才知道的。
+            放在按钮正上方，不是塞进某一步的小字里。 */}
+        {step === 7 && (
+          <p className="mt-8 text-[12.5px] leading-[1.9] text-text-light border-l-2 border-leaf/25 pl-3.5">
+            {t.whereYouAppear}
+          </p>
         )}
 
         {/* 底部导航 */}

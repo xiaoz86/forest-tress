@@ -322,6 +322,8 @@ export const home: typeof zhHome = {
       prev: '← Back',
       next: 'Next →',
       lastStep: 'Last step · how to reach you →',
+      whereYouAppear:
+        'Once planted, you appear in the Creator Forest and as a star in Nearby Sky — neither shows your contact details. The sky also reads what you offer and what you are looking for, with AI, to see what you might build with someone. You can turn the sky off later on your own page.',
       submit: '🌱 Plant my seed',
       submitting: 'Planting…',
 
