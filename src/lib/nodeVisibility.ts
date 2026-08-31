@@ -126,13 +126,3 @@ export function isInSky(node: Pick<NodeCard, 'in_sky'> | null | undefined): bool
   return (node.in_sky ?? true) !== false;
 }
 
-/**
- * 星空里的人。/sky 页、星座聚类、「今夜与你靠近」、「新升起的星」——全部走这里。
- *
- * 和 fetchListedNodes 同一条纪律：判定只有一处。
- * 这个仓库有过「同一个 bug 只修了一边」的前科，而这次漏掉一处的后果是
- * **一个明确说了不想进星空的人仍然出现在星空里**，比列表少一个人严重得多。
- */
-export async function fetchSkyNodes(sb: SupabaseClient): Promise<NodeCard[]> {
-  return (await fetchListedNodes(sb)).filter(isInSky);
-}

@@ -1,3 +1,4 @@
+import { isInSky } from '@/lib/nodeVisibility';
 import type { NodeCard } from '@/lib/supabase';
 
 /**
@@ -98,11 +99,20 @@ export function splitBeauty(beauty: string | undefined): { moment: string; creat
 const DAY = 86_400_000;
 
 /**
- * 把节点卡变成星。
+ * 把节点卡变成星。**收全体在册成员，摘人在这里做。**
  *
  * 顺序很重要：`nodes` 必须按 created_at 稳定排序后传进来，
  * 因为位置里用了序号做 Halton 铺开。新成员只在末尾追加，
  * 已有的星就不会移动。
+ *
+ * ⚠️ 「不进星空」的闸必须在**编号之后**才施加，所以它在这个函数里面，
+ * 而不是在调用方先把人筛掉再传进来。序号是数组下标——
+ * 中间少一个人，他之后所有人的下标都往前挪一位，Halton 取到的就是
+ * 另一个点。实测过：一个人退出，其余 16 人里 14 人的星换了位置，
+ * 最远移动 536px。整片天空会因为一个人的选择而重排，
+ * 那正是上面那句「已有的星就不会移动」要防的事。
+ *
+ * 所以调用方传 fetchListedNodes 的结果（全体在册），不要传筛过的。
  */
 export function toSkyStars(nodes: NodeCard[], now: number = Date.now()): SkyStar[] {
   return nodes.map((node, i) => {
@@ -129,7 +139,9 @@ export function toSkyStars(nodes: NodeCard[], now: number = Date.now()): SkyStar
       recent: Number.isFinite(updated) ? now - updated <= 30 * DAY : false,
       age: Number.isFinite(created) ? Math.floor((now - created) / DAY) : 9999,
     };
-  });
+  })
+  // 编号已经定死，现在才摘人——留下的是空位，不是位移
+  .filter((_, i) => isInSky(nodes[i]));
 }
 
 /**

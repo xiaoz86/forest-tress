@@ -4,7 +4,7 @@ import Nav from '@/components/Nav';
 import CreatorSky from '@/components/CreatorSky';
 import { dict } from '@/i18n';
 import { getLocale } from '@/lib/locale';
-import { fetchSkyNodes } from '@/lib/nodeVisibility';
+import { fetchListedNodes } from '@/lib/nodeVisibility';
 import { getAuthenticatedMemberId } from '@/lib/session';
 import { pickNearby, pickRising, toSkyStars } from '@/lib/sky';
 import { resolveConstellations } from '@/lib/skyConstellations';
@@ -27,9 +27,9 @@ export async function generateMetadata(): Promise<Metadata> {
  * 里面**没有联系方式**。星空把所有人的名字、城市、正在做的事聚合到一屏，
  * 聚合本身就改变了暴露程度——即使每条信息原本都公开。
  *
- * 也因为这个，进星空是可以单独关掉的：fetchSkyNodes 比 fetchListedNodes
- * 多一道 in_sky 闸。关掉的人仍留在创造者森林里，只是不出现在这片天上，
- * 也不参与星座的 AI 分析。见 nodeVisibility.ts 的 isInSky。
+ * 也因为这个，进星空是可以单独关掉的：toSkyStars 里有一道 in_sky 闸。
+ * 关掉的人仍留在创造者森林里，只是不出现在这片天上，也不参与星座的 AI 分析。
+ * 见 nodeVisibility.ts 的 isInSky。
  */
 export default async function SkyPage() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -37,7 +37,7 @@ export default async function SkyPage() {
 
   const [nodes, locale, meId] = await Promise.all([
     supabaseUrl && serviceKey
-      ? fetchSkyNodes(createClient(supabaseUrl, serviceKey))
+      ? fetchListedNodes(createClient(supabaseUrl, serviceKey))
       : Promise.resolve([]),
     getLocale(),
     getAuthenticatedMemberId(),
@@ -45,6 +45,10 @@ export default async function SkyPage() {
 
   // 按加入时间正序：位置用序号做 Halton 铺开，新人只在末尾追加，
   // 已有的星就不会因为有人加入而集体移动。
+  //
+  // ⚠️ 这里传的是**全体在册成员**，不是筛过的。「不进星空」的闸在
+  // toSkyStars 里面、编号之后才施加——先筛再编号会让中间少一个人时
+  // 他之后所有人的星集体位移（实测 16 人里 14 人换位）。
   const ordered = [...nodes].sort((a, b) =>
     String(a.created_at || '').localeCompare(String(b.created_at || '')),
   );
