@@ -1081,21 +1081,7 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
           </svg>
         </section>
 
-        <p className="sky-note">
-          {t.note}
-          {/* 退出的入口。条件是 me 而不是 meId——「不想出现在这里？」这句话
-              只对**确实在这片天上**的人成立；已经退出的人再看到它是荒谬的。
-              放页脚而不是藏进设置里：正在看这片天的人，才是最可能想问
-              「我能不出现在这里吗」的人。 */}
-          {me && (
-            <>
-              {' '}
-              <Link href={`/creators/${me.id}`} className="sky-note-out">
-                {t.noteOptOut}
-              </Link>
-            </>
-          )}
-        </p>
+        <p className="sky-note">{t.note}</p>
       </div>
 
       {/* ══ 星光卡 ══ */}
