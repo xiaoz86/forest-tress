@@ -54,6 +54,37 @@ export async function fetchListedNodes(sb: SupabaseClient): Promise<NodeCard[]> 
 }
 
 /**
+ * 可以拿来做撮合的人。
+ *
+ * 三个调用点（注册那一刻、draft→listed 那一刻、本人手动重新生成）**必须同口径**，
+ * 所以池子的构造也收进这个文件——上面 fetchListedNodes 那句「不要在各处自己拼
+ * filter」不只是说 status。这三处曾经就漂过：/api/join 是 `select('*')` 全表
+ * 只排除自己，既没过 isListed 也没过 isProfileComplete，另外两处是对的。
+ *
+ * 那次漂的后果不是「少推荐几个人」：
+ *   · 候选人的姓名、城市、在做、作品、擅长、可以提供、在寻找、议题会被
+ *     **发给第三方大模型**（见 lib/match.ts 的 callLLMMatch）；
+ *   · 结果会回到新成员的浏览器，并写进他卡上的 ai_recommendations 长期展示。
+ * 也就是说，一个把自己设成 hidden 的人——已经明确表示不想露面——
+ * 他的整段自述会被发出去，并挂在别人的页面上。
+ *
+ * 两道闸性质不同，缺一不可：
+ *   · isListed 是**意愿**：他愿不愿意出现在这个森林里；
+ *   · isProfileComplete 是**质量**：这张卡上的信息够不够拿来配对。
+ * 所以它们没有被并进 isListed，而是在这里一起施加。
+ *
+ * @param excludeId 通常是「我」自己——没人需要被推荐给自己
+ */
+export async function fetchMatchPool(
+  sb: SupabaseClient,
+  excludeId?: string,
+): Promise<NodeCard[]> {
+  return (await fetchListedNodes(sb)).filter(
+    n => n.id !== excludeId && isProfileComplete(n),
+  );
+}
+
+/**
  * 存节点卡时该不该把人放进森林。
  *
  * 只做 draft → listed 这一个方向：填完卡本身就是「加入森林」这个动作，

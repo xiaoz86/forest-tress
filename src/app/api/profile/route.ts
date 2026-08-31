@@ -3,8 +3,7 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
 import { getLocale } from '@/lib/locale';
 import { matchNodesAI } from '@/lib/match';
-import { isProfileComplete } from '@/lib/memberTrust';
-import { NODE_LISTED, fetchListedNodes, shouldPromoteToListed } from '@/lib/nodeVisibility';
+import { NODE_LISTED, fetchMatchPool, shouldPromoteToListed } from '@/lib/nodeVisibility';
 import { getAuthenticatedMemberId } from '@/lib/session';
 import type { NodeCard } from '@/lib/supabase';
 import { toRecommendationSnapshot } from '../join/route';
@@ -196,9 +195,7 @@ export async function PATCH(request: NextRequest) {
   if (promoting && data) {
     after(async () => {
       try {
-        const pool = (await fetchListedNodes(sb)).filter(
-          n => n.id !== nodeId && isProfileComplete(n),
-        );
+        const pool = await fetchMatchPool(sb, nodeId);
         const matches = await matchNodesAI(data as NodeCard, pool, 3, await getLocale());
         if (matches.length === 0) return;
         await sb

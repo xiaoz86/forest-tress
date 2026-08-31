@@ -7,7 +7,7 @@ import { notifyLoginCode } from '@/lib/notify';
 import { matchNodesAI, type MatchedNode } from '@/lib/match';
 import { generateKeywordsAI } from '@/lib/keywords';
 import { notifyNewNode, notifyPeerNewNode, notifyWelcome, getSiteOrigin } from '@/lib/notify';
-import { isListed } from '@/lib/nodeVisibility';
+import { fetchMatchPool, isListed } from '@/lib/nodeVisibility';
 import { getLocale } from '@/lib/locale';
 import {
   signLoginToken,
@@ -284,12 +284,14 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const { data: allNodes } = await supabase
-        .from('node_cards')
-        .select('*');
-      const others = ((allNodes || []) as NodeCard[]).filter(
-        n => n.id !== newNode.id,
-      );
+      /**
+       * 撮合池和另外两处（/api/recommendations、/api/profile 的 draft→listed）
+       * 同口径。这里原来是 `select('*')` 全表只排除自己，既没过 isListed
+       * 也没过 isProfileComplete——于是一个把自己设成 hidden 的人，
+       * 他的整段自述会被发给第三方模型，并挂进新成员卡上的 ai_recommendations。
+       * 发信那一侧本来就有 isListed 闸（见下面「四道闸」），漏的是池子这一侧。
+       */
+      const others = await fetchMatchPool(supabase, newNode.id);
 
       const [aiMatches, aiKeywords] = await Promise.all([
         matchNodesAI(newNode, others, 3, await getLocale()),

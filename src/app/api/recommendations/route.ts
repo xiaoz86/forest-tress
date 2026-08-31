@@ -3,8 +3,7 @@ import { getLocale } from '@/lib/locale';
 import { NextRequest, NextResponse } from 'next/server';
 import { matchNodesAI } from '@/lib/match';
 import { isAdminId } from '@/lib/admin';
-import { isProfileComplete } from '@/lib/memberTrust';
-import { fetchListedNodes } from '@/lib/nodeVisibility';
+import { fetchMatchPool } from '@/lib/nodeVisibility';
 import { getAuthenticatedMemberId } from '@/lib/session';
 import { toRecommendationSnapshot } from '../join/route';
 import type { NodeCard } from '@/lib/supabase';
@@ -61,8 +60,7 @@ export async function POST(request: NextRequest) {
    *                  占掉一个名额还产出一条没道理的推荐。
    * 所以不能只用其中一个顶替另一个。
    */
-  const listed = await fetchListedNodes(sb);
-  const others = listed.filter(n => n.id !== nodeId && isProfileComplete(n));
+  const others = await fetchMatchPool(sb, nodeId);
 
   const matches = await matchNodesAI(me, others, 3, await getLocale());
   const snapshot = matches.map(toRecommendationSnapshot);
