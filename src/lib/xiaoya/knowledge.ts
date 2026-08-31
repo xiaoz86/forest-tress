@@ -21,6 +21,7 @@ const KNOWLEDGE_FILES = [
   '01-manifesto/mission-values.md',
   '02-product/login-registration.md',
   '02-product/meditation-sounds.md',
+  '02-product/creator-sky.md',
   '02-product/node-profile.md',
   '02-product/phil-coach.md',
   '02-product/product-map.md',
@@ -31,6 +32,7 @@ const KNOWLEDGE_FILES = [
   '04-boundaries/current-capabilities.md',
   '04-boundaries/privacy.md',
   '04-boundaries/xiaoya-vs-philcoach.md',
+  '05-design/creator-sky-design.md',
   '05-design/design-philosophy.md',
 ] as const;
 
@@ -40,6 +42,7 @@ const VALID_PAGE_TYPES = new Set<XiaoyaPageType>([
   'creator-directory',
   'creator-profile',
   'creator-profile-edit',
+  'creator-sky',
   'work-editor',
   'share-gallery',
   'share-submission',

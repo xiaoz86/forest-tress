@@ -8,6 +8,7 @@ const PAGE_LABELS: Record<XiaoyaPageContext['pageType'], string> = {
   'creator-directory': '创造者森林列表',
   'creator-profile': '一位创造者的公开个人主页',
   'creator-profile-edit': '自己的节点资料编辑区',
+  'creator-sky': '附近星空——同一批成员看作一片夜空',
   'work-editor': '作品编辑区',
   'share-gallery': '林间分享列表',
   'share-submission': '林间分享投稿区',

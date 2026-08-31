@@ -4,6 +4,7 @@ export type XiaoyaPageType =
   | 'creator-directory'
   | 'creator-profile'
   | 'creator-profile-edit'
+  | 'creator-sky'
   | 'work-editor'
   | 'share-gallery'
   | 'share-submission'
@@ -50,6 +51,7 @@ function pageTypeForPath(pathname: string, category: string): XiaoyaPageType {
   if (pathname === '/') return 'home';
   if (pathname === '/about') return 'forest-about';
   if (pathname === '/creators') return 'creator-directory';
+  if (pathname === '/sky') return 'creator-sky';
   if (CREATOR_PATH_RE.test(pathname)) return 'creator-profile';
   if (pathname === '/login') return 'login';
   if (pathname === '/phil-coach') return 'phil-coach';
