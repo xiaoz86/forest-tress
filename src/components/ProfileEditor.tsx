@@ -43,6 +43,8 @@ type Form = {
   wechat: string;
   email: string;
   topics: string[];
+  /** 进不进「遇见星空」。缺失当 true——老行没有这个值，判 false 会让人凭空消失 */
+  inSky: boolean;
 };
 
 function pickInitial(node: NodeCard): Form {
@@ -58,6 +60,7 @@ function pickInitial(node: NodeCard): Form {
     wechat: node.wechat || '',
     email: node.email || '',
     topics: Array.isArray(node.topics) ? [...node.topics] : [],
+    inSky: node.in_sky !== false,
   };
 }
 
@@ -70,6 +73,14 @@ export default function ProfileEditor({ node, mode, locale }: Props) {
   const t = useMemo(() => dict(locale).creatorDetail.editor, [locale]);
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  /**
+   * 表单基线。**不能直接读 node prop**：保存后只调 router.refresh()，
+   * 那是异步的；在它回来之前重新打开表单，pickInitial 会读到旧值。
+   * 对普通文本字段只是显示一下旧内容，对「进入星空」这个开关是**静默丢意图**——
+   * 「没改就不发」的比较会拿旧基线去比，用户刚打开的那一下就被判成「没改」。
+   * 所以保存成功后立刻用接口返回的整行覆盖它。
+   */
+  const [base, setBase] = useState<NodeCard>(node);
   const [form, setForm] = useState<Form>(() => pickInitial(node));
   const [topicInput, setTopicInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -78,7 +89,7 @@ export default function ProfileEditor({ node, mode, locale }: Props) {
   const formAnchor = useRef<HTMLDivElement>(null);
 
   const startEdit = () => {
-    setForm(pickInitial(node));
+    setForm(pickInitial(base));
     setErr(null);
     setOpen(true);
     // 滚动让用户看到表单
@@ -88,7 +99,7 @@ export default function ProfileEditor({ node, mode, locale }: Props) {
   const cancel = () => {
     setOpen(false);
     setErr(null);
-    setForm(pickInitial(node));
+    setForm(pickInitial(base));
   };
 
   const submit = async () => {
@@ -98,12 +109,27 @@ export default function ProfileEditor({ node, mode, locale }: Props) {
       const res = await fetch(`/api/profile?id=${encodeURIComponent(node.id || '')}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        /**
+         * 后端字段名是 in_sky，表单里叫 inSky，这里显式映射——
+         * 直接把 form 整个丢过去的话，inSky 会被后端当未知字段忽略，
+         * 表现是「开关点了没反应」而且不报错。
+         *
+         * 而且**只在它真的被改过时才发**：in_sky 这一列要迁移才有，
+         * 每次保存都带上，会让还没跑迁移的库上**所有**资料编辑都失败。
+         * 只有真正动了这个开关的人才该撞上「这一列还不存在」。
+         */
+        body: JSON.stringify(
+          form.inSky === (base.in_sky !== false)
+            ? { ...form, inSky: undefined }
+            : { ...form, inSky: undefined, in_sky: form.inSky },
+        ),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setErr(errorText(json.error, t));
       } else {
+        // 接口回的是更新后的整行，拿它当新基线——比等 router.refresh() 可靠
+        if (json.node) setBase(json.node as NodeCard);
         setOpen(false);
         setSavedAt(Date.now());
         router.refresh();
@@ -140,11 +166,16 @@ export default function ProfileEditor({ node, mode, locale }: Props) {
   if (!open) {
     return (
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[12px] text-text-light">
-          {mode === 'admin'
-            ? t.adminMode
-            : t.ownerOnly}
-        </p>
+        <div className="min-w-0">
+          <p className="text-[12px] text-text-light">
+            {mode === 'admin' ? t.adminMode : t.ownerOnly}
+          </p>
+          {/* 关掉之后要能**看见**它关着。这个开关的全部价值就是
+              「我能确认我不在那儿」，只在展开的表单里显示等于没有确认。 */}
+          {base.in_sky === false && (
+            <p className="mt-1 text-[11.5px] text-text-light">· {t.skyOff}</p>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {savedAt && (
             <span className="text-[11px] text-leaf">{t.saved}</span>
@@ -245,6 +276,27 @@ export default function ProfileEditor({ node, mode, locale }: Props) {
             <Text type="email" value={form.email} onChange={v => setForm(p => ({ ...p, email: v }))} maxLength={200} />
           </Field>
         </div>
+
+        {/* 进不进星空。放在最后：它不是资料，是一个关于「被怎么看见」的选择。 */}
+        <label className="flex gap-3 items-start rounded-xl border border-black/[0.07] bg-[#fafaf7] p-3.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.inSky}
+            onChange={e => setForm(p => ({ ...p, inSky: e.target.checked }))}
+            className="mt-0.5 size-4 shrink-0 accent-[#2f513d]"
+          />
+          <span className="min-w-0">
+            <span className="block text-[13px] font-medium text-forest-deep">
+              {t.skyTitle}
+              {!form.inSky && (
+                <span className="ml-2 text-[11px] font-normal text-text-light">{t.skyOff}</span>
+              )}
+            </span>
+            <span className="mt-1 block text-[11.5px] leading-[1.75] text-text-light">
+              {t.skyHint}
+            </span>
+          </span>
+        </label>
 
         {err && <p className="text-[12px] text-coral">{err}</p>}
 

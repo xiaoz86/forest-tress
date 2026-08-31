@@ -4,7 +4,7 @@ import Nav from '@/components/Nav';
 import CreatorSky from '@/components/CreatorSky';
 import { dict } from '@/i18n';
 import { getLocale } from '@/lib/locale';
-import { fetchListedNodes } from '@/lib/nodeVisibility';
+import { fetchSkyNodes } from '@/lib/nodeVisibility';
 import { getAuthenticatedMemberId } from '@/lib/session';
 import { pickNearby, pickRising, toSkyStars } from '@/lib/sky';
 import { resolveConstellations } from '@/lib/skyConstellations';
@@ -26,6 +26,10 @@ export async function generateMetadata(): Promise<Metadata> {
  * ⚠️ 下发给客户端的只有 `toSkyStars()` 产出的白名单字段，
  * 里面**没有联系方式**。星空把所有人的名字、城市、正在做的事聚合到一屏，
  * 聚合本身就改变了暴露程度——即使每条信息原本都公开。
+ *
+ * 也因为这个，进星空是可以单独关掉的：fetchSkyNodes 比 fetchListedNodes
+ * 多一道 in_sky 闸。关掉的人仍留在创造者森林里，只是不出现在这片天上，
+ * 也不参与星座的 AI 分析。见 nodeVisibility.ts 的 isInSky。
  */
 export default async function SkyPage() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -33,7 +37,7 @@ export default async function SkyPage() {
 
   const [nodes, locale, meId] = await Promise.all([
     supabaseUrl && serviceKey
-      ? fetchListedNodes(createClient(supabaseUrl, serviceKey))
+      ? fetchSkyNodes(createClient(supabaseUrl, serviceKey))
       : Promise.resolve([]),
     getLocale(),
     getAuthenticatedMemberId(),
@@ -59,7 +63,10 @@ export default async function SkyPage() {
       <Nav night />
       <CreatorSky
         stars={stars}
-        meId={me?.id ?? null}
+        // 传原始 session id，**不是** me?.id：退出星空的人 me 是 null，
+        // 但他仍然是登录成员，CreatorSky 要靠 meId 认出这一点，
+        // 才不会把「找到我的星」指向 /#join 去邀请他重新注册。
+        meId={meId || null}
         nearby={pickNearby(stars, me)}
         risingIds={pickRising(stars)}
         constellations={constellations}

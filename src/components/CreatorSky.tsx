@@ -708,9 +708,12 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
         : {
             title: t.lens.constellation.title,
             /* AI 聚出来的星座自带一句「是什么在把他们拉近」，
-               那句比我写的模板具体得多，有就用它。 */
+               那句比我写的模板具体得多，有就用它。
+               ⚠️ 必须用 ||，不能用 ??：note 有两条路会是**空串**——
+               规则聚类根本不产出 note，以及有人退出星空后 note 被清空。
+               空串不是 nullish，?? 会让它直接通过，渲染成一个空的 <p>。 */
             body: constellations[activeConst]?.note
-              ?? (constellations.length
+              || (constellations.length
                 ? fill(t.lens.constellation.body, {
                     labels: constellations.map(c => c.name).join('、'),
                   })
@@ -843,6 +846,12 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
               >
                 {t.hero.ctaMine}
               </button>
+            ) : meId ? (
+              // 登录了、但这片天上没有他的星——自己关掉了进入星空，或卡是
+              // hidden/draft。这时指向 /#join 是在邀请一个已经是成员的人重新注册。
+              <Link href={`/creators/${meId}`} className="sky-btn sky-btn-2">
+                {t.hero.ctaMyPage}
+              </Link>
             ) : (
               <Link href="/#join" className="sky-btn sky-btn-2">
                 {t.hero.ctaMine}
@@ -1020,7 +1029,21 @@ export default function CreatorSky({ stars, meId, nearby, risingIds, constellati
           </svg>
         </section>
 
-        <p className="sky-note">{t.note}</p>
+        <p className="sky-note">
+          {t.note}
+          {/* 退出的入口。条件是 me 而不是 meId——「不想出现在这里？」这句话
+              只对**确实在这片天上**的人成立；已经退出的人再看到它是荒谬的。
+              放页脚而不是藏进设置里：正在看这片天的人，才是最可能想问
+              「我能不出现在这里吗」的人。 */}
+          {me && (
+            <>
+              {' '}
+              <Link href={`/creators/${me.id}`} className="sky-note-out">
+                {t.noteOptOut}
+              </Link>
+            </>
+          )}
+        </p>
       </div>
 
       {/* ══ 星光卡 ══ */}

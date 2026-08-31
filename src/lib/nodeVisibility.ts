@@ -70,3 +70,38 @@ export function shouldPromoteToListed(
 ): boolean {
   return (current ?? NODE_LISTED) === NODE_DRAFT && isProfileComplete(nextCard);
 }
+
+/**
+ * 这个人愿不愿意出现在「遇见星空」里。
+ *
+ * 为什么不复用 status='hidden'：那个会把人从**创造者森林里一起**摘掉，
+ * 等于「我想在星空里低调一点」只能用「我整个消失」来表达。两件事，两个开关。
+ *
+ * 星空为什么需要自己这道闸——它比森林多做了两件事：
+ *
+ *   一、**聚合**。森林是一次看一个人，星空把所有人的名字、城市、正在做的事
+ *       放进同一屏。每一条单看都已经是公开的，但聚合本身就改变了暴露程度。
+ *
+ *   二、**AI 的推断会被公开**。「正在形成的星座」把成员的「优势与独特性」
+ *       「可以提供」「在寻找」喂给大模型，再把模型的结论连人名一起发布出来
+ *       （「A 有场地、B 正在找场地 → 可以一起做 X」）。
+ *       这和「列一张资料卡」是性质不同的一件事，理应能被单独拒绝。
+ *
+ * 缺失一律当 true，理由和 isListed 相同：迁移前建的老行没有这个值，
+ * 判成 false 会让整片天空在加字段的那一刻空掉。
+ */
+export function isInSky(node: Pick<NodeCard, 'in_sky'> | null | undefined): boolean {
+  if (!node) return false;
+  return (node.in_sky ?? true) !== false;
+}
+
+/**
+ * 星空里的人。/sky 页、星座聚类、「今夜与你靠近」、「新升起的星」——全部走这里。
+ *
+ * 和 fetchListedNodes 同一条纪律：判定只有一处。
+ * 这个仓库有过「同一个 bug 只修了一边」的前科，而这次漏掉一处的后果是
+ * **一个明确说了不想进星空的人仍然出现在星空里**，比列表少一个人严重得多。
+ */
+export async function fetchSkyNodes(sb: SupabaseClient): Promise<NodeCard[]> {
+  return (await fetchListedNodes(sb)).filter(isInSky);
+}

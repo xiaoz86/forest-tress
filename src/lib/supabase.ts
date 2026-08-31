@@ -59,6 +59,12 @@ export type NodeCard = {
    * 只管撮合通知；验证码、欢迎信这些本人主动触发的事务性邮件不受它影响。
    */
   notify_matches?: boolean;
+  /**
+   * 在不在「遇见星空」里。创造者森林不受它影响——判定在
+   * src/lib/nodeVisibility.ts 的 isInSky，不要在别处自己比对。
+   * **缺失要当成 true**：迁移前的老行没有这个值，判成 false 会让整片天空当场空掉。
+   */
+  in_sky?: boolean;
 };
 
 /**

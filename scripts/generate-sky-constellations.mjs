@@ -95,13 +95,22 @@ async function main() {
 
   const headers = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` };
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/node_cards?select=id,name,city,keywords,topics,doing,experience,offer,seeking,status`,
+    `${SUPABASE_URL}/rest/v1/node_cards?select=id,name,city,keywords,topics,doing,experience,offer,seeking,status,in_sky`,
     { headers },
   );
-  const rows = (await res.json()).filter(
-    n => (n.status ?? 'listed') === 'listed' && n.name && !/^_*test/i.test(n.name),
+  const all = await res.json();
+  const rows = all.filter(
+    n =>
+      (n.status ?? 'listed') === 'listed' &&
+      // ⚠️ 关掉「进入星空」的人**一个字都不能喂给模型**。
+      // 星座会把模型的结论连人名一起发布，漏在这里 = 他明确拒绝过的那件事照做了。
+      // 缺失当 true：迁移前的老行没有这个值。
+      (n.in_sky ?? true) !== false &&
+      n.name &&
+      !/^_*test/i.test(n.name),
   );
-  console.log(`森林里 ${rows.length} 人`);
+  const optedOut = all.filter(n => (n.status ?? 'listed') === 'listed' && n.in_sky === false).length;
+  console.log(`森林里 ${rows.length} 人进入星空${optedOut ? `（另有 ${optedOut} 人选择不进入，已排除）` : ''}`);
 
   // 喂完整资料。原来只给 keywords + 40 字 doing——而 keywords 本身
   // 已经是「把一个人压缩成 6 个话题词」的结果，拿它去聚只能聚出类目。
@@ -171,6 +180,12 @@ async function main() {
     generatedAt: new Date().toISOString(),
     memberCount: rows.length,
     constellations,
+    // 生成时喂给模型的全部人。**服务端专用，不下发**。
+    // 存名字是为了将来能删掉它：note 是模型写的自由文本、里面会点名，
+    // 而它点到的人不一定在 memberIds 里（memberIds 会滤掉模型编造的 id，
+    // note 不会）。有名册才能判断某句 note 是否提到了已经退出星空的人。
+    // 见 src/lib/skyConstellations.ts 的 refilterConstellations。
+    roster: rows.map(n => ({ id: n.id, name: n.name })),
   };
   const up = await fetch(`${SUPABASE_URL}/rest/v1/sky_constellations`, {
     method: 'POST',

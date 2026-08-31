@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { createChatCompletion, getLLMConfig } from '@/lib/llm';
 import type { SkyStar } from '@/lib/sky';
+import { isInSky, isListed } from '@/lib/nodeVisibility';
 import type { NodeCard } from '@/lib/supabase';
 
 /**
@@ -34,6 +35,17 @@ type CachedPayload = {
   /** 生成时森林里有多少人。人数变化明显时提示该重算了 */
   memberCount: number;
   constellations: Constellation[];
+  /**
+   * 生成这批星座时，喂给模型的全部人的 id 与名字。**只在服务端用，不下发。**
+   *
+   * 存名字是为了能**删掉**它：note 是模型写的自由文本，里面会点名，而它点到的
+   * 人不一定在 memberIds 里——生成时 memberIds 会被过滤掉模型编造的 id，
+   * note 不会。所以「这一组少了人」检测不到那种情况。
+   * 有了名册，就能精确判断某句 note 是否提到了现在已经不在星空里的人。
+   *
+   * 老缓存没有这个字段，退回只按人数缩水判断。
+   */
+  roster?: { id: string; name: string }[];
 };
 
 /** 把关键词收敛成可比较的形态：去分隔符、去空白、转小写 */
@@ -137,10 +149,20 @@ const AI_SYSTEM = `你在为一个叫「附近森林」的创造者社区，从�
  * 用大模型聚类。**只在服务端调用**——参数收的是原始节点卡，
  * 里面有 experience 这类不下发给浏览器的字段。
  * 失败一律返回 null，调用方退回规则聚类，星空不该因为模型不可用而空掉一个镜头。
+ *
+ * ⚠️ 目前**没有任何调用方**。线上真正跑的是
+ * scripts/generate-sky-constellations.mjs（那里有自己的一份提示词和过滤）。
+ * 这里留着是为了将来可能的服务端重算路径——但别以为它是「第二道闸」：
+ * 它没被调用，就什么也没挡住。两份提示词也存在漂移的风险。
  */
 export async function generateConstellationsAI(
-  nodes: NodeCard[],
+  raw: NodeCard[],
 ): Promise<Constellation[] | null> {
+  // ⚠️ 纵深防守。调用方**应该**已经传进来筛过的人，但这一步会把
+  // 「优势与独特性 / 可以提供 / 在寻找」原文发给第三方模型，
+  // 并把结论连人名一起公开——漏一个人的代价是他明确拒绝过的那件事照做了。
+  // 所以这里不信任入参，自己再筛一遍。
+  const nodes = raw.filter(n => isListed(n) && isInSky(n));
   if (!getLLMConfig() || nodes.length < 6) return null;
 
   // 和脚本喂一样的材料。只给 keywords 的话，模型只能聚出类目——
@@ -219,6 +241,7 @@ export async function fetchCachedConstellations(): Promise<CachedPayload | null>
 export async function saveConstellations(
   constellations: Constellation[],
   memberCount: number,
+  roster?: { id: string; name: string }[],
 ): Promise<boolean> {
   const sb = client();
   if (!sb) return false;
@@ -226,6 +249,7 @@ export async function saveConstellations(
     generatedAt: new Date().toISOString(),
     memberCount,
     constellations,
+    roster,
   };
   const { error } = await sb
     .from(TABLE)
@@ -235,6 +259,61 @@ export async function saveConstellations(
     return false;
   }
   return true;
+}
+
+/**
+ * 把缓存里的星座对齐到「现在还在星空里的人」。
+ *
+ * 抽成纯函数是因为它有一条**不显然但要紧**的规则，值得单独有个名字、单独被测：
+ *
+ * 只把 memberIds 筛掉是不够的。note 是模型写的一句话，里面**会点名**
+ * （「A 有场地、B 正在找场地 → 可以一起做 X」）。有人关掉「进入星空」、
+ * 转成 hidden 或 archived 之后，他的 id 从 memberIds 里消失了，
+ * 但那句话仍然挂在页面上说着他的事——而那正是他关掉开关想避免的。
+ *
+ * 所以只要这一组少了人，就把 note 一并清空：这句话描述的已经不是现在这组人了，
+ * 留着既不准确也不该留。星座名是抽象的（「正念课程共建」），不点名，可以保留。
+ *
+ * @param valid 当前还在星空里的成员 id
+ */
+export function refilterConstellations(
+  cached: Constellation[],
+  valid: Set<string>,
+  roster?: { id: string; name: string }[],
+): Constellation[] {
+  /**
+   * 现在已经不在星空里的人的名字。note 里出现其中任何一个，这句话就得清掉。
+   *
+   * 为什么不能只看「这一组少了人」：note 点到的名字**不一定在 memberIds 里**。
+   * 生成时 memberIds 会被 `byId.has(x)` 滤掉模型编造的 id，note 是自由文本、
+   * 不过滤。于是完全可能出现「note 写着张三，memberIds 里没有张三」——
+   * 那时这一组人数没变，shrank 是 false，而「张三」三个字会继续挂在页面上。
+   * 那正是这个开关要防的事。
+   */
+  const goneNames = (roster || [])
+    .filter(r => !valid.has(r.id))
+    .map(r => r.name.trim())
+    // 一两个字的名字做子串匹配会误伤（「小」「李」几乎必然出现在任何句子里）。
+    // 宁可漏判一个极短的名字，也不要把所有 note 全清空。
+    .filter(n => n.length >= 2);
+
+  return cached
+    .map(c => {
+      const kept = c.memberIds.filter(id => valid.has(id));
+      const shrank = kept.length !== c.memberIds.length;
+      const names = goneNames.some(n => c.note.includes(n));
+      // 显式挑字段，不用 {...c}：缓存是一行 JSON，将来谁往里塞了调试用的
+      // members:[{id,name}]，展开就会原封不动下发到浏览器。
+      return {
+        id: c.id,
+        name: c.name,
+        note: shrank || names ? '' : c.note,
+        memberIds: kept,
+      };
+    })
+    .filter(c => c.memberIds.length >= 3)
+    // 3~5 人的组比原来的 11 人组小得多，显示三个仍留得住「其余退暗」那层意思
+    .slice(0, 3);
 }
 
 /**
@@ -249,11 +328,7 @@ export async function resolveConstellations(stars: SkyStar[]): Promise<Constella
   const valid = new Set(stars.map(s => s.id));
 
   if (cached) {
-    const usable = cached.constellations
-      .map(c => ({ ...c, memberIds: c.memberIds.filter(id => valid.has(id)) }))
-      .filter(c => c.memberIds.length >= 3)
-      // 3~5 人的组比原来的 11 人组小得多，显示三个仍留得住「其余退暗」那层意思
-      .slice(0, 3);
+    const usable = refilterConstellations(cached.constellations, valid, cached.roster);
     if (usable.length) return usable;
   }
   return buildFallbackConstellations(stars);

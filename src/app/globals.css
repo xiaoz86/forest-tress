@@ -484,6 +484,20 @@
 .sky-content dl { pointer-events: auto; width: fit-content; max-width: 100%; }
 .sky-content .sky-note { pointer-events: auto; width: auto; }
 
+/* 退出星空的那句。比正文再暗一档，但下划线保证它读得出是可点的——
+   这类「你可以离开」的入口不该做成显眼的按钮，也不该藏到看不见。 */
+.sky-note-out {
+  color: rgba(214, 224, 208, 0.62);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(214, 224, 208, 0.3);
+  transition: color 0.3s ease, text-decoration-color 0.3s ease;
+}
+.sky-note-out:hover {
+  color: rgba(238, 243, 232, 0.92);
+  text-decoration-color: rgba(238, 243, 232, 0.6);
+}
+
 .sky-hero {
   position: relative;
   min-height: 100svh;

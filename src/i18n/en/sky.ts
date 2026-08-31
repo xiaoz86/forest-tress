@@ -14,6 +14,7 @@ export const sky: typeof zhSky = {
     empty: 'The forest is just beginning. The first tree could be yours.',
     ctaRoam: 'Wander the sky',
     ctaMine: 'Find my star',
+    ctaMyPage: 'Back to my creator page →',
     searchPlaceholder: 'Look for a star: name, city, what they’re doing',
     searchLabel: 'Search creators',
   },
@@ -84,4 +85,7 @@ export const sky: typeof zhSky = {
   },
 
   note: 'Each star’s position, size and brightness are generated stably from the creator’s ID. Size only simulates apparent brightness in a night sky — it does not indicate popularity, payment, tier or recommendation weight.',
+
+  noteOptOut:
+    'Rather not be here? You can turn off “appear in Creator Sky” on your own creator page — you’ll still be in the Creator Forest.',
 };

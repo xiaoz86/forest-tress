@@ -97,6 +97,18 @@ export async function PATCH(request: NextRequest) {
     patch.email = e.trim().toLowerCase().slice(0, LIMITS.email);
   }
 
+  /**
+   * 进不进「遇见星空」。和资料字段不同，这是**意愿**，所以：
+   * 只认真正的布尔值，不做 truthy 转换——前端传错类型时应该报错，
+   * 而不是把一个人静悄悄放回他关掉过的那片天上。
+   */
+  if ('in_sky' in body) {
+    if (typeof body.in_sky !== 'boolean') {
+      return NextResponse.json({ error: 'bad-in_sky' }, { status: 400 });
+    }
+    patch.in_sky = body.in_sky;
+  }
+
   if ('topics' in body) {
     const raw = body.topics;
     if (!Array.isArray(raw)) {

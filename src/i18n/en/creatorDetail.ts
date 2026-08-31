@@ -117,6 +117,11 @@ export const creatorDetail: typeof zhCreatorDetail = {
     cancel: 'Cancel',
     save: 'Save changes',
     saving: 'Saving…',
+      skyTitle: 'Appear in Creator Sky',
+      skyHint:
+        'The sky places everyone on one screen, and uses AI to infer from your strengths, what you offer and what you are looking for who might build something together — publishing that inference alongside your name. Turn it off and you stay in the Creator Forest; you simply do not appear in that sky, and are left out of the analysis.',
+      skyOn: 'Yes',
+      skyOff: 'Stay out of the sky',
     field: {
       name: 'Name *',
       city: 'City',
