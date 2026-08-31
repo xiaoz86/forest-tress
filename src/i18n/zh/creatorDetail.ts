@@ -23,6 +23,9 @@ export const creatorDetail = {
     offer: '可以提供',
     seeking: '正在寻找',
     interests: '兴趣爱好',
+    moment: '一个美的时刻',
+    create: '想创造或守护的美',
+    seed: '心里的那颗种子',
   },
 
   contact: {

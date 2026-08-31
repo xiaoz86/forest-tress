@@ -16,6 +16,9 @@ export const creatorDetail: typeof zhCreatorDetail = {
     offer: 'Can offer',
     seeking: 'Looking for',
     interests: 'Loves doing',
+    moment: 'A moment of beauty',
+    create: 'Beauty they want to make or protect',
+    seed: 'The seed they carry',
   },
 
   contact: {

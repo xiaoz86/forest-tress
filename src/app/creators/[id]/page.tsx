@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { splitBeauty } from '@/lib/beauty';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Nav from '@/components/Nav';
@@ -58,6 +59,8 @@ export default async function CreatorDetail({ params }: Props) {
   if (!me) notFound();
 
   const graph = buildRelationGraph(me, all, 8);
+  // beauty 一列存两段，靠前缀分隔。拆法和星空、编辑器共用 lib/beauty.ts
+  const beauty = splitBeauty(me.beauty);
 
   const [memberId, locale] = await Promise.all([getAuthenticatedMemberId(), getLocale()]);
   const t = dict(locale).creatorDetail;
@@ -195,6 +198,16 @@ export default async function CreatorDetail({ params }: Props) {
             <Section label={t.section.offer} body={me.offer} />
             <Section label={t.section.seeking} body={me.seeking} tone="coral" />
             <Section label={t.section.interests} body={me.interests} />
+            {/* 三段「人味」内容。放在最后：前面是这个人做什么、能给什么，
+                读到这里才是这个人本身。星空的星光卡里也是同样的次序和同样的
+                视觉（米绿底、左侧绿线、衬线体）——同一段内容在两处不该长得不一样。 */}
+            {(beauty.moment || beauty.create || me.seed?.trim()) && (
+              <section className="space-y-2.5">
+                <Human label={t.section.moment} body={beauty.moment} />
+                <Human label={t.section.create} body={beauty.create} />
+                <Human label={t.section.seed} body={me.seed} />
+              </section>
+            )}
           </div>
         </div>
 
@@ -308,6 +321,26 @@ function Section({
         {body}
       </p>
     </section>
+  );
+}
+
+/**
+ * 「美的时刻 / 想创造或守护 / 那颗种子」用的样式。
+ *
+ * 和普通 Section 分开，是因为这三段性质不同：其余几栏回答「这个人做什么、
+ * 能给什么、在找什么」，这三段回答「这个人是谁」——是全站唯一无法被
+ * 同质化的内容。星空的星光卡给了它们米绿底和衬线体，这里照搬同一套，
+ * 免得同一段话在两个界面里长成两个样子。
+ */
+function Human({ label, body }: { label: string; body?: string | null }) {
+  if (!body || !body.trim()) return null;
+  return (
+    <div className="border-l-2 border-[#7e9b72] bg-[#edf1e6] px-4 py-3.5">
+      <div className="mb-1.5 text-[12px] tracking-[0.04em] text-[#5f7357]">{label}</div>
+      <p className="font-serif text-[15px] leading-[1.85] text-[#26332a] whitespace-pre-wrap">
+        {body}
+      </p>
+    </div>
   );
 }
 
