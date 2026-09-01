@@ -1051,13 +1051,18 @@
 
 /* 主 CTA 反过来：深绿底在深色导航上会糊掉，换成米白底深绿字，
    和星空里那颗「漫游星空」按钮同一套语言。 */
-.nav-night a[class*="bg-forest"],
-.nav-night span[class*="bg-forest"] {
+/* ⚠️ 用 ~= 而不是 *=。Tailwind 的 class 是空格分隔的，
+   `~="bg-forest"` 只命中恰好是 bg-forest 那一个 token——顶栏那颗 CTA；
+   `*=` 会把手机菜单里的 `bg-forest/[0.05]` 一起算进去。
+   实测这一条选择器多命中了 6 个菜单项，于是它们全被刷成米白底，
+   而下面 `.nav-night span` 又把文字刷成浅色：**米白底 + 浅色字 = 看不见**。 */
+.nav-night a[class~="bg-forest"],
+.nav-night span[class~="bg-forest"] {
   background: rgba(242, 232, 203, 0.92) !important;
   color: #0f2318 !important;
   box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32) !important;
 }
-.nav-night a[class*="bg-forest"]:hover { background: #f7f0dc !important; }
+.nav-night a[class~="bg-forest"]:hover { background: #f7f0dc !important; }
 
 /* 语言下拉浮层同样反相，否则点开是一块白板 */
 .nav-night [class*="bg-white"] {
@@ -1069,6 +1074,18 @@
 .nav-night button[class*="hover:bg-forest"]:hover {
   background: rgba(226, 232, 214, 0.12) !important;
 }
+
+/* 手机汉堡菜单的夜间样式。
+   这几块原来靠 Tailwind 任意值的子串去匹配（bg-forest/[0.05]、bg-paper-soft），
+   既脆又会误伤，所以组件里给了稳定的类名，这里按类名来。 */
+.nav-night .nav-mpanel { border-top-color: rgba(226, 232, 214, 0.12) !important; }
+/* 5% 的森林绿压在夜色上等于没有，药丸读不出是药丸。换成极淡的暖白。 */
+.nav-night .nav-mitem,
+.nav-night .nav-mrow { background: rgba(226, 232, 214, 0.07) !important; }
+.nav-night .nav-mitem:active { background: rgba(226, 232, 214, 0.14) !important; }
+/* 汉字图标那颗小圆是米白底、深绿字。上面的 `.nav-night span` 会把字一起刷成浅色，
+   于是圆里空着。按回深色——这颗圆保持米白，和 CTA 是同一种亮法。 */
+.nav-night .nav-micon { color: #17281d !important; }
 
 /* ══════ 星空页的小芽按钮 ══════
    和 nav-night 同一个理由：米白底压在夜空上会比星还亮。

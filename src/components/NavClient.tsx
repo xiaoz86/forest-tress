@@ -270,14 +270,14 @@ export default function NavClient({ locale, t, night = false }: Props) {
           面板还被拉到近半屏。两列把宽度用满、行数减半，
           汉字符号也和首页四条小径对得上。
         */
-        <div className="hidden border-t border-forest/10 px-4 pb-3 pt-2.5 max-lg:block">
+        <div className="nav-mpanel hidden border-t border-forest/10 px-4 pb-3 pt-2.5 max-lg:block">
           <div className="grid grid-cols-2 gap-2">
             {menuItems.map((link, i) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMenuOpen(false)}
-                className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 no-underline transition-colors active:bg-forest/10 ${
+                className={`nav-mitem flex items-center gap-3 rounded-2xl px-3.5 py-3 no-underline transition-colors active:bg-forest/10 ${
                   // 「联系我们」用描边而不是实底：它是次级入口，
                   // 和桌面端那颗胶囊是同一个意思
                   link.outline ? 'border border-forest/20' : 'bg-forest/[0.05]'
@@ -288,7 +288,7 @@ export default function NavClient({ locale, t, night = false }: Props) {
               >
                 <span
                   aria-hidden="true"
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-paper-soft text-[14px] text-forest"
+                  className="nav-micon grid h-7 w-7 shrink-0 place-items-center rounded-full bg-paper-soft text-[14px] text-forest"
                   >
                   {link.icon}
                 </span>
@@ -298,7 +298,7 @@ export default function NavClient({ locale, t, night = false }: Props) {
           </div>
 
           {/* 语言放在菜单最后一行：它不是常用动作，但要找得到 */}
-          <div className="mt-2 flex items-center gap-2 rounded-2xl bg-forest/[0.05] px-4 py-3">
+          <div className="nav-mrow mt-2 flex items-center gap-2 rounded-2xl bg-forest/[0.05] px-4 py-3">
             <span className="text-[13px] text-[#33403a]/60">{t.language.label}</span>
             <div className="ml-auto flex gap-1.5">
               {(['zh', 'en'] as const).map(value => (
