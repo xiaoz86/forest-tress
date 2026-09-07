@@ -128,6 +128,8 @@ export const meditations = {
     // 分享。手机上先叫系统面板，叫不出来就退成复制链接
     share: '分享',
     shareCopied: '链接已复制',
+    shareReady: '分享链接已生成',
+    shareCopy: '复制链接',
     /** 剪贴板也用不了时（微信里常见），把链接摆出来让人自己长按复制 */
     shareManual: '复制不了，长按下面这行自己复制',
     /** 节气条左边那一列 */

@@ -125,6 +125,8 @@ export const meditations: typeof zhMeditations = {
     // 分享。手机上先叫系统面板，叫不出来就退成复制链接
     share: 'Share',
     shareCopied: 'Link copied',
+    shareReady: 'Share link ready',
+    shareCopy: 'Copy link',
     /** 剪贴板也用不了时（微信里常见），把链接摆出来让人自己长按复制 */
     shareManual: 'Couldn\u2019t copy — press and hold the link below',
     /** 节气条左边那一列 */

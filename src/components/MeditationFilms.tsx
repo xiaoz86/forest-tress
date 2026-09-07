@@ -231,8 +231,8 @@ function FilmCard({
   onCountChange: (trackId: string, delta: number) => void;
 }) {
   const [failed, setFailed] = useState(false);
-  /** idle | copied（复制成功，两秒后消失）| manual（两条路都不通，把链接摆出来） */
-  const [share, setShare] = useState<'idle' | 'copied' | 'manual'>('idle');
+  /** idle | ready（链接已生成）| copied（复制成功，两秒后消失）| manual（复制失败，把链接摆出来） */
+  const [share, setShare] = useState<'idle' | 'ready' | 'copied' | 'manual'>('idle');
   const [shareUrl, setShareUrl] = useState('');
   const term = findSolarTerm(film.seq);
 
@@ -248,6 +248,7 @@ function FilmCard({
     shared.hash = film.id;
     const url = shared.toString();
     setShareUrl(url);
+    setShare('ready');
 
     // 手机上优先叫系统分享面板。微信内置浏览器没有这个 API，会落到下面。
     if (navigator.share) {
@@ -370,13 +371,30 @@ function FilmCard({
           </button>
         </div>
 
-        {/*
-          系统面板和剪贴板都不给用（微信里常有）。这时候不能只说一句
-          「复制失败」就没了下文——把链接原样摆出来，长按能选中复制。
-        */}
-        {share === 'manual' && (
+        {/* 点击分享后把完整链接摆出来，系统面板、复制按钮和长按复制都能用。 */}
+        {share !== 'idle' && (
           <div className="mt-2 rounded-xl border border-forest/12 bg-white/70 px-3 py-2.5">
-            <p className="text-[11.5px] text-ink-soft">{t.shareManual}</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11.5px] text-ink-soft">
+                {share === 'copied' ? t.shareCopied : share === 'manual' ? t.shareManual : t.shareReady}
+              </p>
+              {share !== 'copied' && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (await copyText(shareUrl)) {
+                      setShare('copied');
+                      window.setTimeout(() => setShare('idle'), 2400);
+                    } else {
+                      setShare('manual');
+                    }
+                  }}
+                  className="shrink-0 rounded-full border border-forest/20 px-2.5 py-1 text-[11px] text-forest-deep transition-colors hover:bg-forest/[0.07]"
+                >
+                  {t.shareCopy}
+                </button>
+              )}
+            </div>
             <p className="mt-1 select-all break-all text-[12px] leading-[1.7] text-forest-deep">
               {shareUrl}
             </p>
