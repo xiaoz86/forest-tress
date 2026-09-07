@@ -21,7 +21,6 @@ const ALLOWED_MIME = new Set([
   'audio/wav',
   'audio/webm',
   'audio/x-m4a',
-  'video/mp4',
 ]);
 
 export const runtime = 'nodejs';

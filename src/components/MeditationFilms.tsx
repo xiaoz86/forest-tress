@@ -264,6 +264,9 @@ function FilmCard({
     film.duration,
   ].filter(Boolean).join(' · ');
 
+  const videoType = film.videoUrl && /\.webm(?:[?#]|$)/i.test(film.videoUrl)
+    ? 'video/webm'
+    : 'video/mp4';
   const cover = film.videoUrl ? (
     <video
       controls
@@ -283,7 +286,7 @@ function FilmCard({
       className="block aspect-video w-full rounded-[20px] border border-forest-deep/[0.10] bg-black object-contain"
       {...wechatInlineAttrs}
     >
-      <source src={film.videoUrl} type="video/mp4" />
+      <source src={film.videoUrl} type={videoType} />
     </video>
   ) : (
     <div className="grid aspect-video w-full place-items-center rounded-[20px] border border-forest/12 bg-white/60 text-[13.5px] text-ink-soft">

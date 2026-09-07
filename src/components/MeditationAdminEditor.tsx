@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { supabase } from '@/lib/supabase';
 import type {
   MeditationCategory,
   MeditationContent,
@@ -174,7 +175,9 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
       fd.append('trackId', trackId);
       fd.append('file', file);
       const res = await fetch('/api/meditations/audio', { method: 'POST', body: fd });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({
+        error: res.status === 413 ? '文件太大，上传未完成。' : '上传未完成，请检查网络后重试。',
+      }));
       if (!res.ok) throw new Error(json.error || 'upload-failed');
       setContent(json.content);
       setMessage('音频已上传。');
@@ -185,8 +188,50 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
     }
   };
 
+  const uploadFilm = async (trackId: string, file: File | null) => {
+    if (!file) return;
+    if (!/\.(mp4|webm)$/i.test(file.name)) {
+      setMessage('请选择 MP4 或 WebM 视频。MP4 推荐使用 H.264 编码。');
+      return;
+    }
+    setUploadingTrackId(trackId);
+    setMessage('正在准备上传影片…');
+    try {
+      const savedContent = await persistContent(content);
+      setContent(savedContent);
+      const res = await fetch('/api/meditations/film', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackId, fileName: file.name, fileType: file.type, fileSize: file.size }),
+      });
+      const upload = await res.json();
+      if (!res.ok) throw new Error(upload.error || '暂时无法上传影片，请稍后重试。');
+
+      setMessage('正在上传影片，请保持页面打开…');
+      const { error } = await supabase.storage.from(upload.bucket).uploadToSignedUrl(
+        upload.path, upload.token, file, { cacheControl: '31536000' },
+      );
+      if (error) throw new Error('影片上传未完成，请检查网络和文件大小后重试。');
+
+      setMessage('影片已传输，正在确认保存…');
+      const saved = await fetch('/api/meditations/film', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackId, path: upload.path }),
+      });
+      const result = await saved.json();
+      if (!saved.ok) throw new Error(result.error || '影片尚未关联成功，请重试。');
+      updateTrack(trackId, result.track);
+      setMessage('影片已上传并保存，刷新展示页即可播放。');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : '影片上传未完成，请重试。');
+    } finally {
+      setUploadingTrackId('');
+    }
+  };
+
   return (
-    <div className="space-y-8">
+    <fieldset disabled={saving || Boolean(uploadingTrackId)} className="min-w-0 space-y-8">
       <section className="rounded-lg border border-white/10 bg-white/[0.045] p-6 max-md:p-5">
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
@@ -342,12 +387,12 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
             <div className="text-[11px] font-medium tracking-[0.18em] text-coral-soft uppercase">
-              音频内容
+              音频与影像
             </div>
             <h2 className="mt-2 text-xl font-normal text-white">分类页里的具体冥想</h2>
           </div>
           <button type="button" onClick={addTrack} className={ghostBtnCls}>
-            添加音频
+            添加内容
           </button>
         </div>
 
@@ -405,16 +450,23 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
                 <Field label="阶段">
                   <input value={track.stage} onChange={e => updateTrack(track.id, { stage: e.target.value })} className={inputCls} />
                 </Field>
-                <Field label="音频文件">
+                <Field label={isFilm ? '影片文件' : '音频文件'}>
                   <input
                     type="file"
-                    accept="audio/*,video/mp4"
-                    onChange={e => uploadAudio(track.id, e.target.files?.[0] || null)}
+                    aria-label={`${track.title} — ${isFilm ? '影片文件' : '音频文件'}`}
+                    accept={isFilm ? 'video/mp4,video/webm,.mp4,.webm' : 'audio/*'}
+                    onChange={e => {
+                      const file = e.target.files?.[0] || null;
+                      e.target.value = '';
+                      if (isFilm) void uploadFilm(track.id, file);
+                      else void uploadAudio(track.id, file);
+                    }}
                     className="block w-full text-sm text-white/44 file:mr-4 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#111512]"
                   />
                   {uploadingTrackId === track.id && (
-                    <div className="mt-2 text-xs text-white/40">上传中...</div>
+                    <div role="status" className="mt-2 text-xs text-white/60">{message || '上传中…'}</div>
                   )}
+                  {isFilm && <div className="mt-2 text-xs text-white/40">支持 MP4 / WebM；MP4 推荐 H.264 编码。上传成功后自动保存并显示预览。</div>}
                 </Field>
                 {isFilm && (
                   <>
@@ -445,9 +497,8 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
                         placeholder="https://…"
                         className={inputCls}
                       />
-                      {/* 几十兆的文件走不了这个页面，得从命令行传 */}
                       <div className="mt-2 text-xs text-white/40">
-                        影片文件用 scripts/upload-film.mjs 传，传完这里会自动填好。手动粘地址也可以。
+                        上传影片后自动填入。也可以粘贴可直接播放的视频地址，再点击保存。
                       </div>
                     </Field>
                   </>
@@ -461,7 +512,7 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
                 </Field>
               </div>
 
-              {(track.audioPath || track.audioUrl) && (
+              {!isFilm && (track.audioPath || track.audioUrl) && (
                 <audio
                   controls
                   preload="none"
@@ -493,7 +544,7 @@ export default function MeditationAdminEditor({ initialContent }: Props) {
           {message}
         </div>
       )}
-    </div>
+    </fieldset>
   );
 }
 
