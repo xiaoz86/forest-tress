@@ -23,7 +23,7 @@ import {
 } from '@/lib/meditations';
 
 type Props = {
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string; track?: string }>;
 };
 
 /**
@@ -33,11 +33,11 @@ type Props = {
  * 不给 og 就只剩一句「林间呼吸 · 附近森林」——每一条分享都长得一模一样，
  * 看不出发过来的是哪一支。所以带上专题名、简介和一张封面。
  *
- * 只能做到「专题」这一层：锚点（#solar-chushu）不会发到服务端，
- * 服务器无从知道分享的是哪一支影片。
+ * 分享链接同时带专题和具体曲目 id：服务端可以把这一支单独展示，
+ * 让分享预览的标题和封面也对应正在分享的影片。
  */
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
-  const [{ category }, locale] = await Promise.all([searchParams, getLocale()]);
+  const [{ category, track: trackId }, locale] = await Promise.all([searchParams, getLocale()]);
   const t = dict(locale).meditations;
   const fallback: Metadata = { title: t.metaTitle, description: t.metaDescription };
   if (!category) return fallback;
@@ -46,10 +46,14 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   const active = content.categories.find(item => item.id === category);
   if (!active) return fallback;
 
-  const title = active.heroTitle || active.label;
-  const description = active.heroSubtitle || active.description || t.metaDescription;
+  const track = trackId
+    ? content.tracks.find(item => item.categoryId === active.id && item.id === trackId)
+    : undefined;
+  const title = track?.title || active.heroTitle || active.label;
+  const description = track?.intention || active.heroSubtitle || active.description || t.metaDescription;
   // 专题自己的封面优先；没上传就拿第一支影片的封面顶上
-  const image = active.coverUrl
+  const image = track?.posterUrl
+    || active.coverUrl
     || content.tracks.find(track => track.categoryId === active.id && track.posterUrl)?.posterUrl;
 
   return {
@@ -67,7 +71,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 type T = Dictionary['meditations'];
 
 export default async function MeditationsPage({ searchParams }: Props) {
-  const [{ category }, rawContent, memberId, locale] = await Promise.all([
+  const [{ category, track: trackId }, rawContent, memberId, locale] = await Promise.all([
     searchParams,
     fetchMeditationContent(),
     getAuthenticatedMemberId(),
@@ -138,11 +142,16 @@ export default async function MeditationsPage({ searchParams }: Props) {
   }
 
   const activeCategoryId = activeCategory.id;
-  const tracks = getTracksForCategory(content, activeCategoryId);
   const kind = activeCategory.kind || 'guided';
   const isProgram = kind === 'program';
   const isAmbient = kind === 'ambient';
   const isFilm = kind === 'film';
+  const allTracks = getTracksForCategory(content, activeCategoryId);
+  const sharedTrack = isFilm && trackId
+    ? allTracks.find(item => item.id === trackId)
+    : undefined;
+  const tracks = sharedTrack ? [sharedTrack] : allTracks;
+  const contentForView = sharedTrack ? { ...content, tracks } : content;
   // 一次把当前分类所有段落的感悟条数取回来，省掉一段一次的往返
   const noteCounts = await fetchNoteCounts(tracks.map(t => t.id));
 
@@ -267,10 +276,11 @@ export default async function MeditationsPage({ searchParams }: Props) {
                 <CategoryNotes category={activeCategory} t={t} />
                 <MeditationFilms
                   locale={locale}
-                  content={content}
+                  content={contentForView}
                   category={activeCategory}
                   noteCounts={noteCounts}
                   loggedIn={Boolean(memberId)}
+                  showTrail={!sharedTrack}
                   /* 按北京时间在服务端算好。交给浏览器算会在跨日那几个小时里水合不一致 */
                   currentTermSeq={currentSolarTermSeq()}
                 />

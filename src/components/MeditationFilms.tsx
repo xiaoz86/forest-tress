@@ -42,6 +42,8 @@ type Props = {
   category: MeditationCategory;
   noteCounts: Record<string, number>;
   loggedIn: boolean;
+  /** 分享单条影片时隐藏整年路线，打开后只聚焦正在分享的这一支。 */
+  showTrail: boolean;
   /**
    * 此刻大约在第几个节气。一定要服务端按北京时间算好传进来——
    * 让浏览器自己 new Date()，服务端渲染的那一版和水合之后的那一版
@@ -97,7 +99,7 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 export default function MeditationFilms({
-  locale, content, category, noteCounts, loggedIn, currentTermSeq,
+  locale, content, category, noteCounts, loggedIn, showTrail, currentTermSeq,
 }: Props) {
   // 用 useMemo 包一层：dict() 是个函数调用，直接放在组件体里
   // React Compiler 分析不了，会连带放弃保留下面 useCallback 的记忆化。
@@ -145,6 +147,7 @@ export default function MeditationFilms({
     <FilmCard
       key={film.id}
       film={film}
+      categoryId={category.id}
       t={t}
       audioT={audioT}
       locale={locale}
@@ -193,7 +196,7 @@ export default function MeditationFilms({
         </div>
       )}
 
-      {isSolarTerms && (
+      {isSolarTerms && showTrail && (
         <SolarTermTrail
           locale={locale}
           t={t}
@@ -210,9 +213,10 @@ export default function MeditationFilms({
  * 区别只在封面本身就是播放器——影片不需要另配一张装饰图。
  */
 function FilmCard({
-  film, t, audioT, locale, isNow, wide, hideTitle, loggedIn, noteCount, notesOpen, onToggleNotes, onCountChange,
+  film, categoryId, t, audioT, locale, isNow, wide, hideTitle, loggedIn, noteCount, notesOpen, onToggleNotes, onCountChange,
 }: {
   film: MeditationTrack;
+  categoryId: string;
   t: ReturnType<typeof dict>['meditations']['film'];
   audioT: ReturnType<typeof dict>['meditations']['audio'];
   locale: Locale;
@@ -234,11 +238,15 @@ function FilmCard({
 
   const onShare = async () => {
     /*
-      分享的是「这一页 + 这张卡的锚点」，不是影片文件本身。
+      分享的是「这一支影片的单条页面」，不是影片文件本身。
       发影片地址等于把桶里的对象直接甩出去：没有标题、没有简介，
-      也没法从那里走回森林。锚点已经有了（article 上的 id）。
+      也没法从那里走回森林。页面会根据 track 参数只展示这一支。
     */
-    const url = `${window.location.origin}${window.location.pathname}${window.location.search}#${film.id}`;
+    const shared = new URL(window.location.href);
+    shared.searchParams.set('category', categoryId);
+    shared.searchParams.set('track', film.id);
+    shared.hash = film.id;
+    const url = shared.toString();
     setShareUrl(url);
 
     // 手机上优先叫系统分享面板。微信内置浏览器没有这个 API，会落到下面。
