@@ -8,6 +8,8 @@
 //   --include-demo   连标着「[演示]」的活动 / 报名 / 预约 / 招呼一起搬（默认不搬：搬上去会出现在线上的社区广场）
 //   --include-outbox 连开发环境的待发邮件一起搬（默认不搬，线上用不到）
 //   --overwrite      线上已经有的同一条也用本地的覆盖掉（默认不覆盖，见下）
+//   --only=events    只搬这几张表（逗号分隔：settings,events,registrations,bookings,greetings,records），
+//                    比如只把演示活动搬上去：--include-demo --only=events
 // 目标库默认读 .env.local 的 NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY；
 // 想搬到别的库（比如本地测试库），用 MIGRATE_SUPABASE_URL / MIGRATE_SUPABASE_KEY 覆盖。
 //
@@ -24,6 +26,8 @@ const args = new Set(process.argv.slice(2));
 const APPLY = args.has('--apply');
 const DEMO = args.has('--include-demo');
 const OVERWRITE = args.has('--overwrite');
+const ONLY = new Set((process.argv.find(a => a.startsWith('--only=')) || '').slice('--only='.length).split(',').filter(Boolean));
+const want = t => !ONLY.size || ONLY.has(t);
 const OUTBOX = args.has('--include-outbox');
 
 const ROOT = path.join(process.cwd(), '.space-cache');
@@ -62,7 +66,7 @@ const readJson = f => JSON.parse(readFileSync(f, 'utf8'));
 const isDemo = row => /^\[演示\]/.test(String(row.title ?? row.name ?? ''));
 
 // ── 1. 每个人的空间记录 ──
-const records = readdirSync(ROOT)
+const records = !want('records') ? [] : readdirSync(ROOT)
   .filter(f => f.endsWith('.json') && UUID.test(f.slice(0, -5)))
   .map(f => ({ member_id: f.slice(0, -5).toLowerCase(), data: readJson(path.join(ROOT, f)) }));
 
@@ -71,7 +75,7 @@ const rows = [];
 const skipped = { demo: 0, outbox: 0 };
 for (const tbl of TABLES) {
   const file = path.join(ROOT, 'tables', `${tbl}.json`);
-  if (!existsSync(file)) continue;
+  if (!existsSync(file) || !want(tbl)) continue;
   for (const r of readJson(file)) {
     if (tbl === 'outbox' && !OUTBOX) { skipped.outbox++; continue; }
     if (!DEMO && tbl !== 'settings' && tbl !== 'outbox' && isDemo(r)) { skipped.demo++; continue; }
@@ -79,9 +83,9 @@ for (const tbl of TABLES) {
     rows.push({ tbl, id: r.id, data: r });
   }
 }
-// 报名、预约、招呼不能挂在一个没搬的活动 / 不存在的人身上：活动被跳过了，它的报名也跳过
+// 报名不能挂在一个没搬的活动上：活动被跳过了，它的报名也跳过（--only 时，线上已有的活动也算）
 const eventIds = new Set(rows.filter(r => r.tbl === 'events').map(r => r.id));
-const orphan = rows.filter(r => r.tbl === 'registrations' && !eventIds.has(r.data.eventId));
+const orphan = want('events') ? rows.filter(r => r.tbl === 'registrations' && !eventIds.has(r.data.eventId)) : [];
 for (const o of orphan) rows.splice(rows.indexOf(o), 1);
 
 // ── 3. 还被引用着的私有图片：收款码、活动封面、付款截图 ──
