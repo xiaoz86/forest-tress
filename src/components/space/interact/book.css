@@ -1,0 +1,91 @@
+/*
+ * 服务单每一行的「预约这个 →」和展开的内联表单。
+ * 渲染在 .sp-menu li 的 grid 里（手机两列：序号 / 内容，按钮在内容下面；≥768 三列：序号 / 内容 / 动作）。
+ * 表单容器跨列放在这一行下面；手机上占满整行，宽屏和内容列对齐。
+ */
+.sp .bk-go {
+  margin-top: 0; padding: 0; border: 0; background: none; cursor: pointer;
+  font-family: var(--sp-body); text-align: left;
+}
+.sp .bk-go:disabled { cursor: default; color: var(--sp-meta); }
+.sp .bk-go:focus-visible { outline: 2px solid var(--sp-accent-text); outline-offset: 3px; border-radius: 2px; }
+@media (min-width: 768px) {
+  .sp .bk-go { margin-top: -8px; }
+}
+
+.bk-wrap { grid-column: 1 / -1; margin-top: 14px; max-width: 36em; }
+@media (min-width: 768px) {
+  .bk-wrap { grid-column: 2 / -1; }
+}
+
+.bk-lead { margin: 0 0 14px; font-family: var(--sp-head); font-size: 15px; color: var(--sp-ink-soft); }
+.bk-row { display: grid; gap: 0 16px; }
+@media (min-width: 560px) { .bk-row { grid-template-columns: 1fr 1fr; } }
+.bk-l { display: block; margin: 14px 0 6px; font-size: 14px; color: var(--sp-ink-soft); }
+.bk-row > div:first-child .bk-l { margin-top: 0; }
+@media (min-width: 560px) { .bk-row .bk-l { margin-top: 0; } }
+.bk-l small { font-size: 12.5px; color: var(--sp-meta); }
+.bk-in {
+  display: block; width: 100%; min-height: 48px; margin: 0; padding: 11px 14px;
+  border: 1px solid var(--sp-line); border-radius: var(--sp-radius);
+  background: var(--sp-bg); color: var(--sp-ink);
+  font: 16px/1.6 var(--sp-body);
+  -webkit-appearance: none; appearance: none;
+}
+.bk-in:focus { outline: 2px solid var(--sp-accent-text); outline-offset: -1px; }
+.bk-in::placeholder { color: var(--sp-meta); opacity: 1; }
+.bk-ta { min-height: 96px; resize: vertical; }
+.bk-hint { display: block; margin-top: 6px; font-size: 12.5px; color: var(--sp-meta); }
+
+.bk-err { margin: 14px 0 0; font-size: 14.5px; line-height: 1.7; color: var(--sp-ink); }
+.bk-err::before { content: '· '; color: var(--sp-accent-text); }
+
+.bk-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 18px; }
+.sp .bk-send { border: 0; cursor: pointer; }
+.sp .bk-send:disabled { opacity: 0.6; cursor: progress; }
+.bk-cancel {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px;
+  border: 0; background: none; cursor: pointer; color: var(--sp-ink-soft);
+  font: 15px/1 var(--sp-body);
+  text-decoration: underline; text-underline-offset: 0.3em; text-decoration-thickness: 1px;
+}
+.bk-preview { margin: 10px 0 0; font-size: 12.5px; color: var(--sp-meta); }
+
+.bk-done-t { margin: 0; font-family: var(--sp-head); font-size: 19px; color: var(--sp-ink); }
+.bk-done-d { margin: 4px 0 0; font-size: 15px; color: var(--sp-ink-soft); }
+.bk-link {
+  display: inline-flex; align-items: center; min-height: 44px; margin-top: 6px;
+  font-size: 15px; color: var(--sp-accent-text);
+  text-decoration: underline; text-underline-offset: 0.3em; text-decoration-thickness: 1px;
+}
+.sp .bk-link { color: var(--sp-accent-text); }
+
+/* 这台设备上以前约过：服务标题下面一行小字链接（grid 里放在内容列；泛预约时就是普通一段） */
+.bk-mine { grid-column: 2 / -1; margin: 6px 0 0; font-size: 13.5px; color: var(--sp-meta); }
+.sp .bk-mine-a {
+  display: inline-flex; align-items: center; min-height: 44px;
+  color: var(--sp-accent-text); text-decoration: underline; text-underline-offset: 0.3em; text-decoration-thickness: 1px;
+}
+
+/* 成功框里的「查看我的预约」和「复制链接」 */
+.bk-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0 18px; margin: 6px 0 0; }
+.bk-links .bk-link { margin-top: 0; }
+.bk-copy { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.bk-copy .cl-btn {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px;
+  border: 0; background: none; cursor: pointer; color: var(--sp-ink-soft);
+  font: 15px/1 var(--sp-body);
+  text-decoration: underline; text-underline-offset: 0.3em; text-decoration-thickness: 1px;
+}
+.bk-copy .cl-btn:focus-visible { outline: 2px solid var(--sp-accent-text); outline-offset: 3px; border-radius: 2px; }
+.bk-copy .cl-manual { display: block; flex-basis: 100%; }
+.bk-copy .cl-say { display: block; font-size: 12.5px; color: var(--sp-meta); }
+.bk-copy .cl-in {
+  display: block; width: 100%; min-height: 44px; margin-top: 4px; padding: 8px 12px;
+  border: 1px solid var(--sp-line); border-radius: var(--sp-radius);
+  background: var(--sp-bg); color: var(--sp-ink); font: 14px/1.5 var(--sp-body);
+}
+.bk-copy .cl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* 蜜罐：人看不见、读屏跳过，脚本常常会填 */
+.bk-hp { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; opacity: 0; }

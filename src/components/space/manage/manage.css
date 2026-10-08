@@ -1,0 +1,58 @@
+/* 个人空间管理页：外壳和「谁能看到」面板。其他面板各自带 CSS。沿用风格工作室的 .st 变量 */
+
+.mg .st-head h1 { margin-bottom: 8px; }
+.mg-status { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 10px; font-size: 14px; }
+.mg-pill { padding: 3px 12px; border-radius: 999px; background: #f1e6cf; color: #6d5424; font-size: 13px; }
+.mg-pill.is-on { background: var(--st-sage); color: var(--st-accent); }
+.mg-slug { color: var(--st-soft); font-family: 'Manrope', monospace; }
+.mg-go { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 0; }
+.mg-go a { color: var(--st-accent); }
+
+.mg-tabs {
+  display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
+  margin-top: 36px; border-bottom: 1px solid var(--st-line);
+}
+.mg-tabs::-webkit-scrollbar { display: none; }
+.mg-tabs a {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px;
+  color: var(--st-soft); text-decoration: none; white-space: nowrap;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.mg-tabs a.is-on { color: var(--st-ink); border-bottom-color: var(--st-accent); font-weight: 600; }
+.mg-badge {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 999px; background: #b5643c; color: #fff; font-size: 12px; font-weight: 600;
+}
+.mg-body { margin-top: 28px; }
+
+/* ── 谁能看到 ── */
+.mg-card { background: var(--st-surface); border: 1px solid var(--st-line); border-radius: 14px; padding: 20px 22px; margin-bottom: 16px; }
+.mg-card h3 { margin: 0 0 4px; font-size: 17px; }
+.mg-hint { margin: 0 0 14px; color: var(--st-mute); font-size: 13.5px; }
+.mg-row { border: 0; margin: 0; padding: 12px 0; border-top: 1px solid var(--st-line); }
+.mg-row legend { padding: 0; margin-bottom: 8px; font-size: 15px; color: var(--st-ink); float: left; width: 100%; }
+.mg-row legend + * { clear: both; }
+.mg-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.mg-seg label {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; cursor: pointer;
+  border: 1px solid var(--st-line); border-radius: 999px; background: var(--st-bg); font-size: 14px; color: var(--st-soft);
+}
+.mg-seg label.is-on { background: var(--st-accent); border-color: var(--st-accent); color: #f5f1e8; }
+.mg-seg input { position: absolute; opacity: 0; pointer-events: none; }
+.mg-seg label:focus-within { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.mg-row:disabled { opacity: 0.7; }
+.mg-switch { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--st-line); cursor: pointer; }
+.mg-switch input { width: 20px; height: 20px; margin-top: 3px; accent-color: var(--st-accent); flex: none; }
+.mg-switch small { display: block; color: var(--st-mute); font-size: 13px; }
+.mg-links { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0; }
+.mg-links a { color: var(--st-accent); display: inline-flex; min-height: 40px; align-items: center; }
+.mg-msg { min-height: 1.6em; color: var(--st-mute); font-size: 13.5px; }
+
+@media (max-width: 760px) {
+  .mg-card { padding: 16px; }
+  .mg-seg label { font-size: 13.5px; padding: 0 12px; }
+}
+
+.mg-admin { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; background: #eef1f6; border: 1px solid #cfd6e3; color: #34405a; font-size: 14px; }
+.mg-pending { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; background: #fbf1dc; border: 1px solid #ecd6a8; color: #6d5424; font-size: 14px; }
+.mg-pending a { margin-left: 6px; color: #6d5424; font-weight: 600; }

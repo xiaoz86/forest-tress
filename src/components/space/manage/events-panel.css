@@ -1,0 +1,100 @@
+/*
+ * 管理页「活动」面板，套在 .st（风格工作室）容器里，用 --st-* 变量。
+ * 手机优先：可点区域 ≥ 44px，输入框字号 16px（iOS 不自动放大）。
+ */
+.sep { display: grid; gap: 36px; }
+.sep-sec { display: grid; gap: 10px; }
+.sep-sec > p { margin: 0; }
+.sep-h { margin: 0; font-family: 'EB Garamond', 'Noto Serif SC', 'Songti SC', serif; font-weight: 500; font-size: 22px; line-height: 1.4; color: var(--st-ink); }
+.sep-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.sep .st-btn { min-height: 44px; }
+.sep .st-note { margin: 0; }
+.sep .st-err { margin: 0; }
+.sep-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; }
+.sep-tb { display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; }
+.sep-tb:disabled { opacity: 0.6; cursor: progress; }
+.sep-danger { color: #a8563d; }
+
+/* 收款码 */
+.sep-qr-body { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 22px; }
+.sep-qr-img { display: block; width: 140px; height: 140px; object-fit: contain; border-radius: 10px; background: #fff; border: 1px solid var(--st-line); }
+
+/* 表单 */
+.sep-form { display: grid; gap: 14px; padding: 18px 0 8px; }
+.sep-f { display: grid; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.sep-f > span, .sep-f > legend { font-size: 14.5px; color: var(--st-ink); padding: 0; }
+.sep-f small { margin-left: 8px; font-size: 13px; color: var(--st-mute); }
+.sep-f input:not([type='radio']), .sep-f textarea, .sep-f select {
+  width: 100%; min-height: 46px; padding: 10px 12px;
+  border: 1px solid var(--st-line); border-radius: 10px; background: var(--st-surface); color: var(--st-ink);
+  font: 16px/1.6 'Manrope', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+}
+.sep-f select { -webkit-appearance: menulist; }
+.sep-f textarea { resize: vertical; }
+.sep-f input:focus, .sep-f textarea:focus, .sep-f select:focus { outline: 2px solid var(--st-accent); outline-offset: 1px; }
+.sep-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 520px) { .sep-2 { grid-template-columns: 1fr; } }
+.sep-radios { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.sep-radios legend { width: 100%; margin-bottom: 4px; }
+.sep-radios label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 15px; cursor: pointer; }
+.sep-radios input { width: 18px; height: 18px; accent-color: var(--st-accent); }
+
+/* 活动列表：细线分隔，不做卡片 */
+.sep-events { list-style: none; margin: 0; padding: 0; }
+.sep-ev { padding: 18px 0; border-top: 1px solid var(--st-line); }
+.sep-ev:last-child { border-bottom: 1px solid var(--st-line); }
+.sep-ev[data-status='cancelled'] .sep-ev-t, .sep-ev[data-status='closed'] .sep-ev-t { color: var(--st-soft); }
+.sep-ev-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.sep-ev-t { margin: 0; font-size: 18px; line-height: 1.5; font-weight: 600; overflow-wrap: break-word; overflow-wrap: anywhere; }
+.sep-tag { font-size: 12.5px; padding: 1px 9px; border-radius: 99px; background: var(--st-sage); color: var(--st-accent); white-space: nowrap; }
+.sep-tag[data-status='draft'] { background: #efe9dc; color: var(--st-soft); }
+.sep-tag[data-status='closed'] { background: #efe9dc; color: var(--st-soft); }
+.sep-tag[data-status='cancelled'] { background: #f6e3dc; color: #8a4a33; }
+.sep-ev-meta { display: flex; flex-wrap: wrap; gap: 0 14px; margin: 4px 0 2px; font-size: 14px; color: var(--st-soft); font-variant-numeric: tabular-nums; }
+
+/* 报名名单 */
+.sep-empty { margin: 6px 0 0; }
+.sep-regs { list-style: none; margin: 8px 0 0; padding: 0 0 0 14px; border-left: 2px solid var(--st-sage); }
+.sep-reg { padding: 12px 0; }
+.sep-reg + .sep-reg { border-top: 1px dashed var(--st-line); }
+.sep-reg[data-status='cancelled'], .sep-reg[data-status='rejected'] { opacity: 0.7; }
+.sep-reg-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+.sep-reg-name { font-size: 16px; overflow-wrap: anywhere; }
+.sep-reg-st { font-size: 13.5px; color: var(--st-soft); }
+.sep-reg-st[data-status='claimed'] { color: #8a6a2f; font-weight: 600; }
+.sep-reg-st[data-status='pending'] { color: #8a6a2f; }
+.sep-reg-st[data-status='confirmed'] { color: var(--st-accent); }
+.sep-reg-contact { margin: 2px 0 0; font-size: 15px; user-select: all; overflow-wrap: anywhere; }
+.sep-reg-note { margin: 4px 0 0; font-size: 14px; color: var(--st-soft); white-space: pre-line; overflow-wrap: anywhere; }
+.sep-reg-meta { display: flex; flex-wrap: wrap; gap: 0 14px; margin: 4px 0 0; font-size: 13px; color: var(--st-mute); }
+.sep-reg-meta a { color: var(--st-accent); display: inline-flex; align-items: center; min-height: 44px; }
+.sep-code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; letter-spacing: 0.12em; color: var(--st-ink); }
+.sep-reg-acts { margin-top: 6px; gap: 8px; }
+.sep-mini {
+  min-height: 44px; padding: 0 16px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--st-line); background: var(--st-surface); color: var(--st-ink);
+  font: 14px/1 'Manrope', 'PingFang SC', sans-serif;
+}
+.sep-mini.is-main { background: var(--st-accent); border-color: var(--st-accent); color: #f5f1e8; }
+.sep-mini:disabled { opacity: 0.6; cursor: progress; }
+
+/* 去通知 TA */
+.sep-notices { background: #fbf1dc; border: 1px solid #ecd6a8; border-radius: 14px; padding: 16px 18px; }
+.sep-notice-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+.sep-notice-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 14.5px; }
+.sep-notice-list li.is-refund b::after { content: '要退款'; margin-left: 8px; padding: 1px 8px; border-radius: 99px; background: #b5643c; color: #fff; font-size: 12px; font-weight: 600; }
+.sep-notice-acts { display: inline-flex; flex-wrap: wrap; gap: 0 14px; }
+.sep-notice-acts .rc-copy { color: var(--st-accent); }
+.sep-sent { color: var(--st-accent); font-size: 13px; }
+/* 封面 */
+.sep-cover { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 10px; }
+.sep-cover img { width: 120px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid var(--st-line); }
+/* 名单里的复制、屏蔽 */
+.sep-reg-contact { display: flex; flex-wrap: wrap; align-items: center; gap: 0 14px; }
+.sep-reg-contact .rc-copy { color: var(--st-accent); }
+.sep-mini-link {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0; background: none; border: 0; cursor: pointer;
+  font: inherit; font-size: 13.5px; color: var(--st-accent); text-decoration: underline; text-underline-offset: 0.2em;
+}
+.sep-reg-blocked { margin-left: 8px; padding: 1px 8px; border-radius: 99px; background: #eee6da; color: #6d5424; font-size: 12px; }
+.sep-acts .rc-copy { color: var(--st-accent); }

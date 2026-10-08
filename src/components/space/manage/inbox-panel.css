@@ -1,0 +1,77 @@
+/* 管理页的收件箱。套在 .st（风格工作室的米白与森林绿）里 */
+.ib { font-size: 15px; }
+.ib-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ib-sum { margin: 0; font-size: 17px; font-weight: 600; }
+.ib-privacy { margin: 4px 0 0; font-size: 13px; color: var(--st-mute); }
+.ib-err { margin: 14px 0 0; padding: 10px 14px; border-radius: 10px; background: #f8e8e1; color: #8a3f28; font-size: 14.5px; }
+
+.ib-h {
+  display: flex; align-items: baseline; gap: 10px;
+  margin: 40px 0 8px; font-family: 'EB Garamond', 'Noto Serif SC', 'Songti SC', serif; font-weight: 500; font-size: 22px;
+}
+.ib-h span { font-family: 'Manrope', 'PingFang SC', sans-serif; font-size: 13px; color: var(--st-mute); }
+.ib-closed { margin: 0 0 10px; font-size: 13.5px; color: #6d5424; }
+.ib-empty { margin: 0; padding: 14px 0; color: var(--st-soft); font-size: 14.5px; border-top: 1px solid var(--st-line); }
+
+.ib-list { list-style: none; margin: 0; padding: 0; }
+.ib-item { padding: 18px 0 16px; border-top: 1px solid var(--st-line); }
+.ib-item:last-child { border-bottom: 1px solid var(--st-line); }
+.ib-item[data-new] { background: linear-gradient(90deg, var(--st-sage), rgba(228, 234, 219, 0) 70%); padding-left: 12px; margin-left: -12px; }
+
+.ib-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; }
+.ib-dot { width: 8px; height: 8px; border-radius: 50%; background: #c98a2b; flex: none; }
+.ib-name { font-size: 16.5px; }
+.ib-badge {
+  display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 99px;
+  background: var(--st-sage); color: var(--st-accent); font-size: 12px; text-decoration: none;
+}
+.ib-status { padding: 1px 8px; border-radius: 99px; font-size: 12px; background: #f3e3c6; color: #6d5424; }
+.ib-status[data-status='accepted'] { background: var(--st-accent); color: #f5f1e8; }
+.ib-status[data-status='declined'] { background: var(--st-line); color: var(--st-soft); }
+.ib-status[data-status='done'] { background: var(--st-sage); color: var(--st-accent); }
+.ib-time { margin-left: auto; font-size: 12.5px; color: var(--st-mute); white-space: nowrap; }
+
+.ib-contact { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; margin: 6px 0 0; }
+.ib-k { font-size: 13px; color: var(--st-mute); }
+.ib-v { overflow-wrap: anywhere; -webkit-user-select: all; user-select: all; }
+.ib-blocked { padding: 1px 8px; border-radius: 99px; background: #f8e8e1; color: #8a3f28; font-size: 12px; }
+.ib-msg { margin: 8px 0 0; white-space: pre-line; overflow-wrap: anywhere; max-width: 40em; }
+.ib-quiet { color: var(--st-mute); font-size: 14px; }
+
+.ib-dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 8px 0 0; }
+.ib-dl dt { font-size: 13px; color: var(--st-mute); padding-top: 2px; }
+.ib-dl dd { margin: 0; overflow-wrap: anywhere; }
+.ib-pre { white-space: pre-line; }
+
+.ib-acts { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 10px; }
+.ib-btn {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px;
+  border: 1px solid var(--st-line); border-radius: 999px; background: var(--st-surface); color: var(--st-ink);
+  font: inherit; font-size: 14px; cursor: pointer;
+}
+.ib-btn--main { background: var(--st-accent); border-color: var(--st-accent); color: #f5f1e8; }
+.ib-btn--del { color: #8a3f28; }
+.ib-btn:disabled { opacity: 0.55; cursor: progress; }
+.ib-link {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px;
+  border: 0; background: none; color: var(--st-accent); font: inherit; font-size: 14px; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 0.25em;
+}
+.ib-copy { min-height: 36px; font-size: 13px; }
+
+.ib-reply { margin-top: 12px; max-width: 36em; }
+.ib-reply .ib-k { display: block; margin-bottom: 6px; font-size: 14px; color: var(--st-soft); }
+.ib-reply small { margin-left: 4px; color: var(--st-mute); font-size: 12.5px; }
+.ib-ta {
+  display: block; width: 100%; min-height: 84px; padding: 10px 12px;
+  border: 1px solid var(--st-line); border-radius: 10px; background: #fff; color: var(--st-ink);
+  font: 16px/1.6 'Manrope', 'PingFang SC', 'Hiragino Sans GB', sans-serif; resize: vertical;
+}
+.ib-ta:focus { outline: 2px solid var(--st-accent); outline-offset: -1px; }
+
+.ib-mailbody {
+  margin: 8px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--st-surface);
+  font: 13.5px/1.7 'Manrope', 'PingFang SC', sans-serif; color: var(--st-soft);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.ib button:focus-visible, .ib a:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }

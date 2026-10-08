@@ -4,6 +4,7 @@ import { isAdminId } from '@/lib/admin';
 import { getLocale } from '@/lib/locale';
 import { matchNodesAI } from '@/lib/match';
 import { NODE_LISTED, fetchMatchPool, shouldPromoteToListed } from '@/lib/nodeVisibility';
+import { draftInBackground } from '@/lib/space/autoDraft';
 import { getAuthenticatedMemberId } from '@/lib/session';
 import type { NodeCard } from '@/lib/supabase';
 import { toRecommendationSnapshot } from '../join/route';
@@ -193,6 +194,8 @@ export async function PATCH(request: NextRequest) {
    * 他仍然可以自己去点「重新生成」。
    */
   if (promoting && data) {
+    // 进森林的那一刻，个人空间的默认推荐版本也一起起稿（和走完注册的人同一个时机，见 api/join）
+    after(() => draftInBackground(data as NodeCard));
     after(async () => {
       try {
         const pool = await fetchMatchPool(sb, nodeId);

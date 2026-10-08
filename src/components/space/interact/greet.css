@@ -1,0 +1,57 @@
+/*
+ * 尾声里的「打个招呼」。底色是 --sp-back（多数主题深色，晨雾湖面是浅色），
+ * 所以一律用 currentColor + 透明度，不写死颜色。
+ * 老内核不认 inset、color-mix()、:has()：输入框的半透明底和边框用包一层的伪元素来画。
+ */
+.gr { margin-top: 32px; max-width: 32em; }
+.sp .gr .sp-btn { border: 0; cursor: pointer; font-family: var(--sp-body); }
+.sp .gr .gr-open { margin-top: 0; }
+.sp .gr .sp-btn:disabled { opacity: 0.6; cursor: progress; }
+
+.gr-off { margin: 28px 0 0; font-size: 14px; opacity: 0.75; }
+.gr-preview { margin: 12px 0 0; font-size: 12.5px; opacity: 0.65; }
+.gr-done {
+  margin: 0; max-width: 22em;
+  font-family: var(--sp-head); font-size: clamp(19px, 2.2vw, 24px); line-height: 1.6;
+}
+
+.gr-lead { margin: 0 0 18px; font-family: var(--sp-head); font-size: 16px; opacity: 0.75; }
+.gr-l { display: block; margin: 16px 0 6px; font-size: 14px; opacity: 0.8; }
+.gr-l:first-of-type { margin-top: 0; }
+
+.gr-f { position: relative; display: block; }
+.gr-f::before, .gr-f::after {
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+  border-radius: var(--sp-radius); pointer-events: none;
+}
+.gr-f::before { background: currentColor; opacity: 0.08; }
+.gr-f::after { border: 1px solid currentColor; opacity: 0.3; }
+.gr-f:focus-within::after { opacity: 0.85; border-width: 2px; }
+.gr-f input, .gr-f textarea {
+  position: relative; z-index: 1; display: block; width: 100%;
+  min-height: 48px; margin: 0; padding: 11px 14px;
+  border: 0; border-radius: var(--sp-radius); outline: 0;
+  background: transparent; color: inherit;
+  font: 16px/1.6 var(--sp-body);
+  -webkit-appearance: none; appearance: none;
+}
+.gr-f textarea { min-height: 120px; resize: vertical; }
+.gr-f input::placeholder, .gr-f textarea::placeholder { color: inherit; opacity: 0.45; }
+.gr-hint { display: block; margin-top: 6px; font-size: 12.5px; opacity: 0.6; }
+
+.gr-err { margin: 16px 0 0; font-size: 14.5px; line-height: 1.7; }
+.gr-err::before { content: '· '; }
+
+.gr-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 22px; }
+.sp .gr .gr-send { margin-top: 0; }
+.gr-cancel {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px;
+  border: 0; background: none; color: inherit; cursor: pointer;
+  font: 15px/1 var(--sp-body); opacity: 0.75;
+  text-decoration: underline; text-underline-offset: 0.3em; text-decoration-thickness: 1px;
+}
+
+/* 蜜罐：人看不见、读屏跳过，脚本常常会填 */
+.gr-hp { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; opacity: 0; }
+
+.gr button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

@@ -1,0 +1,49 @@
+/*
+ * 报名人自己的报名页（/space/r/<token>），套在风格工作室的 .st 容器里（米白底、森林绿）。
+ * 手机优先：单栏、可点区域 ≥ 44px；不用 position:fixed、backdrop-filter、color-mix()、:has()。
+ */
+.sr > * { max-width: 560px; }
+.sr { padding-top: 48px; }
+.sr h1 {
+  margin: 6px 0 8px; font-family: 'EB Garamond', 'Noto Serif SC', 'Songti SC', serif; font-weight: 500;
+  font-size: clamp(26px, 6vw, 36px); line-height: 1.35; overflow-wrap: break-word; overflow-wrap: anywhere;
+}
+.sr h2 { margin: 0 0 8px; font-family: 'EB Garamond', 'Noto Serif SC', 'Songti SC', serif; font-weight: 500; font-size: 21px; line-height: 1.4; }
+.sr-meta { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 0; font-size: 15px; color: var(--st-soft); font-variant-numeric: tabular-nums; }
+
+.sr-status, .sr-pay, .sr-mine, .sr-desc, .sr-foot { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--st-line); }
+.sr-status p { margin: 0 0 8px; color: var(--st-soft); }
+.sr-status[data-status='rejected'] h2, .sr-status[data-status='event-cancelled'] h2 { color: #8a4a33; }
+.sr-note { padding-left: 12px; border-left: 2px solid var(--st-line); }
+
+.sr-pay-facts { display: grid; gap: 10px; margin: 0 0 18px; }
+.sr-pay-facts > div { display: grid; grid-template-columns: 3.5em 1fr; align-items: baseline; gap: 10px; }
+.sr-pay-facts dt { color: var(--st-mute); font-size: 14px; }
+.sr-pay-facts dd { margin: 0; font-size: 17px; }
+.sr-pay-facts small { display: block; font-size: 13.5px; color: var(--st-soft); }
+.sr-code { font-size: 28px; letter-spacing: 0.2em; font-variant-numeric: tabular-nums; color: var(--st-accent); font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+
+.sr-qr { margin: 0 0 22px; }
+.sr-qr img { display: block; width: 260px; max-width: 100%; height: auto; border-radius: 12px; background: #fff; }
+.sr-qr figcaption { margin-top: 8px; font-size: 13.5px; color: var(--st-mute); }
+
+.sr-proof-lead { margin: 0 0 10px; }
+.sr-btn { min-height: 48px; padding: 0 24px; font-size: 16px; }
+.sr-ok { color: var(--st-accent); font-weight: 600; margin: 10px 0 0; }
+.sr-proof .st-err, .sr-cancel .st-err { margin: 10px 0 0; }
+.sr-proof .st-muted { margin: 10px 0 0; }
+
+.sr-mine dl { margin: 0 0 8px; display: grid; gap: 8px; }
+.sr-mine dl > div { display: grid; grid-template-columns: 5em 1fr; gap: 10px; }
+.sr-mine dt { color: var(--st-mute); font-size: 14px; }
+.sr-mine dd { margin: 0; overflow-wrap: break-word; overflow-wrap: anywhere; }
+.sr-pre { margin: 0; white-space: pre-line; color: var(--st-soft); overflow-wrap: break-word; overflow-wrap: anywhere; }
+
+.sr-foot { display: grid; gap: 14px; justify-items: start; }
+.sr-foot .st-muted { margin: 0; }
+.sr-foot .st-go { display: inline-flex; align-items: center; min-height: 44px; border-bottom: 0; text-decoration: underline; text-underline-offset: 0.25em; }
+.sr-textbtn { display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; color: #8a4a33; }
+.sr-textbtn:disabled { opacity: 0.6; cursor: progress; }
+@media (max-width: 760px) { .sr { padding-top: 36px; } }
+
+.sr-foot .rc-copy { color: var(--st-accent); margin-bottom: 4px; }

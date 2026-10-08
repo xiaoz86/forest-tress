@@ -1,0 +1,114 @@
+/* 管理页「分享」面板：套在 .st（风格工作室）里，用 --st-* 变量 */
+
+.shp { display: block; }
+.shp-sec { padding: 28px 0; border-top: 1px solid var(--st-line); }
+.shp-sec:first-child { border-top: 0; padding-top: 4px; }
+.shp-h { font-family: 'EB Garamond', 'Noto Serif SC', 'Songti SC', serif; font-weight: 500; font-size: 22px; margin: 0 0 12px; color: var(--st-ink); }
+.shp-p { margin: 0 0 10px; color: var(--st-soft); font-size: 15px; line-height: 1.8; max-width: 38em; }
+.shp-strong { color: var(--st-ink); font-weight: 600; }
+.shp-mute { margin: 6px 0 0; color: var(--st-mute); font-size: 14px; line-height: 1.7; min-height: 0; }
+.shp-mute:empty { display: none; }
+.shp-err { margin: 6px 0 0; color: #a8563d; font-size: 14px; line-height: 1.7; }
+.shp-ok { margin: 6px 0 0; color: var(--st-accent); font-size: 14px; line-height: 1.7; }
+.shp-row { display: flex; align-items: center; gap: 14px; margin: 0 0 12px; flex-wrap: wrap; }
+
+/* 开关：整块可点，≥44px */
+.shp-switch {
+  display: inline-flex; align-items: center; gap: 12px; min-height: 44px; padding: 6px 16px 6px 6px;
+  border: 1px solid var(--st-line); border-radius: 999px; background: var(--st-surface); color: var(--st-ink);
+  font: inherit; font-size: 15px; cursor: pointer;
+}
+.shp-switch:disabled { opacity: 0.6; cursor: progress; }
+.shp-knob { position: relative; width: 52px; height: 30px; border-radius: 999px; background: var(--st-line); transition: background 0.2s; flex: none; }
+.shp-knob::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); transition: transform 0.2s;
+}
+.shp-switch.is-on .shp-knob { background: var(--st-accent); }
+.shp-switch.is-on .shp-knob::after { transform: translateX(22px); }
+.shp-switch:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+
+/* 短链 */
+.shp-slug { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; max-width: 34em; }
+.shp-field {
+  flex: 1 1 260px; display: flex; align-items: center; min-height: 48px; min-width: 0;
+  border: 1px solid var(--st-line); border-radius: 12px; background: var(--st-surface); padding: 0 0 0 14px;
+}
+.shp-field:focus-within { border-color: var(--st-accent); }
+.shp-prefix { color: var(--st-mute); font-size: 16px; white-space: nowrap; }
+.shp-input {
+  flex: 1; min-width: 0; border: 0; background: transparent; color: var(--st-ink);
+  font: inherit; font-size: 16px; /* iOS 不自动放大 */ padding: 10px 14px 10px 2px; outline: none;
+}
+.shp-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 22px;
+  border: 0; border-radius: 999px; background: var(--st-accent); color: #f5f1e8;
+  font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+.shp-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.shp-btn-quiet { background: transparent; color: var(--st-accent); border: 1px solid var(--st-accent); }
+.shp-link { display: flex; gap: 10px; align-items: stretch; margin-top: 14px; max-width: 34em; }
+.shp-link-text {
+  border: 1px solid var(--st-line); border-radius: 12px; background: var(--st-sage); padding: 10px 14px;
+  -webkit-user-select: all; user-select: all;
+}
+
+/* 名片 */
+.shp-card { margin: 14px 0 6px; max-width: 320px; }
+.shp-card-img {
+  display: block; width: 100%; height: auto; border-radius: 10px; background: var(--st-line);
+  box-shadow: 0 10px 30px rgba(30, 53, 40, 0.14);
+  -webkit-touch-callout: default; /* iOS 上允许长按出「存储图像」 */
+}
+.shp-card-wait { aspect-ratio: 1080 / 1440; box-shadow: none; }
+.shp-card-fail { padding: 24px 0; }
+.shp-actions { display: flex; gap: 12px; flex-wrap: wrap; margin: 14px 0 4px; }
+.shp-a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+/* 微信里代替「下载」的主提示：长按保存 */
+.shp-hint {
+  margin: 14px 0 4px; padding: 12px 16px; max-width: 320px; border-radius: 12px;
+  background: var(--st-accent); color: #f5f1e8; font-size: 16px; font-weight: 600; line-height: 1.5; text-align: center;
+}
+/* 名片不要发到网上：放在图上面，一眼能看到 */
+.shp-warn {
+  margin: 4px 0 10px; padding: 10px 14px; max-width: 38em; border-radius: 10px;
+  border: 1px solid #d9a58f; background: #fbf0ea; color: #8a4430; font-size: 14.5px; line-height: 1.7;
+}
+
+/* 打开大图：整屏只有这一张图，方便长按保存 */
+.shp-big {
+  position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: rgba(12, 16, 13, 0.94);
+}
+.shp-big-img {
+  display: block; max-width: 100%; max-height: calc(100dvh - 140px); width: auto; height: auto; border-radius: 8px;
+  -webkit-touch-callout: default; -webkit-user-select: auto; user-select: auto;
+}
+.shp-big-tip { margin: 0; color: #f5f1e8; font-size: 16px; font-weight: 600; text-align: center; }
+.shp-big-close {
+  min-height: 44px; padding: 0 22px; border: 1px solid rgba(245, 241, 232, 0.6); border-radius: 999px;
+  background: transparent; color: #f5f1e8; font: inherit; font-size: 15px; cursor: pointer;
+}
+
+/* 分享预览：模拟一张链接卡片 */
+.shp-og {
+  max-width: 420px; margin: 12px 0 10px; border-radius: 12px; overflow: hidden;
+  background: #fff; box-shadow: 0 1px 0 var(--st-line), 0 6px 20px rgba(30, 53, 40, 0.08);
+}
+.shp-og-img { display: block; width: 100%; height: auto; aspect-ratio: 1200 / 630; background: var(--st-line); object-fit: cover; }
+.shp-og-body { padding: 12px 14px 14px; }
+.shp-og-title { margin: 0; color: #1f1f1f; font-size: 15.5px; font-weight: 600; line-height: 1.5; }
+.shp-og-desc {
+  margin: 4px 0 0; color: #6b6b6b; font-size: 13.5px; line-height: 1.6;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.shp-og-host { margin: 8px 0 0; color: #9a9a9a; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 520px) {
+  .shp-slug .shp-btn { flex: 1 1 100%; }
+  .shp-prefix { font-size: 15px; }
+}
+
+.shp-warn { background: #fbf1dc; border: 1px solid #ecd6a8; border-radius: 10px; padding: 8px 12px; color: #6d5424; }
+

@@ -9,6 +9,7 @@ import { generateKeywordsAI } from '@/lib/keywords';
 import { notifyNewNode, notifyPeerNewNode, notifyWelcome, getSiteOrigin } from '@/lib/notify';
 import { fetchMatchPool, isListed } from '@/lib/nodeVisibility';
 import { getLocale } from '@/lib/locale';
+import { draftInBackground } from '@/lib/space/autoDraft';
 import {
   signLoginToken,
   signMemberSession,
@@ -256,6 +257,10 @@ export async function POST(request: NextRequest) {
       if (!signed.ok) {
         console.error('[api/join] AUTH_SECRET not set, welcome link not sent');
       }
+
+      // 个人空间的默认推荐版本：AI 根据他刚写下的资料起稿（一句话、身份、我在意的、服务），主题按画像推荐。
+      // 他之后在自己的网站上逐块改、让 AI 再给两个版本、确认、发布。不挡注册响应；没赶上的，空间第一次被打开时会补上
+      if (isListed(newNode)) after(() => draftInBackground(newNode));
 
       // 主理人通知不阻塞注册响应，但由 Next.js 保证函数生命周期持续到发送结束。
       after(async () => {

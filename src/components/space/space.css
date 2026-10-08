@@ -1,0 +1,691 @@
+/*
+ * 个人空间 · 网站。所有视觉都从主题变量来（--sp-*，见 lib/space/themes.ts）。
+ *
+ * 版式是一段向下走的叙事：照片封面 → 纸上的大字 → 满幅色块 → 正文 → 服务单 → 最后一页 → 照片回来。
+ * 全站不出现带边框的卡片、chips、引用框——那些是资料卡的语言（v2 §7.3「避免卡片堆叠感、信息面板感」）。
+ *
+ * 微信内置浏览器（安卓 XWeb 老内核）不用：backdrop-filter、background-attachment:fixed、color-mix()、
+ * initial-letter、position:fixed；:has()、svh、text-wrap、overflow-x:clip 只作增强。
+ */
+
+/* 自带最小重置：全站的 preflight 放在 @layer 里，老内核（XWeb<99、iOS<15.4）会整块丢掉 */
+body { margin: 0; }
+.sp-bar, .sp-bar *, .sp, .sp *, .sp *::before, .sp *::after { box-sizing: border-box; }
+/* :where 不加权重：后面各个类自己写的 margin 照样生效 */
+:where(.sp) :where(h1, h2, p, figure, blockquote, dl, dd, ol, ul) { margin: 0; }
+
+/* 可视高度：认 svh 的用 svh（微信底栏出现时不跳），不认的用 vh。
+ * 不能在同一属性里写两条靠后一条回退——带 var() 的那条在老内核上会算成 0 */
+.sp { --sp-vh: 100vh; }
+@supports (height: 100svh) { .sp { --sp-vh: 100svh; } }
+
+.sp {
+  --m: max(22px, env(safe-area-inset-left), env(safe-area-inset-right));
+  --sp-bar-h: 0px;
+  --sp-mark: #8a6424;
+  background: var(--sp-bg);
+  color: var(--sp-ink);
+  font-family: var(--sp-body);
+  line-height: 1.85;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  /* 不能用 overflow:hidden——吸顶页眉靠祖先不裁切 */
+  overflow-x: clip;
+}
+.sp[data-bar] { --sp-bar-h: 40px; }
+.sp a { color: inherit; }
+/* 页边距含刘海机型横屏的安全区 */
+@media (max-width: 379px) { .sp { --m: max(18px, env(safe-area-inset-left), env(safe-area-inset-right)); } }
+@media (min-width: 768px) { .sp { --m: max(40px, env(safe-area-inset-left), env(safe-area-inset-right)); } }
+@media (min-width: 1024px) { .sp { --m: max(clamp(40px, 5vw, 96px), env(safe-area-inset-left), env(safe-area-inset-right)); } }
+
+/* ── 预览条：只在预览时出现，不属于网站本身。普通文档流，滚走后顶部让给页眉 ── */
+.sp-bar {
+  display: flex; align-items: center; gap: 14px;
+  height: 40px; padding: 0 max(14px, env(safe-area-inset-right)) 0 max(14px, env(safe-area-inset-left));
+  background: #1f2723; color: #e9ede6;
+  font: 13px/1 'Manrope', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  white-space: nowrap; overflow-x: auto; scrollbar-width: none;
+}
+.sp-bar::-webkit-scrollbar { display: none; }
+.sp-bar a { color: #e9ede6; text-decoration: none; border-bottom: 1px solid rgb(233 237 230 / 0.35); padding: 2px 0; }
+/* 色块和链接视觉很小，点击区撑到 40px（预览条本身 40px 高） */
+.sp-bar a { position: relative; }
+.sp-bar a::after { content: ''; position: absolute; top: -12px; bottom: -12px; left: -4px; right: -4px; }
+.sp-bar-tag { background: #e8c9a0; color: #1e2a22; border-radius: 99px; padding: 4px 9px; font-weight: 600; font-size: 12px; }
+.sp-bar-title { opacity: 0.85; }
+.sp-bar-legend { color: #f0c979; font-size: 12px; }
+.sp-bar-sp { flex: 1; }
+.sp-swatches { display: flex; gap: 6px; align-items: center; }
+.sp-bar .sp-swatch { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; padding: 0; flex: none; }
+.sp-bar .sp-swatch.is-on { border-color: #fff; }
+@media (max-width: 767px) {
+  .sp-bar-title, .sp-bar-legend, .sp-bar-back { display: none; }
+}
+/* 320–380 宽：再省掉「预览」标签，保证「访客视角」「工作室」都放得下 */
+@media (max-width: 380px) {
+  .sp-bar { gap: 10px; }
+  .sp-bar-tag { display: none; }
+}
+
+/* ══════════════ 封面 ══════════════
+ * 移动：照片一行在上，纸幅在下，名字骑在接缝上。
+ * 小字永远落在不透明的纸上——不管照片深浅都清楚；照片框接近正方，人像和竖图风景的主体都不被字压住。 */
+.sp-cover {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(200px, 1fr) auto;
+  min-height: calc(var(--sp-vh) - var(--sp-bar-h));
+  background: rgb(var(--sv));
+  color: var(--sp-sheet-ink);
+  --sp-mark: #8a6424;
+}
+.sp[data-cover='dark'] .sp-cover { --sp-mark: #f0c979; }
+.sp-cover-amb { display: none; }
+.sp-cover-photo { position: relative; overflow: hidden; background: var(--sp-cover-base); }
+/* 本人点过照片焦点时，裁切围着那一点（--fx / --fy 由 SpaceSite 按编辑记录给） */
+.sp-cover-photo img { object-fit: cover; object-position: var(--fx, 50%) var(--fy, 50%); filter: var(--sp-photo-filter); }
+.sp-cover-photo::after {
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none;
+  background: var(--sp-photo-tint);
+}
+.sp[data-photo='none'] .sp-cover-photo, .sp[data-photo='stamp'] .sp-cover-photo { background: var(--sp-art); }
+
+/* 没有照片：名字首字的水印，出血到右下 */
+.sp-glyph {
+  position: absolute; right: -0.08em; bottom: -0.18em;
+  font-family: var(--sp-head); font-weight: var(--sp-head-weight);
+  font-size: min(72vw, 44vh); line-height: 1;
+  color: var(--sp-glyph); opacity: var(--sp-glyph-op);
+  pointer-events: none; user-select: none;
+}
+.sp[data-theme='line'] .sp-glyph { color: transparent; -webkit-text-stroke: 1.5px var(--sp-glyph); }
+
+/* 低清头像：不放大糊掉，改成纸上的一张小相片 */
+.sp-stamp {
+  position: absolute; left: 50%; top: 50%;
+  width: 112px; height: 112px; transform: translate(-50%, -50%);
+  border-radius: var(--sp-radius); overflow: hidden;
+  box-shadow: 0 10px 24px rgb(0 0 0 / 0.18);
+}
+.sp[data-theme='bloom'] .sp-stamp, .sp[data-theme='clay'] .sp-stamp { transform: translate(-50%, -50%) rotate(-2deg); }
+.sp-stamp img { object-fit: cover; }
+
+.sp-sheet { position: relative; padding: 14px var(--m) max(18px, env(safe-area-inset-bottom)); }
+/* 溶边：照片往下溶进纸里 */
+.sp-sheet::before {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 100%;
+  height: var(--sp-fade); pointer-events: none;
+  background: linear-gradient(to top, rgb(var(--sv)) 0, rgb(var(--sv) / 0.85) 43%, rgb(var(--sv) / 0.45) 72%, rgb(var(--sv) / 0) 100%);
+}
+.sp-cover-note {
+  position: absolute; right: var(--m); bottom: calc(100% + 10px); z-index: 2;
+  margin: 0; padding: 3px 9px; border-radius: 99px;
+  font: 500 11px/1.5 var(--sp-body); letter-spacing: 0.02em;
+  background: rgb(255 248 230 / 0.94); color: #7a5a22; border: 1px dashed #d9b87a;
+}
+
+.sp-name {
+  position: relative;
+  margin: -0.42em 0 0;  /* 骑在照片和纸的接缝上：杂志封面的做法 */
+  font-family: var(--sp-head); font-weight: var(--sp-head-weight);
+  font-size: max(28px, calc(48px * var(--ns)));
+  line-height: 1.08; letter-spacing: var(--sp-name-track);
+  text-wrap: balance; word-break: keep-all; overflow-wrap: break-word; overflow-wrap: anywhere;
+}
+/* 相纸、硬边两种边缘没有溶边，名字不压到照片上 */
+.sp[data-edge='print'] .sp-name, .sp[data-edge='rule'] .sp-name { margin-top: 6px; }
+.sp-tagline {
+  margin: 10px 0 0; max-width: 14em;
+  font-family: var(--sp-head); font-weight: 400;
+  font-size: 20px; line-height: 1.45;
+  text-wrap: balance; word-break: keep-all; overflow-wrap: break-word; overflow-wrap: anywhere;
+}
+.sp-tagline[data-long] { font-size: 18px; }
+.sp-placeholder { opacity: 0.55; font-size: 16px; }
+.sp-byline {
+  margin: 10px 0 0; font-size: 13px; line-height: 1.6; letter-spacing: 0.04em; color: var(--sp-sheet-soft);
+  /* 「附近森林创始人」不拆开，只在分隔符的空格处换行 */
+  word-break: keep-all; overflow-wrap: break-word; overflow-wrap: anywhere;
+}
+.sp-byline > span + span::before { content: ' · '; }
+.sp-roles > span + span::before { content: ' / '; }
+.sp-now {
+  margin: 8px 0 0; max-width: 28em; text-wrap: pretty;
+  font-size: 14.5px; line-height: 1.65; color: var(--sp-sheet-soft);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.sp-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 16px; }
+
+.sp-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 0 22px; border-radius: var(--sp-btn-radius, 999px);
+  background: var(--sp-accent-text); color: var(--sp-accent-ink);
+  font: 600 15px/1 var(--sp-body); text-decoration: none; white-space: nowrap;
+}
+.sp .sp-btn { color: var(--sp-accent-ink); }
+/* 按钮圆角来自 --sp-btn-radius（themes.ts tokensToStyle，跟着主题和「圆角」旋钮走） */
+/* 深纸幅上的按钮反过来：浅底深字 */
+.sp[data-cover='dark'] .sp-cover .sp-btn { background: var(--sp-sheet-ink); color: rgb(var(--sv)); }
+.sp-btn[aria-disabled='true'] { cursor: default; }
+.sp-go {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 6px;
+  font-size: 15px; text-decoration: underline; text-underline-offset: 0.3em; text-decoration-thickness: 1px;
+}
+
+/* 照片的边缘，因主题而异 */
+.sp[data-edge='arch'] .sp-cover-photo { margin: 12px 12px 0; border-radius: 999px 999px 0 0; }
+.sp[data-edge='print'] .sp-cover-photo { margin: 16px 16px 0; }
+.sp[data-edge='fog'] .sp-cover-photo::before {
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(to bottom, rgb(var(--sv) / 0.4), rgb(var(--sv) / 0) 38%);
+}
+.sp[data-edge='rule'] .sp-sheet { border-top: 1px solid var(--sp-ink); }
+/* 深色纸幅上，硬边那一道线用纸幅上的浅字色：用墨色画在深底上只剩一条发暗的缝 */
+.sp[data-cover='dark'][data-edge='rule'] :is(.sp-sheet, .sp-cover-photo) { border-color: var(--sp-sheet-soft); }
+
+/* 晨雾湖面：封面文字居中 */
+.sp[data-align='center'] .sp-sheet { text-align: center; }
+.sp[data-align='center'] .sp-tagline, .sp[data-align='center'] .sp-now { margin-left: auto; margin-right: auto; }
+.sp[data-align='center'] .sp-acts { justify-content: center; }
+
+/* 矮屏（小屏微信带底栏）：字和间距都收一点，照片不低于 200px */
+@media (max-width: 767px) and (max-height: 600px) {
+  .sp-name { font-size: max(26px, calc(42px * var(--ns))); }
+  .sp-tagline, .sp-tagline[data-long] { font-size: 17px; margin-top: 7px; }
+  .sp-byline { margin-top: 7px; }
+  .sp-now { margin-top: 6px; }
+  .sp-acts { margin-top: 11px; }
+  .sp-sheet::before { height: min(var(--sp-fade), 40px); }
+}
+
+/* 平板：沿用移动的上下结构 */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sp-cover { grid-template-rows: minmax(46vh, 1fr) auto; }
+  .sp-sheet { padding-bottom: 40px; }
+  .sp-sheet > * { max-width: 36em; }
+  .sp-name { font-size: calc(64px * var(--ns)); }
+  .sp-tagline { font-size: 24px; }
+}
+
+/* 桌面：字靠左贴底，照片从 36% 铺到右边缘、上下出血；左边垫一层同一张照片的模糊版 */
+@media (min-width: 1024px) {
+  .sp-cover {
+    display: block;
+    min-height: clamp(640px, calc(var(--sp-vh) - var(--sp-bar-h)), 960px);
+  }
+  /* 模糊底伸过照片的左缘、自己渐隐，和照片的羽化叠在一起，不留竖向接缝 */
+  .sp-cover-amb {
+    display: block; position: absolute; top: 0; right: 44%; bottom: 0; left: 0; overflow: hidden; opacity: var(--sp-amb);
+    -webkit-mask-image: linear-gradient(to right, #000 55%, transparent 100%);
+            mask-image: linear-gradient(to right, #000 55%, transparent 100%);
+  }
+  .sp-cover-amb img { object-fit: cover; filter: blur(40px) var(--sp-photo-filter); transform: scale(1.3); }
+  .sp-cover-photo { position: absolute; top: 0; right: 0; bottom: 0; left: 36%; }
+  .sp-cover-photo img { object-position: var(--fx, 50%) var(--fy, 45%); }
+  .sp-glyph { font-size: clamp(280px, 34vw, 560px); }
+  .sp-stamp { width: 168px; height: 168px; }
+
+  .sp[data-edge='feather'] .sp-cover-photo {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, rgb(0 0 0 / 0.6) 10%, #000 22%);
+            mask-image: linear-gradient(to right, transparent 0, rgb(0 0 0 / 0.6) 10%, #000 22%);
+  }
+  .sp[data-theme='clay'] .sp-cover-photo {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, rgb(0 0 0 / 0.6) 14%, #000 30%);
+            mask-image: linear-gradient(to right, transparent 0, rgb(0 0 0 / 0.6) 14%, #000 30%);
+  }
+  .sp[data-edge='arch'] .sp-cover-photo { top: 40px; right: 40px; bottom: 0; left: 40%; margin: 0; }
+  .sp[data-edge='print'] .sp-cover-photo {
+    top: 48px; right: 48px; bottom: 48px; left: 42%; margin: 0;
+    outline: 1px solid var(--sp-line); outline-offset: 10px;
+  }
+  .sp[data-edge='fog'] .sp-cover-photo {
+    top: 0; right: 0; bottom: 0; left: 30%;
+    /* 椭圆的横半径小于中心到左缘的距离：左缘完全透明，雾里浮出一张照片，没有竖边 */
+    -webkit-mask-image: radial-gradient(ellipse 62% 105% at 64% 45%, #000 40%, transparent 100%);
+            mask-image: radial-gradient(ellipse 62% 105% at 64% 45%, #000 40%, transparent 100%);
+  }
+  .sp[data-edge='fog'] .sp-cover-photo::before { display: none; }
+  .sp[data-edge='rule'] .sp-cover-photo { top: 0; right: 0; bottom: 0; left: 40%; border-left: 1px solid var(--sp-ink); }
+
+  .sp-sheet {
+    position: relative; z-index: 1;
+    width: 38%; min-height: inherit;
+    display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;
+    padding: 48px 24px clamp(48px, 9vh, 104px) var(--m);
+  }
+  .sp[data-edge='rule'] .sp-sheet { width: 40%; border-top: 0; }
+  .sp[data-align='center'] .sp-sheet { align-items: center; }
+  .sp-sheet::before { display: none; }
+  .sp-cover-note { position: static; margin: 0 0 auto; }
+  /* 纸幅只有 38% 宽：字号不超过「纸幅宽 ÷ 名字的视觉长度」，五个字的中文名不会掉一个字到下一行 */
+  .sp-name, .sp[data-edge='print'] .sp-name, .sp[data-edge='rule'] .sp-name {
+    margin-top: 0;
+    font-size: min(calc(clamp(56px, 6.2vw, 96px) * var(--ns)), calc((38vw - var(--m) - 24px) / (var(--nl) * 1.12)));
+    line-height: 1.04;
+  }
+  .sp-tagline { margin-top: 20px; font-size: clamp(22px, 2.1vw, 32px); }
+  .sp-tagline[data-long] { font-size: clamp(20px, 1.7vw, 26px); }
+  .sp-byline { margin-top: 20px; font-size: 14px; line-height: 1.7; }
+  .sp-now { margin-top: 12px; font-size: clamp(15px, 1.1vw, 17px); line-height: 1.8; -webkit-line-clamp: 3; }
+  .sp-acts { margin-top: 32px; }
+  .sp-cover .sp-btn { min-height: 48px; font-size: 16px; padding: 0 26px; }
+}
+@media (min-width: 1024px) and (max-height: 720px) {
+  .sp-name, .sp[data-edge='print'] .sp-name, .sp[data-edge='rule'] .sp-name {
+    font-size: min(calc(min(80px, 6.2vw) * var(--ns)), calc((38vw - var(--m) - 24px) / (var(--nl) * 1.12)));
+  }
+}
+
+/* ══════════════ 吸顶页眉：DOM 里紧跟封面，封面滚走后吸在顶部 ══════════════ */
+.sp-run {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 18px;
+  height: 48px; padding: 0 var(--m);
+  background: rgb(var(--bg-rgb) / 0.96);
+  border-bottom: 1px solid var(--sp-line);
+  font-size: 13px;
+}
+.sp-run a { text-decoration: none; }
+.sp-run-name {
+  align-self: stretch; display: flex; align-items: center;
+  font-family: var(--sp-head); font-weight: var(--sp-head-weight); font-size: 16px; color: var(--sp-ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 38vw;
+}
+.sp-run-toc { display: none; gap: 24px; color: var(--sp-meta); }
+.sp-run-sp { flex: 1; }
+.sp-run-offer { color: var(--sp-meta); padding: 14px 0; white-space: nowrap; }
+.sp-run-hi {
+  display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: var(--sp-btn-radius, 999px);
+  background: var(--sp-accent-text); color: var(--sp-accent-ink) !important; font-weight: 600; white-space: nowrap;
+  position: relative;
+}
+/* 视觉 36px，点击区用伪元素撑到 44px（box-shadow 不参与点击命中） */
+.sp-run-hi::before { content: ''; position: absolute; top: -4px; bottom: -4px; left: 0; right: 0; }
+@media (min-width: 1024px) {
+  .sp-run { height: 52px; }
+  .sp-run-toc { display: flex; }
+  .sp-run-toc ~ .sp-run-offer { display: none; }
+}
+
+/* ══════════════ 往下：章节 ══════════════ */
+.sp-story { display: block; }
+.sp-ch { padding: calc(var(--sp-gap) * 0.8) 0; }
+.sp-ch, .sp-last, .sp-end { scroll-margin-top: 52px; }
+@media (min-width: 1024px) { .sp-ch { padding: calc(var(--sp-gap) * 1.25) 0; } }
+/* 栏本身宽，字按主题的行宽收：插页和索引可以比正文宽 */
+.sp-col { max-width: 52em; margin: 0 auto; padding: 0 var(--m); }
+
+.sp-mark { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; margin: 0; }
+.sp-num {
+  font-family: var(--sp-head); font-weight: 300; line-height: 1;
+  font-size: clamp(28px, 4vw, 56px); color: var(--sp-accent-text);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.sp-mark-t { margin: 0; font: 500 12.5px/1.4 var(--sp-body); letter-spacing: 0.2em; color: var(--sp-meta); }
+/* 章号：各主题的口音 */
+.sp[data-theme='bloom'] .sp-num {
+  display: inline-grid; place-items: center; width: 1.7em; height: 1.7em; border-radius: 50%;
+  background: var(--sp-accent-soft); font-weight: 700; font-size: clamp(18px, 2.2vw, 26px);
+}
+.sp[data-theme='ink'] .sp-num { font-weight: 400; font-size: clamp(20px, 2.4vw, 34px); color: var(--sp-ink); }
+.sp[data-theme='mist'] .sp-num::before {
+  content: ''; display: inline-block; width: 48px; height: 1px; margin-right: 14px;
+  background: currentColor; opacity: 0.5; vertical-align: middle;
+}
+.sp[data-theme='clay'] .sp-num {
+  display: inline-grid; place-items: center; width: 1.8em; height: 1.8em; border-radius: 50%;
+  border: 1.5px solid currentColor; font-weight: 600; font-size: clamp(16px, 2vw, 24px);
+}
+.sp[data-theme='line'] .sp-mark { border-top: 1px solid var(--sp-ink); padding-top: 14px; }
+
+/* 原话标题：这一章的大字，优先用本人写过的一句话 */
+.sp-head {
+  margin: 20px 0 0; max-width: 18em;
+  font-family: var(--sp-head); font-weight: var(--sp-head-weight);
+  font-size: clamp(26px, 3.6vw, 48px); line-height: 1.35; color: var(--sp-ink);
+  text-wrap: balance; word-break: keep-all; overflow-wrap: break-word; overflow-wrap: anywhere;
+}
+@media (min-width: 1024px) { .sp-head { margin-top: 28px; } }
+/* 兴趣排成的一句话：原文是 ink，前面加的「工作之外，我喜欢」是浅一档的 inkSoft */
+.sp-interests { max-width: 22em; font-weight: 400; }
+.sp-interests[data-size='l'] { font-size: clamp(22px, 2.6vw, 34px); line-height: 1.7; }
+.sp-interests[data-size='m'] { font-size: clamp(19px, 2vw, 24px); line-height: 1.8; }
+.sp-interests[data-size='s'] { font-size: 17px; line-height: 1.9; }
+.sp-pre { color: var(--sp-ink-soft); }
+
+.sp-block { margin-top: 40px; }
+@media (min-width: 1024px) { .sp-block { margin-top: clamp(48px, 5vw, 72px); } }
+/* 引子：替代字段名。单独成行，不和原文拼成一句 */
+.sp-lead { margin: 0 0 10px; max-width: var(--sp-measure); font-family: var(--sp-head); font-size: 15px; color: var(--sp-ink-soft); }
+.sp-p {
+  margin: 0 0 12px; max-width: var(--sp-measure);
+  font-size: 16.5px; line-height: 1.9; letter-spacing: 0.02em; color: var(--sp-ink-soft);
+  white-space: pre-line; line-break: strict; overflow-wrap: break-word; overflow-wrap: anywhere;
+}
+.sp-big { font-size: clamp(18px, 2vw, 22px); color: var(--sp-ink); }
+@media (min-width: 1024px) {
+  .sp-lead { font-size: 16px; }
+  .sp-p { font-size: 17.5px; line-height: 1.95; }
+  .sp-big { font-size: clamp(18px, 2vw, 22px); }
+}
+/* 首字下沉：林间米白、陶土手作，每章第一段正文 */
+/* 导语段：林间米白、陶土手作每章第一段正文放大一档、用正文色。
+ * 不用首字下沉——中文首字可能是「一」、数字或标点，下沉出来是一道横线或一个孤零零的符号 */
+.sp[data-lede] .sp-first { font-size: 18px; line-height: 1.85; color: var(--sp-ink); }
+@media (min-width: 1024px) { .sp[data-lede] .sp-first { font-size: 19.5px; } }
+
+/* 我在意的：每条一行大字，罗马序号，细线分开 */
+.sp-values { list-style: none; margin: 0; padding: 0; max-width: var(--sp-measure); counter-reset: v; }
+.sp-values li {
+  position: relative; counter-increment: v;
+  padding: 14px 0 14px 2.4rem; border-top: 1px solid var(--sp-line);
+  font-family: var(--sp-head); font-size: clamp(20px, 2.2vw, 28px); line-height: 1.5; color: var(--sp-ink);
+}
+.sp-values li:last-child { border-bottom: 1px solid var(--sp-line); }
+.sp-values li::before {
+  content: counter(v, lower-roman); position: absolute; left: 0; top: 1.15em;
+  font: 13px/1 var(--sp-body); color: var(--sp-accent-text);
+}
+.sp-values small { display: block; margin-top: 6px; font: 14px/1.7 var(--sp-body); color: var(--sp-meta); }
+
+/* 「那一幕」：满幅色块里的一句话 */
+.sp-band {
+  margin: clamp(56px, 8vw, 96px) 0 0;
+  padding: clamp(72px, 14vw, 160px) var(--m);
+  background: var(--sp-band); color: var(--sp-band-ink);
+}
+.sp-band + .sp-col { margin-top: clamp(56px, 8vw, 96px); }
+.sp[data-theme='forest'] .sp-band, .sp[data-theme='ink'] .sp-band,
+.sp[data-theme='clay'] .sp-band, .sp[data-theme='line'] .sp-band { --sp-mark: #f0c979; }
+.sp-band-in { max-width: calc(52em - 2 * var(--m)); margin: 0 auto; }
+.sp-band .sp-lead { color: inherit; opacity: 0.9; }
+.sp-band blockquote {
+  margin: 0; max-width: 26em;
+  font-family: var(--sp-head); font-weight: var(--sp-head-weight);
+  /* balance：几行等长，不让「自由」」两个字孤零零落在最后一行 */
+  text-indent: -0.5em; text-wrap: balance; white-space: pre-line;
+}
+.sp-band blockquote::before { content: '「'; }
+.sp-band blockquote::after { content: '」'; }
+.sp-band blockquote[data-size='l'] { font-size: clamp(24px, 3.4vw, 44px); line-height: 1.55; }
+.sp-band blockquote[data-size='m'] { font-size: clamp(21px, 2.6vw, 34px); line-height: 1.65; }
+.sp-band blockquote[data-size='s'] { font-size: clamp(18px, 2vw, 26px); line-height: 1.8; }
+.sp[data-theme='bloom'] .sp-band-in::before {
+  content: '「'; display: block; height: 0.62em; overflow: visible;
+  font: 700 120px/1 var(--sp-head); color: var(--sp-accent); opacity: 0.9;
+}
+.sp[data-theme='ink'] .sp-band blockquote, .sp[data-theme='line'] .sp-band blockquote {
+  text-indent: 0; padding-left: 1em; border-left: 1px solid rgb(250 250 247 / 0.5);
+}
+.sp[data-theme='line'] .sp-band blockquote { border-left: 2px solid var(--sp-accent); }
+.sp[data-theme='ink'] .sp-band blockquote::before, .sp[data-theme='ink'] .sp-band blockquote::after,
+.sp[data-theme='line'] .sp-band blockquote::before, .sp[data-theme='line'] .sp-band blockquote::after { content: none; }
+.sp[data-theme='mist'] .sp-band-in { text-align: center; }
+.sp[data-theme='mist'] .sp-band blockquote { margin: 0 auto; text-indent: 0; font-weight: 300; }
+.sp[data-theme='mist'] .sp-band-in::after {
+  content: ''; display: block; width: 120px; height: 1px; margin: 40px auto 0;
+  background: currentColor; opacity: 0.35;
+}
+
+/* 资历带：证书和身份，一段不断行，细竖线隔开 */
+.sp-cred {
+  display: flex; flex-wrap: wrap; row-gap: 6px;
+  list-style: none; margin: 24px 0 0; padding: 0; max-width: 44em;
+  font-size: 13.5px; line-height: 1.7; letter-spacing: 0.06em; color: var(--sp-ink-soft);
+}
+.sp-cred li { overflow-wrap: break-word; }
+@media (min-width: 768px) { .sp-cred li { white-space: nowrap; } }
+/* 分隔线挂在每段后面：换行时留在行尾，不跑到下一行开头 */
+.sp-cred li:not(:last-child)::after {
+  content: ''; display: inline-block; width: 1px; height: 0.9em; margin: 0 12px;
+  background: var(--sp-muted); vertical-align: -0.1em;
+}
+
+/* 作品插页：图文，不加边框 */
+.sp-plates { display: grid; gap: 40px; margin-top: 8px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.sp-plate { margin: 0; }
+.sp-plate a { display: block; text-decoration: none; }
+.sp-plate-img {
+  position: relative; height: 0; padding-top: 75%; overflow: hidden;
+  border-radius: var(--sp-radius); background: var(--sp-accent-soft);
+}
+.sp-plate-img img { object-fit: cover; object-position: 50% 30%; }
+.sp-plate figcaption { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
+.sp-plate-t { font-family: var(--sp-head); font-size: 18px; line-height: 1.45; color: var(--sp-ink); }
+.sp-plate-d { font-size: 14.5px; line-height: 1.75; color: var(--sp-ink-soft); }
+.sp-plate.is-text { padding-top: 16px; border-top: 1px solid var(--sp-line); }
+.sp-plate.is-text .sp-plate-t { font-size: clamp(19px, 2vw, 24px); }
+.sp-go-link {
+  margin-top: 4px; font-size: 14px; color: var(--sp-accent-text);
+  text-decoration: underline; text-underline-offset: 0.25em; text-decoration-thickness: 1px;
+}
+
+/* 在别处：带点线的索引 */
+.sp-index { list-style: none; margin: 0; padding: 0; max-width: var(--sp-measure); }
+.sp-index li { padding: 12px 0; border-top: 1px solid var(--sp-line); }
+.sp-index li:last-child { border-bottom: 1px solid var(--sp-line); }
+.sp-index a { display: flex; align-items: baseline; gap: 10px; min-height: 44px; padding-top: 8px; text-decoration: none; }
+.sp-index-t { font-family: var(--sp-head); font-size: 18px; line-height: 1.5; color: var(--sp-ink); }
+.sp-dots { flex: 1; min-width: 24px; border-bottom: 1.5px dotted var(--sp-muted); transform: translateY(-0.3em); }
+.sp-index-v { font-size: 14px; color: var(--sp-accent-text); white-space: nowrap; }
+.sp-index small { display: block; margin-top: 2px; font-size: 13.5px; line-height: 1.7; color: var(--sp-meta); }
+
+/* 折叠：原生 details，不依赖 hover */
+.sp-more { margin-top: 10px; max-width: var(--sp-measure); }
+.sp-more summary {
+  display: inline-block; padding: 10px 0; cursor: pointer; list-style: none;
+  font-size: 14px; color: var(--sp-accent-text);
+}
+.sp-more summary::-webkit-details-marker { display: none; }
+.sp-more[open] summary { color: var(--sp-meta); }
+.sp-more > .sp-p:first-of-type { margin-top: 6px; }
+
+/* ══════════════ 第三章：一起做点什么（比正文的纸亮一档） ══════════════ */
+.sp-offer-ch { background: var(--sp-surface); }
+.sp[data-theme='ink'] .sp-offer-ch { border-top: 1px solid var(--sp-line); border-bottom: 1px solid var(--sp-line); }
+.sp-offer { max-width: 1180px; margin: 0 auto; padding: 0 var(--m); }
+.sp-offer-side .sp-head { font-size: clamp(24px, 2.4vw, 34px); max-width: none; }
+/* 两句各占一行、句内不断：否则「？」会被挤到下一行开头 */
+.sp-head .sp-line { display: inline-block; white-space: nowrap; }
+.sp-dek { margin: 14px 0 20px; max-width: 22em; font-size: 15px; line-height: 1.8; color: var(--sp-ink-soft); }
+.sp-offer-main { margin-top: 8px; }
+@media (min-width: 1024px) and (min-height: 720px) {
+  .sp-offer {
+    display: grid; grid-template-columns: minmax(260px, 4fr) 7fr;
+    column-gap: clamp(40px, 5vw, 88px); align-items: start;
+  }
+  .sp-offer-side { position: sticky; top: 76px; }
+  .sp-offer-main { margin-top: 0; }
+  .sp-offer-main > .sp-block:first-child { margin-top: 0; }
+}
+
+/* 服务单：编号菜单行 */
+.sp-menu { list-style: none; margin: 0; padding: 0; }
+.sp-menu li {
+  display: grid; grid-template-columns: 2em 1fr; column-gap: 14px;
+  padding: 20px 0; border-top: 1px solid var(--sp-line);
+}
+.sp-menu li:last-child { border-bottom: 1px solid var(--sp-line); }
+.sp-menu-n { padding-top: 0.35em; font: 14px/1.6 var(--sp-body); color: var(--sp-accent-text); font-variant-numeric: tabular-nums; }
+.sp-menu-t { margin: 0; font-family: var(--sp-head); font-size: clamp(19px, 1.8vw, 24px); line-height: 1.45; color: var(--sp-ink); }
+.sp-menu-d { margin: 6px 0 0; max-width: 32em; font-size: 15px; line-height: 1.75; color: var(--sp-ink-soft); }
+.sp-menu-d small { font-size: 12.5px; color: var(--sp-meta); }
+.sp-menu-a {
+  grid-column: 2; justify-self: start;
+  display: inline-flex; align-items: center; min-height: 44px;
+  font-size: 14px; color: var(--sp-accent-text); text-decoration: none; white-space: nowrap;
+}
+@media (min-width: 768px) {
+  .sp-menu li { grid-template-columns: 2.4em 1fr auto; column-gap: 20px; }
+  .sp-menu-a { grid-column: 3; grid-row: 1; align-self: start; margin-top: -8px; }
+}
+.sp-soon { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 20px 0 0; font-size: 12.5px; color: var(--sp-meta); }
+.sp-soon-btn {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px;
+  border: 1px dashed var(--sp-muted); border-radius: 999px; color: var(--sp-meta); font-size: 14px;
+}
+.sp-orig { margin-top: 18px; }
+.sp-plainlist { margin: 6px 0 0; padding-left: 1.2em; color: var(--sp-ink-soft); }
+
+/* 课程与活动：条目，上方一条线（长期做的是强调色线，活动是墨线） */
+.sp-entries { display: grid; gap: 28px; }
+.sp-entry {
+  display: flex; flex-direction: column; gap: 6px;
+  padding-top: 16px; border-top: 2px solid var(--sp-accent); text-decoration: none;
+}
+.sp-entries[data-line='ink'] .sp-entry { border-top-color: var(--sp-ink); }
+.sp-entry-img {
+  /* 4:3 用 padding 撑：aspect-ratio 在老内核（XWeb<88、iOS<15）上不认，高度会是 0 */
+  position: relative; height: 0; padding-top: 75%; overflow: hidden; margin-bottom: 10px;
+  border-radius: var(--sp-radius); background: var(--sp-accent-soft);
+}
+.sp-entry-img img { object-fit: cover; object-position: 50% 25%; }
+.sp-entry-t { font-family: var(--sp-head); font-size: clamp(19px, 2vw, 24px); line-height: 1.45; color: var(--sp-ink); }
+.sp-acts-grid .sp-entry-t { font-size: clamp(20px, 2.2vw, 28px); }
+.sp-entry-d { font-size: 15px; line-height: 1.75; color: var(--sp-ink-soft); }
+@media (min-width: 1024px) {
+  .sp-acts-grid { grid-template-columns: 1fr 1fr; column-gap: 40px; }
+  .sp-acts-grid[data-one] { grid-template-columns: 1fr; }
+}
+.sp-placeholder-box {
+  margin: 0; padding: 24px; border: 1px dashed var(--sp-muted); border-radius: var(--sp-radius);
+  font-size: 14px; color: var(--sp-meta);
+}
+
+/* ══════════════ 最后一页：种子（换一种纸） ══════════════ */
+/* 换一种纸：前面的服务与活动是 surface，这里用 accentSoft，一眼看得出翻到了最后一页 */
+.sp-last { padding: clamp(80px, 14vh, 160px) 0; background: var(--sp-accent-soft); text-align: center; }
+/* 晨雾湖面的 accentSoft 和尾声同色，改回底色 */
+.sp[data-theme='mist'] .sp-last { background: var(--sp-bg); }
+.sp-last .sp-mark { justify-content: center; }
+.sp-last .sp-lead { margin: 18px auto 14px; font-size: 14.5px; color: var(--sp-ink-soft); }
+.sp-last .sp-mark-t, .sp-last .sp-vis { color: var(--sp-ink-soft); }
+.sp-seed {
+  margin: 0 auto; max-width: 22em;
+  font-family: var(--sp-head); font-size: clamp(20px, 2.6vw, 30px); line-height: 1.9; color: var(--sp-ink);
+  text-wrap: pretty;
+}
+.sp-seed[data-long] { font-size: 18px; }
+.sp-sign { margin: 24px auto 0; max-width: 22em; text-align: right; font-size: 15px; color: var(--sp-ink-soft); }
+.sp[data-theme='line'] .sp-last { text-align: left; }
+.sp[data-theme='line'] .sp-last .sp-mark { justify-content: flex-start; }
+.sp[data-theme='line'] .sp-last .sp-lead, .sp[data-theme='line'] .sp-seed, .sp[data-theme='line'] .sp-sign { margin-left: 0; }
+
+/* ══════════════ 尾声：照片回来，停在「打个招呼」 ══════════════ */
+.sp-end {
+  position: relative; overflow: hidden;
+  padding: clamp(72px, 12vh, 140px) 0 calc(56px + env(safe-area-inset-bottom));
+  background: var(--sp-back); color: var(--sp-back-ink);
+  --sp-mark: #f0c979;
+}
+.sp[data-theme='mist'] .sp-end { --sp-mark: #8a6424; }
+.sp-end-amb {
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0; opacity: 0.2;
+  -webkit-mask-image: radial-gradient(ellipse 60% 70% at 28% 40%, #000 0, transparent 100%);
+          mask-image: radial-gradient(ellipse 60% 70% at 28% 40%, #000 0, transparent 100%);
+}
+.sp-end-amb img { object-fit: cover; filter: blur(40px); transform: scale(1.3); }
+.sp-end-in { position: relative; }
+.sp-end-photo {
+  position: relative; display: block; width: 96px; height: 120px; overflow: hidden; margin-bottom: 28px;
+  border-radius: var(--sp-radius); box-shadow: 0 10px 24px rgb(0 0 0 / 0.18);
+}
+.sp[data-theme='bloom'] .sp-end-photo, .sp[data-theme='clay'] .sp-end-photo { transform: rotate(-1.5deg); }
+.sp-end-photo img { object-fit: cover; object-position: 50% 40%; filter: var(--sp-photo-filter); }
+@media (min-width: 1024px) { .sp-end-photo { width: 128px; height: 160px; } }
+.sp-end .sp-lead { color: inherit; opacity: 0.75; }
+.sp-end-k { margin: 26px 0 6px; font-size: 15px; opacity: 0.75; }
+.sp-end-seek {
+  margin: 0; max-width: 22em; white-space: pre-line;
+  font-family: var(--sp-head); font-size: clamp(20px, 2.4vw, 30px); line-height: 1.6;
+}
+.sp-end-seek[data-long] { max-width: var(--sp-measure); font-size: 17px; line-height: 1.9; }
+.sp .sp-btn--end {
+  margin-top: 32px; min-height: 52px; padding: 0 28px; font-size: 16px;
+  background: var(--sp-back-ink); color: var(--sp-back);
+}
+.sp-contact { margin-top: 36px; }
+.sp-contact .sp-end-k { margin-top: 0; }
+.sp-contact dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 8px 0 0; font-size: 15px; }
+.sp-contact dt { opacity: 0.7; }
+.sp-contact dd { margin: 0; overflow-wrap: anywhere; }
+.sp-end-small { margin: 28px 0 0; font-size: 14px; opacity: 0.75; }
+.sp-colophon { position: relative; margin: 56px 0 0; padding-top: 16px; font-size: 12.5px; letter-spacing: 0.06em; opacity: 0.72; }
+.sp-colophon::before { content: ''; position: absolute; left: 0; top: 0; width: 40px; height: 1px; background: currentColor; opacity: 0.5; }
+.sp-colophon a { display: inline-block; padding: 12px 0; margin: -12px 0; text-decoration: underline; text-underline-offset: 0.2em; }
+
+/* ══════════════ 预览标注：安静的校样。访客视角和上线版不渲染 ══════════════ */
+.sp[data-marks] .sp-ai {
+  text-decoration: underline dotted 1.5px var(--sp-mark);
+  text-underline-offset: 0.3em; text-decoration-skip-ink: none;
+}
+.sp[data-marks] .sp-ai::after {
+  content: 'AI'; display: inline-block; margin-left: 0.2em; vertical-align: super;
+  font: 600 9.5px/1 var(--sp-body); letter-spacing: 0; color: var(--sp-mark); text-decoration: none;
+}
+.sp-note {
+  margin: 0 0 10px; padding-left: 8px; border-left: 1px dashed var(--sp-mark);
+  font-size: 12px; line-height: 1.6; color: var(--sp-mark);
+}
+.sp-vis { display: inline-flex; align-items: center; gap: 6px; font: 500 11.5px/1.4 var(--sp-body); letter-spacing: 0; color: var(--sp-meta); }
+.sp-vis::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #4d6b5b; }
+.sp-vis[data-tone='member']::before { background: #c98a2b; }
+.sp-vis[data-tone='tbd']::before { background: #9a9a92; }
+.sp-end .sp-vis { color: inherit; opacity: 0.8; margin-left: 10px; }
+
+/* ══════════════ 键盘与读屏 ══════════════ */
+.sp a:focus-visible, .sp summary:focus-visible { outline: 2px solid var(--sp-accent-text); outline-offset: 3px; border-radius: 2px; }
+.sp-cover a:focus-visible { outline-color: currentColor; }
+.sp :target, .sp a, .sp summary { scroll-margin-top: 60px; }
+
+/* 起稿之后改过资料的提醒（只在预览里） */
+.sp-stale {
+  max-width: 52em; margin: 24px auto 0; padding: 10px 14px;
+  border: 1px dashed var(--sp-mark); border-radius: 8px;
+  font-size: 13px; line-height: 1.7; color: var(--sp-mark);
+}
+.sp-stale { width: calc(100% - 2 * var(--m)); }
+
+/* 尾声的「如果你读到了这里——」是这一节的标题（给读屏按标题跳转），样子仍是引子 */
+.sp-end-h { font-weight: 400; }
+.sp-end .sp-btn--end { display: inline-flex; }
+.sp-end-small + .sp-btn--end { margin-top: 16px; }
+
+/* ══════════════ 互动：打招呼、预约、报名挂进来的位置 ══════════════ */
+.sp-greet { margin-top: 32px; scroll-margin-top: 72px; }
+.sp-book-any { margin-top: 8px; }
+.sp-end-small a { margin-left: 0.5em; text-decoration: underline; text-underline-offset: 0.2em; }
+.sp-bar-warn { background: #7a4a1e; color: #fbe6c8; border-radius: 99px; padding: 4px 9px; font-size: 12px; }
+.sp-bar-as { display: inline-flex; gap: 10px; }
+.sp-bar-as a { opacity: 0.8; }
+.sp-bar-as a.is-on { opacity: 1; border-bottom-color: #f0c979; color: #f0c979; }
+@media (max-width: 767px) { .sp-bar-warn { display: none; } }
+.sp-vis { margin-left: 8px; }
+.sp-contact dd .sp-vis { font-size: 11px; }
+
+/* ══════════════ 本人编辑出来的内容 ══════════════ */
+/* 服务的细节：形式 · 时长 · 可约时间 · 价格 */
+.sp-menu-meta { margin: 4px 0 0; font-size: 13px; color: var(--sp-meta); }
+/* 最近在读 / 在听 / 在学：书目索引，不做卡片 */
+.sp-learn { list-style: none; margin: 0; padding: 0; max-width: var(--sp-measure); }
+.sp-learn li { display: grid; grid-template-columns: 3em 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--sp-line); }
+.sp-learn li:last-child { border-bottom: 1px solid var(--sp-line); }
+.sp-learn-k { font-size: 13px; color: var(--sp-accent-text); padding-top: 0.25em; letter-spacing: 0.08em; }
+.sp-learn-b { display: grid; gap: 2px; }
+.sp-learn-b a, .sp-learn-t { font-family: var(--sp-head); font-size: 18px; line-height: 1.5; color: var(--sp-ink); text-decoration: none; }
+.sp-learn-b a { text-decoration: underline; text-underline-offset: 0.25em; text-decoration-thickness: 1px; }
+.sp-learn-b small { font-size: 14px; line-height: 1.7; color: var(--sp-ink-soft); }
+/* 一个生命故事：最后一页上，种子之前 */
+.sp-story-text {
+  margin: 0 auto 36px; max-width: 26em; white-space: pre-line;
+  font-family: var(--sp-head); font-size: clamp(17px, 1.9vw, 21px); line-height: 1.95; color: var(--sp-ink); text-align: left;
+}
+.sp[data-theme='line'] .sp-story-text { margin-left: 0; }
+/* 编辑模式下，最后一页和封面里的编辑控件左对齐、不跟着居中 */
+.sp-last .ek, .sp[data-align='center'] .sp-sheet .ek { margin-left: auto; margin-right: auto; }
+.sp-sheet .ek { margin-left: 0; }
+.sp[data-theme='line'] .sp-last .ek { margin-left: 0; }
+
+.sp-bar a.sp-bar-edit { background: #f0c979; color: #1e2a22; border: 0; border-radius: 99px; padding: 4px 11px; font-weight: 600; }
+.sp-bar a.sp-bar-edit.is-on { background: #e9ede6; }

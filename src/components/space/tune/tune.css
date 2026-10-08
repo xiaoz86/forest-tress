@@ -1,0 +1,206 @@
+/*
+ * 调风格面板。只在本人打开「调风格」时出现，访客永远看不到。
+ * 和编辑模式一样不跟主题走：一套固定的中性配色，面板本身不会被拨出来的颜色影响。
+ * 桌面：右侧浮层（让出吸顶页眉那一条）；手机：底部抽屉，可以收起成一条。
+ */
+.tn {
+  --tn-ink: #2a2a26; --tn-soft: #5d5a52; --tn-line: #ddd6c6; --tn-bg: #fffdf8; --tn-main: #2f513d; --tn-mark: #8a6424;
+  position: fixed; z-index: 60; right: 16px; top: 64px; width: 360px; max-height: calc(100vh - 80px);
+  display: flex; flex-direction: column;
+  background: var(--tn-bg); color: var(--tn-ink);
+  border: 1px solid var(--tn-line); border-radius: 16px; box-shadow: 0 18px 50px rgb(0 0 0 / 0.18);
+  font: 14px/1.6 'Manrope', 'PingFang SC', 'Hiragino Sans GB', sans-serif; letter-spacing: 0; text-align: left;
+}
+.tn, .tn * { box-sizing: border-box; }
+.tn:focus { outline: none; }
+.tn :where(p, ul, h3) { margin: 0; }
+.tn-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 16px; border-bottom: 1px solid var(--tn-line); }
+.tn:not(.is-open) .tn-head { border-bottom: 0; }
+.tn-toggle {
+  flex: 1; min-width: 0; min-height: 44px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+  padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.tn-toggle b { display: inline-flex; align-items: baseline; gap: 8px; font-size: 15px; }
+/* 点标题这一条能收起、展开：写出来，不让人猜 */
+.tn-chev { font-style: normal; font-weight: 400; font-size: 12px; color: var(--tn-soft); }
+.tn-chev::after { content: ' ▾'; }
+.tn:not(.is-open) .tn-chev::after { content: ' ▴'; }
+.tn-toggle span {
+  /* 最多两行：「第 2 轮 · 纸色 · 点这里作答」「改了 2 处 · 未保存 · 预览中……」在窄屏上也不被截掉要紧的那半句 */
+  max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  font-size: 12.5px; line-height: 1.45; color: var(--tn-soft);
+}
+.tn-nw { white-space: nowrap; }
+.tn-close {
+  /* 和左边的标题按钮隔开一点：手机上点标题栏空白处收起抽屉时，不会被吸到「完成」上退出调风格 */
+  margin-left: 6px;
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 99px;
+  border: 1px solid var(--tn-line); color: var(--tn-ink); text-decoration: none; font-size: 13px; background: #fff;
+}
+.tn-mini-ab { display: inline-flex; gap: 4px; }
+.tn-mini-ab button {
+  width: 40px; min-height: 36px; border: 1.5px solid var(--tn-line); border-radius: 99px; background: #fff;
+  color: var(--tn-soft); font: 600 13px/1 'Manrope', sans-serif; cursor: pointer;
+}
+.tn-mini-ab button.is-on { border-color: var(--tn-main); background: var(--tn-main); color: #fff; }
+.tn-body { overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 0; }
+
+.tn-tabs { display: flex; gap: 4px; padding: 3px; margin-bottom: 14px; border-radius: 99px; background: #f1ece0; }
+.tn-tabs button {
+  flex: 1; min-height: 36px; border: 0; border-radius: 99px; background: transparent; color: var(--tn-soft);
+  font: inherit; font-size: 13.5px; cursor: pointer;
+}
+.tn-tabs button.is-on { background: #fff; color: var(--tn-ink); font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / 0.1); }
+
+.tn-sec { display: grid; gap: 12px; }
+.tn-sec > *, .tn-notme > * { min-width: 0; }
+.tn-lead { color: var(--tn-ink); }
+.tn-hint { font-size: 12.5px; line-height: 1.6; color: var(--tn-soft); }
+.tn-note { margin-bottom: 12px; padding: 8px 10px; border-radius: 10px; background: #fbf1dc; color: #6d5424; font-size: 13px; }
+.tn-q { font-weight: 600; font-size: 15px; }
+.tn-step { font-size: 12px; letter-spacing: 0.08em; color: var(--tn-mark); }
+.tn-result { color: var(--tn-ink); }
+.tn-changes { padding-left: 1.1em; font-size: 13px; color: var(--tn-soft); display: grid; gap: 2px; }
+
+.tn-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 16px; cursor: pointer;
+  border: 1px solid var(--tn-line); border-radius: 99px; background: #fff; color: var(--tn-ink);
+  font: inherit; font-size: 13.5px; white-space: nowrap;
+}
+.tn-btn.is-main { background: var(--tn-main); border-color: var(--tn-main); color: #fff; }
+.tn-btn:disabled { opacity: 0.45; cursor: default; }
+.tn-link {
+  min-height: 36px; padding: 0 4px; border: 0; background: none; color: var(--tn-soft); cursor: pointer;
+  font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 0.2em; justify-self: start;
+}
+.tn-link:disabled { opacity: 0.4; cursor: default; text-decoration: none; }
+.tn-row-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tn :is(button, a, input):focus-visible { outline: 2px solid var(--tn-main); outline-offset: 2px; }
+
+.tn-say { display: flex; gap: 8px; }
+.tn-say input {
+  flex: 1 1 0; width: 0; min-width: 0; min-height: 40px; padding: 0 12px; border: 1px solid var(--tn-line); border-radius: 99px;
+  background: #fff; color: var(--tn-ink); font: inherit; font-size: 14px;
+}
+.tn-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tn-chip {
+  min-height: 34px; padding: 0 12px; border: 1px solid var(--tn-line); border-radius: 99px; background: #fff;
+  color: var(--tn-ink); font: inherit; font-size: 13px; cursor: pointer;
+}
+.tn-chip:hover { border-color: var(--tn-main); }
+.tn-out { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: #f4f1e8; }
+
+.tn-notme { display: grid; gap: 12px; padding-bottom: 6px; }
+.tn-cancel { margin-top: -4px; }
+
+/* 二选一 */
+.tn-round { display: grid; gap: 10px; }
+.tn-ab { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tn-ab button {
+  display: grid; justify-items: start; gap: 2px; padding: 10px 12px; min-height: 76px; cursor: pointer; text-align: left;
+  border: 1.5px solid var(--tn-line); border-radius: 12px; background: #fff; color: var(--tn-ink); font: inherit;
+}
+.tn-ab button.is-on { border-color: var(--tn-main); box-shadow: 0 0 0 3px rgb(47 81 61 / 0.12); }
+.tn-ab b { font-size: 13px; color: var(--tn-mark); }
+.tn-ab span { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+.tn-ab small { font-size: 12px; color: var(--tn-soft); }
+
+/* 细调 */
+.tn-remix { padding-bottom: 4px; }
+.tn-knob { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--tn-line); }
+.tn-knob-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 600; font-size: 13.5px; }
+.tn-knob-h em { margin-left: 8px; font-style: normal; font-weight: 400; color: var(--tn-soft); }
+.tn-lock {
+  min-height: 28px; padding: 0 10px; border: 1px dashed var(--tn-line); border-radius: 99px; background: none;
+  color: var(--tn-soft); font: inherit; font-size: 12px; font-weight: 400; cursor: pointer;
+}
+.tn-lock.is-on { border-style: solid; border-color: var(--tn-mark); background: #fbf1dc; color: #6d5424; }
+.tn-lock.is-on::before { content: '🔒 '; }
+.tn-swatches { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tn-sw {
+  position: relative; display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; cursor: pointer;
+  border: 2px solid transparent; border-radius: 50%; background: none;
+}
+/* 主题原色：和其他旋钮的「·原」同一个意思 */
+.tn-orig {
+  position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 16px; height: 16px;
+  border-radius: 50%; background: #fff; border: 1px solid var(--tn-line); color: var(--tn-soft);
+  font: 400 10px/1 'PingFang SC', sans-serif; font-style: normal;
+}
+.tn-photo { display: grid; gap: 6px; padding: 8px 10px; border-radius: 12px; background: #f4f1e8; }
+.tn-sub { font-size: 12px; color: var(--tn-soft); }
+.tn-sw.is-on { border-color: var(--tn-ink); }
+.tn-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12); }
+.tn-dot.is-big { width: 26px; height: 26px; }
+.tn-custom {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 10px 0 4px; cursor: pointer;
+  border: 1px dashed var(--tn-line); border-radius: 99px; font-size: 12.5px; color: var(--tn-soft);
+}
+.tn-custom input { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.tn-paper {
+  min-height: 36px; padding: 0 12px; cursor: pointer; border: 1.5px solid var(--tn-line); border-radius: 10px;
+  color: #3a3a34; font: inherit; font-size: 12.5px;
+}
+.tn-paper.is-on { border-color: var(--tn-ink); }
+.tn-paper i { margin-left: 2px; font-style: normal; font-size: 11px; opacity: 0.75; }
+.tn-seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.tn-seg button {
+  min-height: 34px; padding: 0 11px; border: 1px solid var(--tn-line); border-radius: 99px; background: #fff;
+  color: var(--tn-soft); font: inherit; font-size: 13px; cursor: pointer;
+}
+.tn-seg button.is-on { background: var(--tn-main); border-color: var(--tn-main); color: #fff; }
+.tn-seg i { margin-left: 2px; font-style: normal; font-size: 11px; opacity: 0.75; }
+
+.tn-foot {
+  /* 常驻在面板底部：在「细调」里滚到哪，保存、撤销、对比度都看得到 */
+  position: sticky; bottom: 0; z-index: 1; display: grid; gap: 6px;
+  margin: 16px -16px 0; padding: 10px 16px 12px;
+  background: var(--tn-bg); border-top: 1px solid var(--tn-line); box-shadow: 0 -10px 18px -14px rgb(0 0 0 / 0.25);
+}
+.tn-check { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; color: var(--tn-soft); }
+.tn-check em { font-style: normal; }
+.tn-check span { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; color: #fff; }
+.tn-check .is-ok { background: var(--tn-main); }
+.tn-check .is-bad { background: #a8563d; }
+.tn-msg { font-size: 13px; color: var(--tn-main); }
+
+@media (max-width: 760px) {
+  .tn {
+    top: auto; left: 8px; right: 8px; bottom: max(8px, env(safe-area-inset-bottom)); width: auto;
+    max-height: 62vh; border-radius: 16px;
+  }
+  .tn-body { padding: 10px 14px 0; }
+  .tn-foot { margin: 14px -14px 0; padding: 8px 14px 10px; }
+  /* 抽屉的把手：一眼看出这一条能点开、收起（点把手、点空白处都行；不支持拖动） */
+  .tn-head { position: relative; padding-top: 12px; cursor: pointer; }
+  .tn-head::before {
+    content: ''; position: absolute; top: 5px; left: 50%; width: 36px; height: 4px; margin-left: -18px;
+    border-radius: 2px; background: var(--tn-line);
+  }
+  /* 收起的那一条一直压在页面最底下：尾声多留出它的高度，最后一行字才滚得出来 */
+  .sp[data-tuning] .sp-end { padding-bottom: calc(56px + 84px + env(safe-area-inset-bottom)); }
+}
+
+/*
+ * ── 页面上每一块的「这不像我」 ──
+ * 章节里：浮在章名那一行正上方的留白里——不占版面，访客看到的节奏和本人调的时候一模一样
+ * （章节上方至少留着 0.8 × 最紧的留白 56px ≈ 45px，按钮 28px 高放得下）；
+ * 首屏、尾声：浮在左上角（那里本来就空着）。
+ */
+.sp-notme {
+  display: inline-flex; align-items: center; flex: none;
+  min-height: 28px; padding: 0 11px; cursor: pointer; white-space: nowrap;
+  border: 1px dashed #8a6424; border-radius: 99px; background: #fffdf8; color: #6d5424;
+  font: 500 12px/1 'Manrope', 'PingFang SC', 'Hiragino Sans GB', sans-serif; letter-spacing: 0; text-transform: none;
+}
+.sp[data-tuning] .sp-mark { position: relative; }
+/* 「一起做点什么」左栏在桌面上会吸顶：调风格时往下让出按钮的高度，不被吸顶页眉切掉一截 */
+@media (min-width: 1024px) { .sp[data-tuning] .sp-offer-side { top: 112px; } }
+.sp-mark > .sp-notme { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 2; }
+.sp-last .sp-mark > .sp-notme { left: 50%; transform: translateX(-50%); }
+.sp-cover > .sp-notme, .sp-end > .sp-notme {
+  position: absolute; z-index: 6; top: 12px; left: max(12px, env(safe-area-inset-left));
+  min-height: 34px; padding: 0 14px; box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
+}
+.sp-notme:hover { border-style: solid; }
+.sp-notme:focus-visible { outline: 2px solid #2f513d; outline-offset: 2px; }

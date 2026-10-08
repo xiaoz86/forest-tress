@@ -1,0 +1,79 @@
+/*
+ * 网站「一起做点什么」里的近期活动与报名表单。颜色全部来自主题变量（--sp-*）。
+ * 不做带边框的卡片：每个活动上方一条 2px 墨线，和「课程与活动」条目同一种语言。
+ * 微信内置浏览器：不用 position:fixed、backdrop-filter、color-mix()、:has()；表单字号 ≥ 16px，iOS 不自动放大。
+ */
+.spe { margin-top: 40px; max-width: var(--sp-measure); }
+@media (min-width: 1024px) { .spe { margin-top: clamp(48px, 5vw, 72px); } }
+.spe-preview { margin: 0 0 14px; font-size: 13px; line-height: 1.7; color: var(--sp-meta); }
+
+.spe-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 32px; }
+.spe-item { padding-top: 16px; border-top: 2px solid var(--sp-ink); }
+.spe-t {
+  margin: 0; font-family: var(--sp-head); font-weight: var(--sp-head-weight);
+  font-size: clamp(20px, 2.2vw, 26px); line-height: 1.45; color: var(--sp-ink);
+  overflow-wrap: break-word; overflow-wrap: anywhere;
+}
+.spe-meta {
+  display: flex; flex-wrap: wrap; gap: 2px 16px; margin: 8px 0 0;
+  font-size: 15px; line-height: 1.7; color: var(--sp-ink-soft); font-variant-numeric: tabular-nums;
+}
+.spe-meta--2 { margin-top: 2px; }
+.spe-fee { color: var(--sp-ink); font-weight: 600; }
+.spe-full { color: var(--sp-meta); }
+.spe-d {
+  margin: 10px 0 0; font-size: 15px; line-height: 1.8; color: var(--sp-ink-soft);
+  white-space: pre-line; overflow-wrap: break-word; overflow-wrap: anywhere;
+}
+
+.spe-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin-top: 14px; }
+.sp button.spe-btn { border: 0; cursor: pointer; }
+.sp button.spe-btn:disabled { opacity: 0.6; cursor: progress; }
+.spe-link, .spe-textbtn {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px;
+  background: none; border: 0; cursor: pointer;
+  font: 15px/1.4 var(--sp-body); color: var(--sp-accent-text);
+  text-decoration: underline; text-underline-offset: 0.25em; text-decoration-thickness: 1px;
+}
+.spe-d .spe-textbtn { min-height: 0; margin-left: 6px; padding: 0; font-size: 14px; vertical-align: baseline; }
+/* 「展开」字小，点击区撑大一点 */
+.spe-d .spe-textbtn { position: relative; }
+.spe-d .spe-textbtn::after { content: ''; position: absolute; top: -12px; bottom: -12px; left: -8px; right: -8px; }
+.spe-cancel { color: var(--sp-meta); }
+
+/* 报名表单：就地展开，底色就是这一章的 surface，只有输入框自己的边 */
+.spe-form { margin-top: 18px; display: grid; gap: 14px; }
+.spe-field { display: grid; gap: 6px; }
+.spe-field > span { font-size: 14.5px; line-height: 1.5; color: var(--sp-ink); }
+.spe-field small { margin-left: 8px; font-size: 13px; color: var(--sp-meta); }
+.spe-field input, .spe-field textarea {
+  width: 100%; min-height: 46px; padding: 10px 12px;
+  border: 1px solid var(--sp-line); border-radius: min(var(--sp-radius), 10px);
+  background: var(--sp-bg); color: var(--sp-ink);
+  font: 16px/1.6 var(--sp-body);
+  -webkit-appearance: none; appearance: none;
+}
+.spe-field textarea { resize: vertical; min-height: 88px; }
+.spe-field input:focus, .spe-field textarea:focus { outline: 2px solid var(--sp-accent-text); outline-offset: 1px; border-color: transparent; }
+
+/* 蜜罐：挪出视野，不用 display:none（有的脚本会跳过隐藏字段） */
+.spe-hp { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+
+.spe-err { margin: 0; font-size: 14.5px; line-height: 1.7; color: var(--sp-accent-text); font-weight: 600; }
+.spe-small { margin: 0; font-size: 13.5px; line-height: 1.75; color: var(--sp-meta); }
+
+.spe-done { margin-top: 16px; }
+.spe-done-t { margin: 0; font-family: var(--sp-head); font-size: 17px; line-height: 1.75; color: var(--sp-ink); }
+.spe-done .spe-acts { margin: 10px 0 8px; }
+
+/* 活动封面：标题上方一张 3:2 的图（padding 撑高：老内核不认 aspect-ratio） */
+.spe-cover {
+  display: block; width: 100%; height: auto; margin: 0 0 14px;
+  border-radius: min(var(--sp-radius), 12px); background: var(--sp-accent-soft);
+  object-fit: cover; aspect-ratio: 3 / 2;
+}
+/* 带着活动链接打开时，亮一下这一场 */
+.spe-item { scroll-margin-top: 64px; transition: background-color 1.2s ease; }
+.spe-item.is-hit { background: var(--sp-accent-soft); box-shadow: 0 0 0 12px var(--sp-accent-soft); border-radius: 2px; }
+.spe-started { margin: 0; color: var(--sp-meta); }
+.spe .rc-copy { color: var(--sp-accent-text); }

@@ -1,0 +1,14 @@
+/* 「复制链接」：网站（.sp）和状态页（.st）都用，颜色跟着所在的字色走 */
+.rc-copy { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.rc-copy-btn {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px;
+  background: none; border: 0; cursor: pointer; font: inherit; font-size: 15px;
+  color: inherit; text-decoration: underline; text-underline-offset: 0.25em; text-decoration-thickness: 1px;
+}
+.rc-copy-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 2px; }
+.rc-copy-manual { display: grid; gap: 4px; flex-basis: 100%; }
+.rc-copy-input {
+  width: 100%; min-height: 44px; padding: 8px 10px; font: 16px/1.4 inherit;
+  border: 1px solid currentColor; border-radius: 8px; background: transparent; color: inherit; opacity: 0.9;
+}
+.rc-copy-manual small { font-size: 13px; opacity: 0.75; }

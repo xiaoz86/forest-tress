@@ -46,3 +46,6 @@ next-env.d.ts
 
 # Claude Code 的临时工作区，不入库
 .claude/worktrees/
+
+# 个人空间 v1：画像与风格选择的本地缓存（含 AI 对成员的推断，不进仓库）
+/.space-cache/
