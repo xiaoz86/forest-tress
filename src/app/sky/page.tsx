@@ -6,7 +6,10 @@ import { dict } from '@/i18n';
 import { getLocale } from '@/lib/locale';
 import { fetchListedNodes } from '@/lib/nodeVisibility';
 import { getAuthenticatedMemberId } from '@/lib/session';
+import { isAdminId } from '@/lib/admin';
+import { canSeeContacts } from '@/lib/memberTrust';
 import { pickNearby, pickRising, toSkyStars } from '@/lib/sky';
+import { applySpaceVisibilityMany } from '@/lib/space/platformVisibility';
 import { resolveConstellations } from '@/lib/skyConstellations';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * 附近星空。
  *
- * 和「创造者森林」（/creators）是同一批人的两种看法：
+ * 和「创造者平台」（/creators）是同一批人的两种看法：
  * 森林回答「我如何生长」，星空回答「我能看见谁、谁正在靠近」。
  * 两页互相留了入口。
  *
@@ -28,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * 聚合本身就改变了暴露程度——即使每条信息原本都公开。
  *
  * 也因为这个，进星空是可以单独关掉的：toSkyStars 里有一道 in_sky 闸。
- * 关掉的人仍留在创造者森林里，只是不出现在这片天上，也不参与星座的 AI 分析。
+ * 关掉的人仍留在创造者平台里，只是不出现在这片天上，也不参与星座的 AI 分析。
  * 见 nodeVisibility.ts 的 isInSky。
  */
 export default async function SkyPage() {
@@ -49,7 +52,12 @@ export default async function SkyPage() {
   // ⚠️ 这里传的是**全体在册成员**，不是筛过的。「不进星空」的闸在
   // toSkyStars 里面、编号之后才施加——先筛再编号会让中间少一个人时
   // 他之后所有人的星集体位移（实测 16 人里 14 人换位）。
-  const ordered = [...nodes].sort((a, b) =>
+  // 本人在个人空间里把「我这个人」「种子」设得更严时，星光卡也照着裁（美的时刻、想守护的、种子都在卡上）
+  const viewerNode = meId ? nodes.find(n => n.id === meId) ?? null : null;
+  const visibleNodes = await applySpaceVisibilityMany(nodes, {
+    viewerId: meId, isMember: canSeeContacts(viewerNode), isAdmin: isAdminId(meId),
+  });
+  const ordered = [...visibleNodes].sort((a, b) =>
     String(a.created_at || '').localeCompare(String(b.created_at || '')),
   );
   const stars = toSkyStars(ordered);

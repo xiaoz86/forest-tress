@@ -71,11 +71,53 @@
   --color-mist-muted: #dde4da;
   --color-sand: #dfd1bd;
   --color-clay: #b87c5e;
+
+  /*
+    「向内对话」（/phil-coach）一页的色板，取自陈果《好的自己》的封面：
+    顶上一抹灰调的淡紫，往下化进暖米色，黑色宋体标题，大量留白。
+    加 pc- 前缀，不和上面的 ink / paper / cream 混。对比度都算过：
+    pc-ink-3 在淡紫上不够 4.5，只用在输入框里和输入框以下；pc-plum 不放在页面最顶上 90px。
+  */
+  --color-pc-lilac: #b9b3d6;
+  --color-pc-cream: #efe9dc;
+  --color-pc-ivory: #f4efe4;
+  --color-pc-paper: #fbf9f4;
+  --color-pc-ink: #1d1b1f;
+  --color-pc-ink-2: #46414d;
+  --color-pc-ink-3: #5f5968;
+  --color-pc-plum: #4f4580;
+  --color-pc-veil: #e3deef;
+  --color-pc-line: #77708a;
+  --color-pc-brick: #8f3426;
+  --color-pc-brick-bg: #f6e4de;
+
+  /*
+    书封的宋体：只给这一页的标题、那一句问话、「关于」里的小标题用（都是短字）。
+    苹果设备落宋体（Songti SC），其它平台才去取 Noto Serif SC 的分片——
+    所以对话正文不用它，长回复不能让人等字体。
+  */
+  --font-book: 'EB Garamond', 'Songti SC', 'STSong', 'Noto Serif SC', serif;
+}
+
+/* 向内对话：书封那样，顶上淡紫、往下化进米色。停在固定的像素上，页面变长了淡紫也只在顶上 */
+.pc-cover {
+  background: linear-gradient(180deg, #b9b3d6 0, #c8c2de 100px, #ddd8e3 200px, #efe9dc 300px, #f4efe4 520px) #f4efe4;
+}
+@media (min-width: 1024px) {
+  .pc-cover {
+    background: linear-gradient(180deg, #b9b3d6 0, #c8c2de 140px, #ddd8e3 260px, #efe9dc 380px, #f4efe4 640px) #f4efe4;
+  }
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
+  }
+  /* 减少动态效果：页内跳转（#about 之类）和脚本里的滚动都直接到位 */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
 
   body {
@@ -248,6 +290,19 @@
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.08);
   border: 1px solid rgba(0,0,0,0.04);
+}
+
+/* 几张手机截图并排（发布说明里用 <p class="launch-phones">…</p>） */
+.launch-prose .launch-phones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin: 2em 0;
+}
+.launch-prose .launch-phones img {
+  margin: 0;
+  width: 220px;
 }
 
 /* GFM table */
@@ -1036,6 +1091,9 @@
 
 /* 品牌名比链接再亮一档，保持它是导航里的锚点 */
 .nav-night a[href="/"] { color: rgba(240, 243, 234, 0.94) !important; }
+.nav-night a[href="/"] span { color: inherit !important; }
+/* 当前所在的栏目：和悬停同一档亮度 */
+.nav-night a[aria-current] { color: #f2efe4 !important; }
 
 /* 描边类控件（联系我们 / 语言）：换成暖白细线 */
 .nav-night a[class*="border-forest"],
@@ -1083,6 +1141,7 @@
 .nav-night .nav-mitem,
 .nav-night .nav-mrow { background: rgba(226, 232, 214, 0.07) !important; }
 .nav-night .nav-mitem:active { background: rgba(226, 232, 214, 0.14) !important; }
+.nav-night .nav-mitem[aria-current] { background: rgba(226, 232, 214, 0.15) !important; }
 /* 汉字图标那颗小圆是米白底、深绿字。上面的 `.nav-night span` 会把字一起刷成浅色，
    于是圆里空着。按回深色——这颗圆保持米白，和 CTA 是同一种亮法。 */
 .nav-night .nav-micon { color: #17281d !important; }
@@ -1184,4 +1243,13 @@
 /* 减弱动态时连出现都不出现——JS 那边也不会调度，这里只是双保险 */
 @media (prefers-reduced-motion: reduce) {
   .sky-meteor { display: none; }
+}
+
+/* 创造者卡片的关键词（components/CreatorTree.tsx）：字号跟着卡片宽度等比缩放——
+   位置是按 360 宽的画布算的，字一起缩，在什么宽度下都不会压到照片、互相叠住。老内核不认 cqw 时停在 11px */
+.tree-chip { font-size: 11px; line-height: 1.6; padding: 1.5px 9.4px; }
+@supports (font-size: 1cqw) {
+  .tree-chip { font-size: max(9.5px, 3.056cqw); padding: 0.14em 0.85em; }
+  /* 很窄的卡（320 宽的手机）：字停在 9.5px 不再缩，外圈那几个收起来，免得放大了的字互相挤 */
+  @container (max-width: 300px) { .tree-chip[data-ring='outer'], .tree-link[data-ring='outer'] { display: none; } }
 }

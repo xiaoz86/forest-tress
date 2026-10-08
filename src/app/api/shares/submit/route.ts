@@ -117,6 +117,8 @@ export async function POST(request: NextRequest) {
   const note = trim(form, 'note', 220);
   const href = trim(form, 'href', 900);
   const tags = tagsFrom(trim(form, 'tags', 120));
+  // 从「去创作」的哪一项进来：写文章 / Aha!。写进卡片上方那行小字，审核时看得出是哪一种（主理人可以改）
+  const kind = trim(form, 'kind', 12) === 'article' ? 'article' : 'aha';
   const media = form.get('media');
   const poster = form.get('poster');
 
@@ -167,7 +169,7 @@ export async function POST(request: NextRequest) {
   const share: ShareEntry = {
     id: shareId,
     title,
-    kicker: `${member.name || '一位超级个体'}的分享`,
+    kicker: `${member.name || '一位超级个体'}的${kind === 'article' ? '文章' : ' Aha'}`,
     author: member.name || '有温度的超级个体',
     authorLabel: '待审核',
     badgeLabel: `${member.name || '有温度的超级个体'} · 待审核`,

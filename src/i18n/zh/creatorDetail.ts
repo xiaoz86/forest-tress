@@ -7,10 +7,32 @@
 // 这里只收框架：栏目名、按钮、空状态、错误提示。
 export const creatorDetail = {
   metaTitleFallback: '创造者 · 附近森林',
-  metaTitle: (name: string) => `${name} · 创造者森林`,
+  metaTitle: (name: string) => `${name} · 创造者平台`,
   metaDescriptionFallback: '附近森林的一棵创造者之树',
 
-  backToForest: '创造者森林',
+  backToForest: '创造者平台',
+
+  /** 资料页上通往本人个人网站空间的那张卡（只有本人和管理员看得到） */
+  space: {
+    titleOwn: '我的网站空间',
+    titleOther: 'TA 的网站空间（管理员）',
+    statusLive: '已发布',
+    statusDraft: '未发布',
+    drafting: 'AI 正在根据你的资料起草这一页，过一会儿刷新就能看到。',
+    pending: (n: number) => `AI 已经根据资料起好了一版，还有 ${n} 处等你确认。确认好就发布——在那之前，只有你和管理员能看到。`,
+    ready: 'AI 起好的这一版你都确认过了。发布之后访客就能看到，创造者平台里你的卡片也会直接打开它。',
+    live: '访客现在能看到。创造者平台里你的卡片点进去就是它。',
+    open: '打开网站',
+    edit: '在页面上编辑',
+    tune: '调风格',
+    manage: '发布与分享',
+    // 管理员看别人的：说清楚是 TA 的事、发布要 TA 本人来
+    adminLive: 'TA 已经发布，访客现在能看到。',
+    adminNoDraft: '还没有 AI 起稿。点「打开网站」，或者 TA 本人打开自己的资料页、网站时，会在后台起一版，过一会儿刷新就能看到。',
+    adminPending: (n: number) => `AI 已经起好了一版，还有 ${n} 处等 TA 本人确认。发布要 TA 本人来，在那之前只有 TA 和管理员能看到。`,
+    adminReady: 'TA 已经确认过 AI 起的这一版，还没发布。发布要 TA 本人来。',
+    manageAdmin: '管理',
+  },
   logout: '退出登录',
   login: '登录',
   /** 只有主理人看得到；名字是真人，不翻 */
@@ -142,7 +164,7 @@ export const creatorDetail = {
     saving: '保存中…',
       skyTitle: '出现在「附近星空」里',
       skyHint:
-        '星空把所有人放在同一屏，并且会用 AI 从「优势」「可以提供」「在寻找」里推断谁和谁可以一起做点什么，把结论连同名字一起展示出来。关掉之后你仍然在创造者森林里，只是不出现在那片天上，也不参与这项分析。',
+        '星空把所有人放在同一屏，并且会用 AI 从「优势」「可以提供」「在寻找」里推断谁和谁可以一起做点什么，把结论连同名字一起展示出来。关掉之后你仍然在创造者平台里，只是不出现在那片天上，也不参与这项分析。',
       skyOn: '愿意',
       skyOff: '不进入星空',
     field: {

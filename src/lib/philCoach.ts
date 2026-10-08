@@ -256,7 +256,22 @@ export const PHIL_PATHS: PhilPath[] = [
   },
 ];
 
+/**
+ * 没选小径、直接在输入框里开口的那一种。不出现在小径列表里（PHIL_PATHS 还是四条），
+ * 但 getPhilPath 认它：对话接口拼提示词、留住记忆、刷新后恢复对话都按普通小径处理。
+ */
+export const OPEN_PATH_ID = 'open';
+export const OPEN_PATH: PhilPath = {
+  id: OPEN_PATH_ID,
+  mood: 'companion',
+  llmLabel: '直接开口（没有选小径）',
+  llmHint:
+    '用户没有选小径，直接开口了。先接住 ta 说的，从话里感受 ta 此刻更需要被听见、把事情理清、面对一个选择，还是照见自己，自然地跟着走；不点破，也不要让 ta 去选方向。',
+  beats: [],
+};
+
 export function getPhilPath(id: string): PhilPath | undefined {
+  if (id === OPEN_PATH_ID) return OPEN_PATH;
   return PHIL_PATHS.find(p => p.id === id);
 }
 

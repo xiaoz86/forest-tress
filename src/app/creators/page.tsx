@@ -8,6 +8,11 @@ import { tr } from '@/lib/contentTranslate';
 import { getLocale } from '@/lib/locale';
 import { fetchListedNodes } from '@/lib/nodeVisibility';
 import CreatorTree from '@/components/CreatorTree';
+import { isAdminId } from '@/lib/admin';
+import { canSeeContacts } from '@/lib/memberTrust';
+import { getAuthenticatedMemberId } from '@/lib/session';
+import { creatorLooks } from '@/lib/space/creatorLooks';
+import { applySpaceVisibilityMany } from '@/lib/space/platformVisibility';
 import type { NodeCard } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
@@ -33,78 +38,69 @@ async function fetchCreators(): Promise<NodeCard[]> {
 
 export default async function CreatorsPage() {
   const { frontmatter, content } = getContent('creators');
-  const [creators, locale] = await Promise.all([fetchCreators(), getLocale()]);
+  const [listed, locale, meId] = await Promise.all([fetchCreators(), getLocale(), getAuthenticatedMemberId()]);
+  // 卡上的关键词会从「经历」「可以提供」里抽：本人在个人空间里把这些设得更严时，卡片照着裁（和星空、资料页一致）
+  const viewerNode = meId ? listed.find(n => n.id === meId) ?? null : null;
+  const creators = await applySpaceVisibilityMany(listed, {
+    viewerId: meId, isMember: canSeeContacts(viewerNode), isAdmin: isAdminId(meId),
+  });
+  // 每张卡长成这个人空间的样子；发布了个人空间的，点进去就是他的空间
+  const looks = await creatorLooks(listed);
   const t = dict(locale).creators;
-  // hero 三句写在 content/creators.md 里，主理人自己改——走内容对照表，
+  const sp = dict(locale).creatorDetail.space;
+  // 页头的小标题、标题、导语写在 content/creators.md 里，主理人自己改——走内容对照表，
   // 不搬进字典，否则那条 markdown 编辑链路就断了
-  const intro = content.trim().split('\n\n');
+  const lede = content.trim().split('\n\n')[0];
+  // 已经开放个人网站的排在前面（各自仍按加入时间）：点进去就是一个真正的网站，也让「发布」这件事被看见
+  const ordered = [...creators].sort(
+    (a, b) => Number(!!(b.id && looks.get(b.id)?.spaceHref)) - Number(!!(a.id && looks.get(a.id)?.spaceHref)),
+  );
+  // 自己就在森林里的成员：页头右边给一个回到「我的网站空间」的入口
+  const myLook = viewerNode?.id ? looks.get(viewerNode.id) : undefined;
+  const mySpaceHref = viewerNode?.id ? myLook?.spaceHref ?? `/space/${viewerNode.id}` : null;
 
   return (
     <>
       <Nav />
 
-      {/* Hero */}
-      <section className="relative pt-36 pb-20 px-10 bg-gradient-to-b from-forest-deep via-[#223b22] to-forest-mid text-center overflow-hidden max-md:px-7 max-md:pt-28 max-md:pb-14">
-        <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(160deg,rgba(255,255,255,0.055),transparent_44%,rgba(232,201,160,0.045))]" />
-        <div className="relative max-w-[760px] mx-auto">
-          <div className="inline-block text-xs tracking-[3px] text-sage uppercase mb-4 font-medium">
-            {tr(String(frontmatter.label || '创造者'), locale)}
-          </div>
-          <h1 className="font-serif text-[clamp(2.2rem,5vw,3.4rem)] font-light text-white leading-[1.2] mb-5">
-            {tr(String(frontmatter.title || '创造者森林'), locale)}
-          </h1>
-          <p className="text-base text-white/70 leading-[1.9] max-md:text-sm">
-            {tr(intro[0], locale)}
-          </p>
-          {intro[1] && (
-            <p className="text-sm text-white/50 leading-[1.9] mt-4">{tr(intro[1], locale)}</p>
-          )}
-        </div>
-      </section>
-
-      {/* Forest Grid */}
-      <section className="relative py-20 px-10 bg-warm-cream max-md:py-14 max-md:px-7">
-        <div className="max-w-[1200px] mx-auto">
-          {/* 作品书架入口 */}
-          {creators.length > 0 && (
-            <Link
-              href="/launch"
-              className="group block no-underline mb-12 max-md:mb-8"
-              aria-label={t.shelf.ariaLabel}
-            >
-              <article className="flex items-stretch gap-5 p-3 max-md:flex-col max-md:gap-3 bg-white/75 rounded-lg border border-moss/10 shadow-[0_2px_24px_rgba(26,46,26,0.04)] hover:bg-white hover:shadow-[0_8px_36px_rgba(26,46,26,0.07)] hover:-translate-y-0.5 transition-all">
-                {/* GIF 缩略 */}
-                <div className="shrink-0 w-[180px] max-md:w-full max-md:h-40 rounded-md overflow-hidden bg-[#fafaf7] ring-1 ring-black/[0.04]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/launch-screenshots/feature-tour.gif"
-                    alt={t.shelf.imageAlt}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-                {/* 文案 */}
-                <div className="flex-1 flex flex-col justify-center py-2 pr-3 max-md:px-2 max-md:pb-3">
-                  <div className="text-[11px] font-semibold tracking-[0.18em] text-moss uppercase mb-2">
-                    {t.shelf.eyebrow}
-                  </div>
-                  <h3
-                    className="text-[20px] font-medium tracking-[-0.005em] text-forest-deep mb-1.5 max-md:text-[18px]"
-                    style={{ fontFamily: 'var(--font-display)' }}
+      {/*
+        首屏让人先看到人：页头压成一段（和社区广场同一套），卡片紧跟着上来——
+        桌面上第一排卡片整排在首屏里，手机上第一张卡片整张在首屏里。
+        原来那块深绿大 hero 和「作品书架」大卡片把卡片挤到了首屏以外。
+      */}
+      <main className="bg-[linear-gradient(180deg,#fff_0%,#faf8f2_100%)] px-10 pb-20 pt-32 max-md:px-7 max-md:pb-14 max-md:pt-28">
+        <div className="mx-auto max-w-[1200px]">
+          <header className="mb-8 flex items-end justify-between gap-8 max-lg:flex-col max-lg:items-start max-lg:gap-4 max-md:mb-6">
+            <div className="min-w-0 max-w-[820px] flex-1">
+              <p className="m-0 mb-3 text-[11px] font-medium uppercase tracking-[3px] text-forest-light">
+                {tr(String(frontmatter.label || '创造者平台'), locale)}
+              </p>
+              <h1 className="m-0 text-balance font-serif text-[clamp(1.9rem,3.4vw,2.75rem)] font-normal leading-[1.2] text-forest-deep">
+                {tr(String(frontmatter.title || '创造者平台'), locale)}
+              </h1>
+              {lede && (
+                <p className="mb-0 mt-3 max-w-[680px] text-[15px] leading-[1.8] text-text-secondary max-md:text-[14px]">
+                  {tr(lede, locale)}
+                </p>
+              )}
+            </div>
+            {creators.length > 0 && (
+              <div className="flex shrink-0 flex-col items-end gap-2 text-right max-lg:items-start max-lg:text-left">
+                <p className="m-0 text-[13px] tracking-[0.12em] text-forest-light">{t.treeCount(creators.length)}</p>
+                {mySpaceHref && (
+                  <a
+                    href={mySpaceHref}
+                    className="inline-flex min-h-10 items-center gap-2 rounded-full border border-forest-deep/10 bg-white/85 py-1 pl-1.5 pr-4 text-[13px] text-forest-deep no-underline transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-mid"
                   >
-                    {t.shelf.title}
-                  </h3>
-                  <p className="text-[14px] leading-relaxed text-text-secondary mb-3 max-md:text-[13.5px]">
-                    {t.shelf.body}
-                  </p>
-                  <span className="inline-flex items-center gap-1 text-[13px] font-medium text-forest-deep group-hover:text-forest-mid transition-colors">
-                    {t.shelf.cta}
-                    <span className="transition-transform group-hover:translate-x-0.5">→</span>
-                  </span>
-                </div>
-              </article>
-            </Link>
-          )}
+                    <span className={`rounded-full px-2 py-0.5 text-[11.5px] ${myLook?.spaceHref ? 'bg-[#e4eadb] text-[#2f513d]' : 'bg-[#f1e6cf] text-[#6d5424]'}`}>
+                      {myLook?.spaceHref ? sp.statusLive : sp.statusDraft}
+                    </span>
+                    {sp.titleOwn} →
+                  </a>
+                )}
+              </div>
+            )}
+          </header>
 
           {creators.length === 0 ? (
             <div className="text-center py-20">
@@ -128,28 +124,41 @@ export default async function CreatorsPage() {
             </div>
           ) : (
             <>
-              <div className="text-center mb-12">
-                <p className="text-sm text-moss tracking-widest uppercase">
-                  {t.treeCount(creators.length)}
-                </p>
-              </div>
               <div className="grid grid-cols-3 gap-7 max-lg:grid-cols-2 max-md:grid-cols-1 max-md:gap-5">
-                {creators.map(node => (
-                  <Link
-                    key={node.id}
-                    href={node.id ? `/creators/${node.id}` : '/creators'}
-                    className="no-underline block"
-                  >
-                    <CreatorTree node={node} locale={locale} />
-                  </Link>
-                ))}
+                {ordered.map(node => {
+                  const look = node.id ? looks.get(node.id) : undefined;
+                  return (
+                    <Link
+                      key={node.id}
+                      href={look?.spaceHref ?? (node.id ? `/creators/${node.id}` : '/creators')}
+                      // 整张卡是一个链接：读屏先听到「谁、去哪」，而不是先念一串关键词
+                      aria-label={`${node.name || t.tree.unnamed}${node.city ? `，${node.city}` : ''} · ${look?.spaceHref ? t.tree.visitSpace : t.tree.closer}`}
+                      className="no-underline block rounded-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest-mid"
+                    >
+                      <CreatorTree node={node} locale={locale} look={look} />
+                    </Link>
+                  );
+                })}
               </div>
+
+              {/* 作品书架：从首屏的大卡片退到卡片下面的一行（它是上线手记 /launch 唯一的入口，留着） */}
+              <Link
+                href="/launch"
+                className="group mt-14 flex items-baseline gap-3 border-t border-forest-deep/10 pt-6 text-[13.5px] leading-[1.7] text-text-secondary no-underline max-md:mt-10 max-md:flex-col max-md:gap-1.5"
+              >
+                <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-forest-light">{t.shelf.eyebrow}</span>
+                <span className="flex-1">{t.shelf.body}</span>
+                <span className="shrink-0 whitespace-nowrap font-medium text-forest-deep group-hover:text-forest-mid">
+                  {t.shelf.cta} <span aria-hidden className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
+                </span>
+              </Link>
             </>
           )}
         </div>
-      </section>
+      </main>
 
-      {/* CTA */}
+      {/* 邀请种一棵树：已经在森林里的成员不用再看（导航上也已经是「个人中心」） */}
+      {!viewerNode && (
       <section className="py-16 px-10 bg-forest-deep text-center max-md:py-12 max-md:px-7">
         <h2 className="font-serif text-[clamp(1.5rem,3vw,2rem)] font-normal text-white mb-4">
           {t.cta.title}
@@ -164,9 +173,10 @@ export default async function CreatorsPage() {
           {t.cta.button}
         </Link>
       </section>
+      )}
 
       {/* Footer */}
-      <footer className="bg-forest-deep text-white/40 py-10 px-10 text-center text-xs border-t border-white/5">
+      <footer className="bg-forest-deep text-white/55 py-10 px-10 text-center text-xs border-t border-white/5">
         <p>附近森林 · Nearby Forest</p>
         <p className="mt-2">{t.footerTagline}</p>
       </footer>

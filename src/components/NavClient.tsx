@@ -63,14 +63,22 @@ export default function NavClient({ locale, t, night = false }: Props) {
   const [session, setSession] = useState<Session | undefined>(undefined);
   const pathname = usePathname();
   const isHome = pathname === '/';
+  // 当前在哪个栏目：/creators/xxx 也算在「创造者平台」里。
+  // 读屏上「当前页」只给正好是这一页的链接；在栏目里面的子页，栏目链接标成「当前位置」
+  const isHere = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const currentOf = (href: string): 'page' | 'location' | undefined =>
+    pathname === href ? 'page' : isHere(href) ? 'location' : undefined;
+  const en = locale === 'en';
 
   // 中间那排：品牌已经指向首页，这里就不再重复放「首页」
   // icon 沿用首页四条小径那套汉字符号，手机菜单排成两列时靠它认路
+  // 顺序：先是自己（静下来、向内），再是人（广场上发生的事、平台上的每个人、星空里的连接），最后是关于社区
   const baseLinks: (NavLink & { icon: string })[] = [
     { href: '/meditations', label: t.links.meditations, type: 'route', icon: '息' },
     { href: '/phil-coach', label: t.links.philCoach, type: 'route', icon: '伴' },
-    { href: '/shares', label: t.links.shares, type: 'route', icon: '创' },
-    { href: '/sky', label: t.links.creators, type: 'route', icon: '见' },
+    { href: '/shares', label: t.links.square, type: 'route', icon: '聚' },
+    { href: '/creators', label: t.links.creators, type: 'route', icon: '创' },
+    { href: '/sky', label: t.links.sky, type: 'route', icon: '见' },
     { href: '/about', label: t.links.about, type: 'route', icon: '林' },
   ];
 
@@ -166,25 +174,41 @@ export default function NavClient({ locale, t, night = false }: Props) {
         menuOpen ? 'rounded-[26px]' : 'rounded-[999px]'
       }`}
     >
-      <nav className="flex h-[72px] items-center justify-between gap-5 pl-6 pr-3.5 max-md:h-[62px] max-md:pl-4">
+      <nav className="flex h-[72px] items-center justify-between gap-5 pl-6 pr-3.5 max-md:h-[62px] max-md:gap-2 max-md:pl-4 max-md:pr-2.5">
+        {/*
+          品牌字距在手机上收一收：英文「Nearby Forest」13 个字母，0.18em 的字距下单它就 218px，
+          再加上「种下一棵树」和菜单按钮，390 宽的手机上菜单按钮会被挤出屏幕（整行没有能缩的东西）。
+          最窄的英文手机上只留树的标志。
+        */}
         <Link
           href="/"
-          className="flex shrink-0 items-center gap-2.5 font-display text-[21px] font-light tracking-[0.18em] text-forest-dark no-underline"
+          aria-label={t.brand}
+          className={`flex shrink-0 items-center gap-2.5 font-display text-[21px] font-light text-forest-dark no-underline max-md:gap-2 ${
+            en ? 'tracking-[0.06em] max-md:text-[15px] max-md:tracking-[0.02em]' : 'tracking-[0.18em] max-md:text-[18px] max-md:tracking-[0.1em]'
+          }`}
         >
-          <ForestLogo size={26} className="shrink-0" onDark={night} />
-          {t.brand}
+          <ForestLogo size={26} className="shrink-0 max-md:h-[23px] max-md:w-[23px]" onDark={night} />
+          <span aria-hidden="true" className={en ? 'max-[359px]:hidden' : undefined}>{t.brand}</span>
         </Link>
 
-        <div className="flex items-center gap-6 text-[16px] font-medium text-[#2f3d36] max-lg:hidden">
-          {baseLinks.map(link => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="no-underline transition-colors hover:text-forest"
-            >
-              {link.label}
-            </Link>
-          ))}
+        {/* 六个栏目 + 联系我们：1280 以下放不下（1024 时「林间探索」会被折成两行），收进菜单 */}
+        <div className="flex items-center gap-5 whitespace-nowrap text-[16px] font-medium text-[#2f3d36] max-xl:hidden">
+          {baseLinks.map(link => {
+            const here = isHere(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={currentOf(link.href)}
+                className={`nav-link relative no-underline transition-colors hover:text-forest ${here ? 'text-forest' : ''}`}
+              >
+                {link.label}
+                {here && (
+                  <span aria-hidden="true" className="absolute -bottom-[7px] left-1/2 h-[4px] w-[4px] -translate-x-1/2 rounded-full bg-current" />
+                )}
+              </Link>
+            );
+          })}
           <Link
             href={contactHref}
             className="rounded-full border border-forest/20 px-4 py-1.5 text-[16px] no-underline transition-colors hover:border-forest/45 hover:text-forest"
@@ -193,7 +217,7 @@ export default function NavClient({ locale, t, night = false }: Props) {
           </Link>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3 max-md:gap-1">
           {/* 语言：手机上收进汉堡菜单，顶栏这条只在宽屏出现 */}
           <div className="relative max-md:hidden">
             <button
@@ -222,7 +246,7 @@ export default function NavClient({ locale, t, night = false }: Props) {
           {!pending && !memberId && !session?.legacy && (
             <Link
               href="/login"
-              className="text-[15px] font-medium text-[#33403a]/85 no-underline transition-colors hover:text-forest max-md:hidden"
+              className="text-[15px] font-medium text-[#33403a]/85 no-underline transition-colors hover:text-forest max-xl:hidden"
             >
               {t.login}
             </Link>
@@ -234,27 +258,27 @@ export default function NavClient({ locale, t, night = false }: Props) {
           {pending ? (
             <span
               aria-hidden="true"
-              className={`${ctaClass} max-md:min-h-[40px] max-md:px-4 max-md:text-[12.5px] pointer-events-none opacity-0`}
+              className={`${ctaClass} max-md:min-h-[38px] max-md:gap-1 max-md:px-3.5 max-md:text-[12.5px] pointer-events-none opacity-0`}
             >
               {t.ctaJoin}
-              <span aria-hidden="true">↗</span>
+              <span aria-hidden="true" className="max-sm:hidden">↗</span>
             </span>
           ) : cta.type === 'route' ? (
-            <Link href={cta.href} className={`${ctaClass} max-md:min-h-[40px] max-md:px-4 max-md:text-[12.5px]`}>
+            <Link href={cta.href} aria-current={pathname === cta.href ? 'page' : undefined} className={`${ctaClass} max-md:min-h-[38px] max-md:gap-1 max-md:px-3.5 max-md:text-[12.5px]`}>
               {cta.label}
-              <span aria-hidden="true">↗</span>
+              <span aria-hidden="true" className="max-sm:hidden">↗</span>
             </Link>
           ) : (
             <a
               href={resolveHref(cta)}
-              className={`${ctaClass} max-md:min-h-[40px] max-md:px-4 max-md:text-[12.5px]`}
+              className={`${ctaClass} max-md:min-h-[38px] max-md:gap-1 max-md:px-3.5 max-md:text-[12.5px]`}
             >
               {cta.label}
-              <span aria-hidden="true">↗</span>
+              <span aria-hidden="true" className="max-sm:hidden">↗</span>
             </a>
           )}
           <button
-            className="hidden h-10 w-10 place-items-center rounded-full text-[19px] text-forest-dark transition-colors hover:bg-forest/10 max-lg:grid"
+            className="hidden h-10 w-10 place-items-center rounded-full text-[19px] text-forest-dark transition-colors hover:bg-forest/10 max-xl:grid"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label={t.menu}
             aria-expanded={menuOpen}
@@ -270,17 +294,18 @@ export default function NavClient({ locale, t, night = false }: Props) {
           面板还被拉到近半屏。两列把宽度用满、行数减半，
           汉字符号也和首页四条小径对得上。
         */
-        <div className="nav-mpanel hidden border-t border-forest/10 px-4 pb-3 pt-2.5 max-lg:block">
+        <div className="nav-mpanel hidden border-t border-forest/10 px-4 pb-3 pt-2.5 max-xl:block">
           <div className="grid grid-cols-2 gap-2">
             {menuItems.map((link, i) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMenuOpen(false)}
-                className={`nav-mitem flex items-center gap-3 rounded-2xl px-3.5 py-3 no-underline transition-colors active:bg-forest/10 ${
+                aria-current={currentOf(link.href)}
+                className={`nav-mitem flex items-center gap-3 rounded-2xl px-3.5 py-3 no-underline transition-colors active:bg-forest/10 max-sm:gap-2.5 max-sm:px-3 max-[359px]:gap-2 max-[359px]:px-2.5 ${
                   // 「联系我们」用描边而不是实底：它是次级入口，
                   // 和桌面端那颗胶囊是同一个意思
-                  link.outline ? 'border border-forest/20' : 'bg-forest/[0.05]'
+                  link.outline ? 'border border-forest/20' : isHere(link.href) ? 'bg-forest/[0.12]' : 'bg-forest/[0.05]'
                 } ${
                   // 总数是奇数时，最后一张占满整行，不留半个空格
                   i === menuItems.length - 1 && menuItems.length % 2 === 1 ? 'col-span-2' : ''
@@ -288,11 +313,11 @@ export default function NavClient({ locale, t, night = false }: Props) {
               >
                 <span
                   aria-hidden="true"
-                  className="nav-micon grid h-7 w-7 shrink-0 place-items-center rounded-full bg-paper-soft text-[14px] text-forest"
+                  className="nav-micon grid h-7 w-7 shrink-0 place-items-center rounded-full bg-paper-soft text-[14px] text-forest max-[359px]:h-6 max-[359px]:w-6 max-[359px]:text-[12px]"
                   >
                   {link.icon}
                 </span>
-                <span className="text-[16px] font-medium text-[#33403a]">{link.label}</span>
+                <span className={`whitespace-nowrap font-medium leading-tight text-[#33403a] max-[359px]:whitespace-normal ${en ? 'text-[15px] max-sm:text-[14px] max-[359px]:text-[13px]' : 'text-[16px] max-[359px]:text-[15px]'}`}>{link.label}</span>
               </Link>
             ))}
           </div>

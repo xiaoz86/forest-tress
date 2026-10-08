@@ -14,22 +14,18 @@ import type { philCoach as zhPhilCoach } from '@/i18n/zh/philCoach';
  *   那个文件这轮不动，所以英文在这里按 role.id 覆盖。
  */
 export const philCoach: typeof zhPhilCoach = {
-  metaTitle: 'phil-coach · Nearby Forest',
+  metaTitle: 'Inner Dialogue · Nearby Forest',
   metaDescription:
     'phil-coach is a hollow tree in Nearby Forest that answers back: when you want to be heard, or to untangle a knot slowly, there is a conversation that walks you back to yourself.',
 
-  backHome: 'Back home',
-
-  hero: {
-    eyebrow: 'phil-coach · a hollow tree that answers back',
-    title: 'Someone with you, on the way back to yourself',
-    lede: 'Sometimes what is missing is not an answer, but time enough to say a thing all the way through. Put the knot down. Once it has been heard, you begin to see what actually hurts, what you care about, where you want to go.',
-    footnote:
-      'This is one of the Nearby Forest paths for finding yourself. Before meeting anyone else, sit with yourself a while.',
+  page: {
+    title: 'Inner Dialogue',
+    byline: 'phil-coach',
+    aboutTitle: 'About these conversations',
+    feedbackSummary: 'Leave feedback · ask about a real coach',
   },
 
   intro: {
-    eyebrow: 'First meeting',
     title: 'What is phil-coach?',
     origin:
       'A virtual coach planted in Nearby Forest. The “phil” comes from the Greek philia — the love between friends, equal and unpossessive.',
@@ -39,7 +35,7 @@ export const philCoach: typeof zhPhilCoach = {
     listenAfter:
       '. It does not judge you and it will not decide for you — it trusts the answer is already in you, and only keeps you company while you find it.',
     howBefore:
-      'Nothing to prepare: pick the path below that feels most like you right now, then talk the way you would to someone you trust — whatever comes, unshaped, typos and all. It asks one question at a time; ',
+      'Nothing to prepare: just start typing in the box above, or first pick the path that feels most like you right now, then talk the way you would to someone you trust — whatever comes, unshaped, typos and all. It asks one question at a time; ',
     howAccent: 'you do not have to answer well, only truly',
     howAfter:
       '. Stop whenever you want. Nothing here is saved; when you are done, it is gone.',
@@ -85,10 +81,6 @@ export const philCoach: typeof zhPhilCoach = {
   },
 
   faq: {
-    eyebrow: 'You might ask',
-    title: 'Before you start, the things worth saying clearly',
-    note: 'Privacy, limits, and how far it can actually go with you — you have a right to know before you say anything.',
-
     privacy: {
       question: 'Who sees what I say?',
       answer:
@@ -99,16 +91,16 @@ export const philCoach: typeof zhPhilCoach = {
       question: 'Is anything kept? Will it remember me next time?',
       p1: 'Conversations are not written to the Nearby Forest database; close the tab and it is gone, and next time it will not remember what you talked about. (So you do not lose half a conversation by going off to sign in, it is held for the moment in your own browser, cleared when the tab closes, never uploaded to us.) Honestly though: the model provider may keep data briefly under its own rules, so we do not promise zero retention end to end. Please do not write ID numbers, addresses, financial or medical details, and please look after other people’s privacy too. If something is worth keeping, use “keep this for yourself” below the conversation to take it with you.',
       p2Before:
-        'One more thing said plainly: if you keep going after the first path, we will ask for a name to call you by and a WeChat ID — only so we know you, open free access, and invite you into the community. We keep ',
+        'One more thing said plainly: after seven or eight exchanges we will ask you to confirm once by email (members are simply signed in; first-timers can leave just a name to call you by) — only so we know you and can open free use. We keep ',
       p2Keep: 'who you are and when you came',
       p2Middle: ', but ',
       p2NotSaved: 'the conversations themselves are still not saved',
       p2After: ' (unless a member chooses to keep one).',
       p3Before:
-        'One plan already on the way: in time, you will be able to let it remember. Once you ',
+        'You can also choose to let it remember. Once you ',
       p3Link: 'become a tree in the forest',
       p3After:
-        ' (sign up), you can choose by hand to keep the part of a conversation that mattered — saved only with your explicit yes, into a record of your own growth. Next time, phil-coach picks the thread back up: “Last time you said you wanted to try sleeping earlier — how did that go?” Until this exists, every time it meets you is the first time.',
+        ' (sign up), you can tap “Keep this part” on the part of a conversation that mattered — saved only with your explicit yes, onto your own node page, visible only to you and deletable any time. Next time, phil-coach picks the thread back up: “Last time you said you wanted to try sleeping earlier — how did that go?” Anything you don’t keep, it meets you fresh.',
     },
 
     therapy: {
@@ -119,18 +111,19 @@ export const philCoach: typeof zhPhilCoach = {
   },
 
   experience: {
-    eyebrow: 'Sit here a while',
-    title: 'Give yourself ten minutes',
-
-    chooseHint: 'There’s no right one. Just pick whichever sounds most like today—start on one path, and the rest can come slowly.',
+    start: {
+      pathsLabel: 'Or pick a path first (optional)',
+      trust: 'Not therapy · nothing is saved by default',
+      trustMore: 'Worth knowing first',
+      preparing: 'Getting ready…',
+    },
     paths: {
       heard: { label: 'I want to be heard', hint: 'Something’s sitting in me; no rush to fix it' },
       untangle: { label: 'I’m tangled, I want to sort it out', hint: 'Too much at once, and I want to see a direction' },
       choice: { label: 'I’m stuck on a choice', hint: 'I can’t let go of either side' },
       mirror: { label: 'I want to meet who I am right now', hint: 'Stop for a moment and see yourself as you are' },
+      open: { label: 'Just talking', hint: '' },
     },
-    enter: 'Start talking',
-    entering: 'Getting ready…',
 
     profile: {
       importing: 'phil-coach is reading your profile, to get to know you…',
@@ -156,7 +149,9 @@ export const philCoach: typeof zhPhilCoach = {
     },
 
     ephemeral: 'This happens only now. Nothing is saved · it goes when you’re done',
-    switchPath: 'Take another path',
+    restart: 'New conversation',
+    replyLabel: 'Your reply',
+    restartConfirm: 'Start a new conversation? This one will be gone. To hold on to it, tap “Keep this for yourself” to copy it first.',
     me: 'Me',
     transcribing: 'Turning what you said into words…',
     thinking: 'I’m listening—give me a moment to hold what you just said…',
@@ -179,7 +174,6 @@ export const philCoach: typeof zhPhilCoach = {
 
     inviteAfterClose: 'That went somewhere today. Shall we let PhilCoach know you from here on, and bring you closer to Nearby Forest?',
     inviteAfterCloseCta: 'Complete my profile',
-    againPath: 'Walk another path',
     join: 'Become a tree in the forest',
 
     error: {
@@ -278,8 +272,6 @@ export const philCoach: typeof zhPhilCoach = {
   },
 
   feedback: {
-    eyebrow: 'Tell us',
-    title: 'Leave your feedback',
     lede: 'This path is still young. However it felt to use, what you hoped for, or a wish to be accompanied by a real person—all of it can be left here.',
 
     kindFeedback: 'Give feedback',
@@ -305,7 +297,7 @@ export const philCoach: typeof zhPhilCoach = {
     lede: 'These are the moments you chose to keep during a conversation. Only you can see them, and you can delete them any time.',
     empty: {
       before: 'Nothing kept yet. Next time you’re at',
-      link: 'coming back to yourself',
+      link: 'Inner Dialogue',
       after: 'and you reach something that matters, tap “Keep this part”.',
     },
     fromProfile: 'From your profile',
@@ -316,8 +308,6 @@ export const philCoach: typeof zhPhilCoach = {
   },
 
   outro: {
-    title: 'Every tree deserves to be seen this way',
-    body: 'The more you can hear yourself, the easier it is to meet people in the forest who are truly in tune with you. You know what you are looking for, and what you can bring to someone else. phil-coach stays beside this path, for whenever you want to come back and sit a while.',
     ctaJoin: 'Become a tree in the forest',
     ctaListen: 'Or go listen to the sounds in the forest',
   },

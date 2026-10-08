@@ -122,7 +122,16 @@ export function XiaoyaShell({ locale }: XiaoyaShellProps) {
     [locale, pageContext.pageType],
   );
   const suggestions = responseSuggestions?.length ? responseSuggestions : pageSuggestions;
-  const hiddenRoute = pathname === "/meditations/orders" || pathname.includes("/admin");
+  // 个人空间是成员自己的网站，不放平台的悬浮助手（也会和首屏贴底的按钮、微信底栏挤在一起）
+  const hiddenRoute =
+    pathname === "/meditations/orders" ||
+    pathname.includes("/admin") ||
+    pathname.startsWith("/space/") ||
+    // 短链 /@xiaoz 是 rewrite，地址栏（和 usePathname）保持原样；/s/ 是它背后的真实路由
+    pathname.startsWith("/@") ||
+    pathname.startsWith("/%40") ||
+    pathname.startsWith("/s/");
+  // 向内对话那一页：小芽缩成一颗圆钮；手机和平板上干脆不出——输入框就在页面那个位置，会被它压住
   const compactLauncher = pathname === "/phil-coach";
   /**
    * 星空页是深色的：米白按钮压在夜空上会成为全页最亮的元素，
@@ -345,7 +354,7 @@ export function XiaoyaShell({ locale }: XiaoyaShellProps) {
         aria-label={copy.launcher}
         tabIndex={isOpen ? -1 : undefined}
         onClick={() => setIsOpen(true)}
-        className={`${nightLauncher ? "xy-night " : ""}fixed right-4 z-[80] flex h-14 items-center justify-center gap-2.5 rounded-full border border-[#91aa91]/55 bg-[#f7f4eb]/95 px-3 text-[#244a35] shadow-[0_12px_38px_rgba(18,47,31,0.22)] backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#315d43] motion-reduce:transform-none motion-reduce:transition-none sm:bottom-6 sm:right-6 ${compactLauncher ? "w-14" : "sm:h-[58px] sm:px-4"} ${isOpen ? "pointer-events-none invisible" : ""} bottom-[max(1rem,env(safe-area-inset-bottom))]`}
+        className={`${nightLauncher ? "xy-night " : ""}fixed right-4 z-[80] flex h-14 items-center justify-center gap-2.5 rounded-full border border-[#91aa91]/55 bg-[#f7f4eb]/95 px-3 text-[#244a35] shadow-[0_12px_38px_rgba(18,47,31,0.22)] backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#315d43] motion-reduce:transform-none motion-reduce:transition-none sm:bottom-6 sm:right-6 ${compactLauncher ? "w-14 max-lg:hidden" : "sm:h-[58px] sm:px-4"} ${isOpen ? "pointer-events-none invisible" : ""} bottom-[max(1rem,env(safe-area-inset-bottom))]`}
       >
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#315d43] text-[#dbead3]">
           <XiaoyaSprout className="h-7 w-7" />

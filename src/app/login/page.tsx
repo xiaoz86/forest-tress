@@ -5,8 +5,18 @@ import { dict } from '@/i18n';
 import { getLocale } from '@/lib/locale';
 
 type Props = {
-  searchParams: Promise<{ err?: string }>;
+  searchParams: Promise<{ err?: string; next?: string }>;
 };
+
+/**
+ * ?next= 登录完回到哪里（比如社区广场上点了「发起活动」）。只认站内路径：
+ * 以一个 / 开头、不是 //（协议相对地址会跳出站）、不带反斜杠和换行。不认的就当没有，照旧去资料页。
+ */
+function safeNext(raw: string | undefined): string | null {
+  if (typeof raw !== 'string' || raw.length > 300) return null;
+  if (!raw.startsWith('/') || raw.startsWith('//') || /[\\\s]/.test(raw)) return null;
+  return raw;
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = dict(await getLocale()).login;
@@ -30,7 +40,7 @@ function errorText(err: string | undefined, t: ReturnType<typeof dict>['login'])
 }
 
 export default async function LoginPage({ searchParams }: Props) {
-  const [{ err }, locale] = await Promise.all([searchParams, getLocale()]);
+  const [{ err, next }, locale] = await Promise.all([searchParams, getLocale()]);
   const t = dict(locale).login;
   const errMsg = errorText(err, t);
 
@@ -52,7 +62,7 @@ export default async function LoginPage({ searchParams }: Props) {
             *
             * 只有 ?err= 那条是服务端算出来的，所以从外面传进去。
             */}
-          <LoginForm locale={locale} linkError={errMsg} />
+          <LoginForm locale={locale} linkError={errMsg} next={safeNext(next)} />
         </div>
       </main>
     </>

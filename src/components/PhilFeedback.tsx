@@ -1,6 +1,6 @@
 'use client';
 
-// phil-coach 模块反馈 / 咨询真人教练陪伴。放在体验区下方，任何人都可提交。
+// phil-coach 模块反馈 / 咨询真人教练陪伴。收在「关于这段对话」最后一条里，任何人都可提交。
 
 import { useMemo, useState } from 'react';
 import { dict } from '@/i18n';
@@ -40,33 +40,27 @@ export default function PhilFeedback({ locale }: { locale: Locale }) {
 
   if (state === 'done') {
     return (
-      <section className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center max-md:p-6">
-        <p className="text-[16px] leading-[1.9] text-white/72">
+      <div role="status">
+        <p className="m-0 text-[15px] leading-[1.9] text-pc-ink">
           {t.doneLead}
           {kind === 'coach-inquiry' ? t.doneCoach : t.doneFeedback}
         </p>
         <button
           onClick={() => setState('idle')}
           type="button"
-          className="mt-5 text-[13px] text-white/45 underline-offset-4 transition-colors hover:text-white hover:underline"
+          className="mt-3 text-[13px] text-pc-plum underline decoration-pc-plum/40 underline-offset-4 hover:decoration-pc-plum"
         >
           {t.doneAgain}
         </button>
-      </section>
+      </div>
     );
   }
 
   return (
-    <section className="mt-16 rounded-2xl border border-white/10 bg-white/[0.03] p-8 max-md:p-6">
-      <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-white/32">
-        {t.eyebrow}
-      </div>
-      <h2 className="text-2xl font-normal">{t.title}</h2>
-      <p className="mt-3 text-[14px] leading-[1.9] text-white/52">
-        {t.lede}
-      </p>
+    <div>
+      <p className="m-0">{t.lede}</p>
 
-      <div className="mt-6 flex gap-2">
+      <div className="mt-5 flex flex-wrap gap-2">
         {(
           [
             { id: 'feedback', label: t.kindFeedback },
@@ -77,10 +71,11 @@ export default function PhilFeedback({ locale }: { locale: Locale }) {
             key={opt.id}
             onClick={() => setKind(opt.id)}
             type="button"
-            className={`rounded-full px-4 py-2 text-[13px] transition-colors ${
+            aria-pressed={kind === opt.id}
+            className={`inline-flex min-h-10 items-center rounded-full border px-4 text-[13px] transition-colors ${
               kind === opt.id
-                ? 'bg-coral-soft text-[#20140f]'
-                : 'border border-white/16 bg-white/[0.05] text-white/70 hover:bg-white/12'
+                ? 'border-pc-ink bg-pc-ink text-pc-ivory'
+                : 'border-pc-ink/15 bg-pc-paper/60 text-pc-ink-2 hover:text-pc-ink'
             }`}
           >
             {opt.label}
@@ -98,7 +93,8 @@ export default function PhilFeedback({ locale }: { locale: Locale }) {
             ? t.placeholderCoach
             : t.placeholderFeedback
         }
-        className="mt-5 w-full resize-none rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[16px] leading-relaxed text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
+        aria-label={kind === 'coach-inquiry' ? t.placeholderCoach : t.placeholderFeedback}
+        className="mt-4 block w-full resize-none rounded-xl border border-pc-line bg-pc-paper px-4 py-3 text-[16px] leading-relaxed text-pc-ink placeholder:text-pc-ink-3 focus:border-pc-plum focus:outline-none"
       />
       <input
         value={contact}
@@ -109,7 +105,8 @@ export default function PhilFeedback({ locale }: { locale: Locale }) {
             ? t.contactCoach
             : t.contactFeedback
         }
-        className="mt-3 w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
+        aria-label={kind === 'coach-inquiry' ? t.contactCoach : t.contactFeedback}
+        className="mt-3 block w-full rounded-xl border border-pc-line bg-pc-paper px-4 py-3 text-[16px] text-pc-ink placeholder:text-pc-ink-3 focus:border-pc-plum focus:outline-none"
       />
 
       <div className="mt-4 flex items-center gap-4">
@@ -117,14 +114,14 @@ export default function PhilFeedback({ locale }: { locale: Locale }) {
           onClick={submit}
           disabled={!message.trim() || state === 'sending'}
           type="button"
-          className="rounded-full bg-white px-6 py-2.5 text-[14px] font-medium text-[#141a12] transition-opacity disabled:opacity-35"
+          className="inline-flex min-h-11 items-center rounded-full bg-pc-ink px-6 text-[14px] font-medium text-pc-ivory transition-colors disabled:bg-pc-ink/15 disabled:text-pc-ink-3"
         >
           {state === 'sending' ? t.sending : t.send}
         </button>
         {state === 'error' && (
-          <span className="text-[13px] text-coral-soft">{t.failed}</span>
+          <span role="alert" className="text-[13px] text-pc-brick">{t.failed}</span>
         )}
       </div>
-    </section>
+    </div>
   );
 }

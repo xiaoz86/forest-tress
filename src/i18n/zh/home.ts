@@ -60,21 +60,21 @@ export const home = {
       },
       {
         icon: '伴',
-        title: '回到自己',
+        title: '向内对话',
         body: '一个会记得你的虚拟陪伴教练 phil-coach，支持你整理感受、看见选择，并找到下一步。',
         cta: '开始一次对话',
       },
       {
-        icon: '见',
-        title: '遇见附近',
-        body: '浏览创造者节点，通过同频推荐、小桌子对话和主题活动认识彼此。',
-        cta: '看看创造者森林',
+        icon: '创',
+        title: '创造者平台',
+        body: '每位创造者都有一页自己的网站：TA 是谁、正在做什么、可以和你一起做点什么。',
+        cta: '走进创造者平台',
       },
       {
-        icon: '创',
-        title: '个体创造',
-        body: '让你的课程、内容、活动、作品或项目被看见，并找到可以支持它的人。',
-        cta: '看看正在生长的事',
+        icon: '聚',
+        title: '社区广场',
+        body: '成员发起的活动，和每个人的 Aha Moment：报名一场，或者把你的也放进来。',
+        cta: '去社区广场看看',
       },
     ],
   },
@@ -83,7 +83,7 @@ export const home = {
     headingTop: '森林里，已经有人',
     headingBottom: '在做这些事。',
     lede: '每一个节点都来自一个真实的人。你可以看见他们正在创造什么、能够提供什么，以及此刻希望遇见怎样的伙伴。',
-    link: '进入创造者森林',
+    link: '进入创造者平台',
     showcase: {
       growing: '森林里正在生长',
       cityFallback: '附近',
@@ -378,7 +378,7 @@ export const home = {
   footer: {
     tagline: '让独立的个体彼此连接、流动、共创。',
     about: '附近森林的来处',
-    creators: '创造者森林',
+    creators: '创造者平台',
     copyright: '© 2026 附近森林生态社区',
   },
 };

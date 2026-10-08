@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { after } from 'next/server';
 import { splitBeauty } from '@/lib/beauty';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -15,6 +16,12 @@ import { buildRelationGraph } from '@/lib/network';
 import { isAdminId } from '@/lib/admin';
 import { getAuthenticatedMemberId } from '@/lib/session';
 import { canSeeContacts } from '@/lib/memberTrust';
+import { applySpaceVisibility } from '@/lib/space/platformVisibility';
+import { draftInBackground } from '@/lib/space/autoDraft';
+import { effectiveDraft } from '@/lib/space/edits';
+import { getSettings } from '@/lib/space/settings';
+import { readSpace } from '@/lib/space/store';
+import { getSiteOrigin } from '@/lib/notify';
 import { toPublicGraph } from '@/lib/publicNode';
 import { dict } from '@/i18n';
 import { getLocale, type Locale } from '@/lib/locale';
@@ -59,8 +66,6 @@ export default async function CreatorDetail({ params }: Props) {
   if (!me) notFound();
 
   const graph = buildRelationGraph(me, all, 8);
-  // beauty 一列存两段，靠前缀分隔。拆法和星空、编辑器共用 lib/beauty.ts
-  const beauty = splitBeauty(me.beauty);
 
   const [memberId, locale] = await Promise.all([getAuthenticatedMemberId(), getLocale()]);
   const t = dict(locale).creatorDetail;
@@ -73,14 +78,37 @@ export default async function CreatorDetail({ params }: Props) {
   const isMember = canSeeContacts(viewer);
   const isOwner = memberId === me.id;
   const isAdmin = isAdminId(memberId);
+  // 本人在个人空间里设了更严的可见性（比如种子「仅自己」），资料页也照着裁；本人和管理员看全部
+  const shown = await applySpaceVisibility(me, { viewerId: memberId, isMember, isOwner, isAdmin });
+  // beauty 一列存两段，靠前缀分隔。拆法和星空、编辑器共用 lib/beauty.ts
+  const beauty = splitBeauty(shown.beauty);
   const canEditAvatar = isOwner || isAdmin;
   const canEditWorks = isOwner || isAdmin;
   const canEditProfile = isOwner || isAdmin;
   const canSeeRecommendations = isOwner || isAdmin;
-  const works: Work[] = Array.isArray(me.works) ? me.works : [];
+  const works: Work[] = Array.isArray(shown.works) ? shown.works : [];
   const recommendations: AIRecommendation[] = Array.isArray(me.ai_recommendations)
     ? me.ai_recommendations
     : [];
+
+  // 「我的网站空间」那张卡：只给本人和管理员。读不到空间（比如线上还没有这份存储）就不显示
+  let space: { published: boolean; href: string; ready: boolean; pending: number; shortUrl: string | null } | null = null;
+  if ((isOwner || isAdmin) && me.id) {
+    try {
+      const [settings, rec] = await Promise.all([getSettings(me.id), readSpace(me.id)]);
+      space = {
+        published: settings.published,
+        href: settings.slug ? `/@${settings.slug}` : `/space/${me.id}`,
+        ready: !!rec.result,
+        pending: rec.result ? effectiveDraft(rec.result.draft, rec.edits).pending.length : 0,
+        shortUrl: settings.slug ? `${getSiteOrigin().replace(/^https?:\/\//, '')}/@${settings.slug}` : null,
+      };
+      // 还没有 AI 起稿（注册时没赶上）：本人来看资料页时在后台补上
+      if (!rec.result && isOwner) after(() => draftInBackground(me));
+    } catch (err) {
+      console.error('[creators] space entry unavailable', err);
+    }
+  }
 
   const tags = (me.keywords && me.keywords.length > 0)
     ? me.keywords.slice(0, 8)
@@ -173,6 +201,7 @@ export default async function CreatorDetail({ params }: Props) {
       {/* 主体 — 干净的白底 */}
       <main className="bg-white">
         <div className="max-w-[680px] mx-auto px-6 py-16 max-md:py-10 max-md:px-7">
+          {space && me.id && <SpaceEntry t={t.space} own={isOwner} id={me.id} space={space} />}
           {canEditProfile && (
             <div className="mb-10 max-md:mb-7">
               <ProfileEditor locale={locale} node={me} mode={isOwner ? 'owner' : 'admin'} />
@@ -190,22 +219,22 @@ export default async function CreatorDetail({ params }: Props) {
               locale={locale}
               nodeId={me.id!}
               works={works}
-              legacyText={me.product}
+              legacyText={shown.product}
               canEdit={canEditWorks}
               isOwner={isOwner}
             />
-            <Section label={t.section.experience} body={me.experience} />
-            <Section label={t.section.offer} body={me.offer} />
+            <Section label={t.section.experience} body={shown.experience} />
+            <Section label={t.section.offer} body={shown.offer} />
             <Section label={t.section.seeking} body={me.seeking} tone="coral" />
-            <Section label={t.section.interests} body={me.interests} />
+            <Section label={t.section.interests} body={shown.interests} />
             {/* 三段「人味」内容。放在最后：前面是这个人做什么、能给什么，
                 读到这里才是这个人本身。星空的星光卡里也是同样的次序和同样的
                 视觉（米绿底、左侧绿线、衬线体）——同一段内容在两处不该长得不一样。 */}
-            {(beauty.moment || beauty.create || me.seed?.trim()) && (
+            {(beauty.moment || beauty.create || shown.seed?.trim()) && (
               <section className="space-y-2.5">
                 <Human label={t.section.moment} body={beauty.moment} />
                 <Human label={t.section.create} body={beauty.create} />
-                <Human label={t.section.seed} body={me.seed} />
+                <Human label={t.section.seed} body={shown.seed} />
               </section>
             )}
           </div>
@@ -231,7 +260,7 @@ export default async function CreatorDetail({ params }: Props) {
               {t.contact.title}
             </div>
             {isMember ? (
-              <ContactBlock node={me} t={t} />
+              <ContactBlock node={shown} t={t} />
             ) : (
               <GatedContact t={t} />
             )}
@@ -444,5 +473,40 @@ function GatedContact({ t }: { t: ReturnType<typeof dict>['creatorDetail'] }) {
         {t.contact.cta}
       </Link>
     </div>
+  );
+}
+
+/**
+ * 资料页上通往个人网站空间的入口：资料是原料，网站是用这些原料长出来的那一页。
+ * 本人在这里看到网站现在的状态（AI 在起草 / 还有几处待确认 / 已发布），一步进到网站上去改、调风格、发布。
+ */
+function SpaceEntry({ t, own, id, space }: {
+  t: ReturnType<typeof dict>['creatorDetail']['space'];
+  own: boolean;
+  id: string;
+  space: { published: boolean; href: string; ready: boolean; pending: number; shortUrl: string | null };
+}) {
+  // 管理员看别人的：资料页本身不触发起稿（只有本人来看资料页、或谁以主人身份打开网站时才起），所以不说「正在起草」；发布也只有本人能做
+  const desc = own
+    ? space.published ? t.live : !space.ready ? t.drafting : space.pending > 0 ? t.pending(space.pending) : t.ready
+    : space.published ? t.adminLive : !space.ready ? t.adminNoDraft : space.pending > 0 ? t.adminPending(space.pending) : t.adminReady;
+  const btn = 'inline-flex items-center min-h-10 px-4 rounded-full text-[13.5px] no-underline transition-colors';
+  return (
+    <section className="mb-10 max-md:mb-7 rounded-2xl border border-forest-deep/10 bg-[#faf8f2] p-6 max-md:p-5" aria-labelledby="space-entry-h">
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="space-entry-h" className="m-0 text-[17px] font-medium text-forest-deep">{own ? t.titleOwn : t.titleOther}</h2>
+        <span className={`shrink-0 rounded-full px-3 py-0.5 text-[12px] ${space.published ? 'bg-[#e4eadb] text-[#2f513d]' : 'bg-[#f1e6cf] text-[#6d5424]'}`}>
+          {space.published ? t.statusLive : t.statusDraft}
+        </span>
+      </div>
+      <p className="mt-2 mb-0 text-[14px] leading-[1.8] text-text-secondary">{desc}</p>
+      {space.published && space.shortUrl && <p className="mt-1 mb-0 text-[13px] tracking-wide text-forest-mid">{space.shortUrl}</p>}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <a href={space.href} className={`${btn} bg-forest-deep text-white hover:bg-forest-mid`}>{t.open} →</a>
+        <a href={`/space/${id}?edit=1`} className={`${btn} border border-forest-deep/15 text-forest-deep hover:bg-white`}>{t.edit}</a>
+        <a href={`/space/${id}?tune=1`} className={`${btn} border border-forest-deep/15 text-forest-deep hover:bg-white`}>{t.tune}</a>
+        <a href={`/space/${id}/manage`} className={`${btn} border border-forest-deep/15 text-forest-deep hover:bg-white`}>{own ? t.manage : t.manageAdmin}</a>
+      </div>
+    </section>
   );
 }

@@ -62,7 +62,7 @@ export default function ShareAdminEditor({ initialContent }: Props) {
         ...prev.shares,
         {
           id: makeId('share'),
-          title: '新的林间分享',
+          title: '新的 Aha Moment',
           kicker: '超级个体的分享',
           author: '分享者',
           authorLabel: '作品 / 产品 / 活动 / 体验',
@@ -143,9 +143,12 @@ export default function ShareAdminEditor({ initialContent }: Props) {
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
             <div className="text-[11px] font-medium tracking-[0.18em] text-coral-soft uppercase">
-              首页分享区
+              社区广场 · Aha Moment
             </div>
-            <h2 className="mt-2 text-xl font-normal text-white">林间分享文案</h2>
+            <h2 className="mt-2 text-xl font-normal text-white">编辑分享</h2>
+            <p className="mt-2 text-[13px] leading-relaxed text-white/55">
+              下面的分享条目改完，点右边「保存」。社区广场页头的标题和说明写在站内文案里（src/i18n/zh/shares.ts），不在这里改。
+            </p>
           </div>
           <button
             type="button"
@@ -157,6 +160,13 @@ export default function ShareAdminEditor({ initialContent }: Props) {
           </button>
         </div>
 
+        {/*
+          社区广场改版（发起吧 / Aha Moment）之后，页头文案改由站内文案提供，这几项和下面的「右侧手记」
+          都不再显示在任何页面上。数据还留着，收起来免得改了半天看不到效果。
+        */}
+        <details className="rounded-md border border-white/10 px-4 py-3">
+          <summary className="cursor-pointer text-[13px] text-white/55">旧版页面文案（社区广场改版后不再显示在页面上）</summary>
+          <div className="mt-4">
         <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1">
           <Field label="小标题">
             <input value={content.eyebrow} onChange={e => patchContent({ eyebrow: e.target.value })} className={inputCls} />
@@ -179,12 +189,14 @@ export default function ShareAdminEditor({ initialContent }: Props) {
             />
           </Field>
         </div>
+          </div>
+        </details>
       </section>
 
       <section className="rounded-lg border border-white/10 bg-white/[0.045] p-6 max-md:p-5">
-        <div className="mb-5 text-[11px] font-medium tracking-[0.18em] text-coral-soft uppercase">
-          右侧手记
-        </div>
+        <details>
+          <summary className="cursor-pointer text-[13px] text-white/55">右侧手记（旧版，不再显示在页面上）</summary>
+          <div className="mt-4">
         <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1">
           <Field label="手记小标题">
             <input value={content.noteEyebrow} onChange={e => patchContent({ noteEyebrow: e.target.value })} className={inputCls} />
@@ -203,6 +215,8 @@ export default function ShareAdminEditor({ initialContent }: Props) {
             <input value={content.footer} onChange={e => patchContent({ footer: e.target.value })} className={inputCls} />
           </Field>
         </div>
+          </div>
+        </details>
       </section>
 
       <section className="rounded-lg border border-white/10 bg-white/[0.045] p-6 max-md:p-5">

@@ -2,10 +2,30 @@ import type { creatorDetail as zhCreatorDetail } from '@/i18n/zh/creatorDetail';
 
 export const creatorDetail: typeof zhCreatorDetail = {
   metaTitleFallback: 'Creator · Nearby Forest',
-  metaTitle: (name: string) => `${name} · Creator Forest`,
+  metaTitle: (name: string) => `${name} · Creators`,
   metaDescriptionFallback: 'A creator’s tree in Nearby Forest',
 
-  backToForest: 'Creator Forest',
+  backToForest: 'Creators',
+
+  space: {
+    titleOwn: 'My website',
+    titleOther: 'Their website (admin)',
+    statusLive: 'Published',
+    statusDraft: 'Not published',
+    drafting: 'AI is drafting this page from your profile. Refresh in a moment to see it.',
+    pending: (n: number) => `AI has drafted a first version from your profile; ${n} part${n === 1 ? '' : 's'} still wait for your confirmation. Publish once you are happy — until then only you and the admins can see it.`,
+    ready: 'You have confirmed everything AI drafted. Once you publish, visitors can see it and your card on the Creators page opens it directly.',
+    live: 'Visitors can see it now. Your card on the Creators page opens it.',
+    open: 'Open website',
+    edit: 'Edit on the page',
+    tune: 'Adjust style',
+    manage: 'Publish & share',
+    adminLive: 'They have published it; visitors can see it now.',
+    adminNoDraft: 'No AI draft yet. Opening their website (or them opening their own profile or website) starts one in the background; refresh in a moment to see it.',
+    adminPending: (n: number) => `AI has drafted a first version; ${n} part${n === 1 ? '' : 's'} still wait for their confirmation. Only they can publish — until then only they and the admins can see it.`,
+    adminReady: 'They have confirmed the AI draft but not published yet. Only they can publish.',
+    manageAdmin: 'Manage',
+  },
   logout: 'Log out',
   login: 'Log in',
   adminView: (name: string) => `Admin view · ${name}`,
@@ -122,7 +142,7 @@ export const creatorDetail: typeof zhCreatorDetail = {
     saving: 'Saving…',
       skyTitle: 'Appear in Creator Sky',
       skyHint:
-        'The sky places everyone on one screen, and uses AI to infer from your strengths, what you offer and what you are looking for who might build something together — publishing that inference alongside your name. Turn it off and you stay in the Creator Forest; you simply do not appear in that sky, and are left out of the analysis.',
+        'The sky places everyone on one screen, and uses AI to infer from your strengths, what you offer and what you are looking for who might build something together — publishing that inference alongside your name. Turn it off and you stay on the Creators page; you simply do not appear in that sky, and are left out of the analysis.',
       skyOn: 'Yes',
       skyOff: 'Stay out of the sky',
     field: {

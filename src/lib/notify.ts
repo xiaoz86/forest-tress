@@ -40,7 +40,8 @@ type CriticalEmailKind =
   | 'welcome'
   | 'login-link'
   | 'login-code'
-  | 'program-claim';
+  | 'program-claim'
+  | 'space-inbox';
 
 type ResendMessage = {
   from: string;
@@ -622,13 +623,13 @@ export async function notifyLoginCode(
 function buildShareSubmissionHtml(node: NodeCard, share: ShareEntry, reviewUrl: string): string {
   return `<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>新的林间分享待审核</title></head>
+<head><meta charset="utf-8"><title>新的 Aha Moment 投稿待审核</title></head>
 <body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
   <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(26,46,26,0.08);">
     <!-- 和新成员通知同一个 Outlook 坑，处理方式见上面那段注释 -->
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
       <tr><td bgcolor="#2d4a2d" style="padding:28px 32px;background-color:#2d4a2d;background-image:linear-gradient(135deg,#2d4a2d,#4a7c4a);color:#ffffff;">
-        <div style="font-size:13px;color:#d7e5d2;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · 林间分享</div>
+        <div style="font-size:13px;color:#d7e5d2;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">附近森林 · 社区广场 · Aha Moment</div>
         <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">有新的分享待审核</h1>
         <div style="margin-top:8px;font-size:14px;color:#e3eede;">${escape(node.name)} 上传了「${escape(share.title)}」</div>
       </td></tr>
@@ -643,7 +644,7 @@ function buildShareSubmissionHtml(node: NodeCard, share: ShareEntry, reviewUrl: 
       ${row('格式', share.mediaKind)}
     </table>
     <div style="padding:22px 32px;background:#faf8f2;font-size:13px;color:#5a5a5a;line-height:1.8;">
-      <p style="margin:0 0 14px;">请进入后台审核，确认是否发布到林间分享页。</p>
+      <p style="margin:0 0 14px;">请进入后台审核，确认是否发布到社区广场的 Aha Moment。</p>
       <p style="margin:0;"><a href="${reviewUrl}" style="color:#2d4a2d;font-weight:600;text-decoration:underline;">${reviewUrl}</a></p>
     </div>
   </div>
@@ -653,7 +654,7 @@ function buildShareSubmissionHtml(node: NodeCard, share: ShareEntry, reviewUrl: 
 
 function buildShareSubmissionText(node: NodeCard, share: ShareEntry, reviewUrl: string): string {
   return [
-    `附近森林 · 新的林间分享待审核`,
+    `附近森林 · 新的 Aha Moment 投稿待审核`,
     `─────────────────────`,
     `分享者：${node.name || ''}`,
     `标题：${share.title}`,
@@ -685,7 +686,7 @@ export async function notifyShareSubmission(
 
   const from = process.env.NOTIFY_FROM?.trim() || '附近森林 <onboarding@resend.dev>';
   const reviewUrl = `${getSiteOrigin()}/shares/admin`;
-  const subject = `新的林间分享待审核 · ${share.title}`;
+  const subject = `新的 Aha Moment 投稿待审核 · ${share.title}`;
 
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -937,4 +938,29 @@ export async function notifyProgramClaim(params: {
     { from, to: recipients, subject, html, text },
     `program-claim/${params.orderId}/${Math.floor(Date.now() / 60_000)}`,
   );
+}
+
+
+/**
+ * 个人空间：有人打招呼、报名、预约、传了付款截图时，提醒空间的主人。
+ * 只发给主人自己的注册邮箱；正文只放必要的信息和一个回到管理页的链接，
+ * 报名人的联系方式不写进邮件（邮件会被转发、会留在别的邮箱里）。
+ */
+export async function notifySpaceHost(params: {
+  to: string;
+  subject: string;
+  lines: string[];
+  link: string;
+  linkLabel: string;
+  idempotencyKey: string;
+}): Promise<EmailSendResult> {
+  const from = process.env.NOTIFY_FROM?.trim() || '';
+  const body = params.lines.map(l => `<p style="margin:0 0 10px;">${escape(l)}</p>`).join('');
+  const html = `<div style="font-family:-apple-system,'PingFang SC',sans-serif;font-size:15px;line-height:1.8;color:#23331f;max-width:520px;">
+${body}
+<p style="margin:22px 0 0;"><a href="${escape(params.link)}" style="display:inline-block;padding:11px 22px;border-radius:999px;background:#2d4a2d;color:#fff;font-weight:600;font-size:14px;text-decoration:none;">${escape(params.linkLabel)}</a></p>
+<p style="margin:26px 0 0;font-size:12.5px;color:#8a917f;">这封信来自你在附近森林的个人空间。</p>
+</div>`;
+  const text = `${params.lines.join('\n')}\n\n${params.linkLabel}：${params.link}`;
+  return sendCriticalEmail('space-inbox', { from, to: [params.to], subject: params.subject, html, text }, params.idempotencyKey);
 }

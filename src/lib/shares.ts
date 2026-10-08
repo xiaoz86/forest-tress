@@ -41,7 +41,7 @@ export type ShareContent = {
 export const SHARE_CONTENT_ID = 'forest-shares';
 
 export const DEFAULT_SHARE_CONTENT: ShareContent = {
-  eyebrow: '林间分享',
+  eyebrow: 'Aha Moment',
   title: '积极希望，\n从一次围坐开始',
   intro:
     '那天，四位创始人聊了一个问题：最近还有什么，让你愿意再往前一点？没有急着给答案，只是把各自正在发生的东西，慢慢说出来。',

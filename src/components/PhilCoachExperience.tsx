@@ -12,23 +12,16 @@ import type { VoiceAnalysis } from '@/lib/philCoachVoice';
 import { dict } from '@/i18n';
 import type { Locale } from '@/lib/locale';
 import {
+  OPEN_PATH_ID,
   PHIL_PATHS,
   PROFILE_PATH,
   getPhilOpening,
   getPhilPath,
   normalizePhilProfileName,
-  type PhilPath,
 } from '@/lib/philCoach';
 
 /** 以字典里的键为准：lib 里加了小径却没配文案，这里会当场编译报错 */
 type PathId = keyof ReturnType<typeof dict>['philCoach']['experience']['paths'];
-
-const MOOD_GRADIENT: Record<PhilPath['mood'], string> = {
-  companion: 'bg-[linear-gradient(135deg,#cf9087_0%,#ead0bf_52%,#c7d8cb_100%)]',
-  clarity: 'bg-[linear-gradient(135deg,#6f8966_0%,#bac8ad_52%,#e7dac4_100%)]',
-  choice: 'bg-[linear-gradient(135deg,#738faa_0%,#b7c7d3_54%,#e5d6d2_100%)]',
-  mirror: 'bg-[linear-gradient(135deg,#1d352d_0%,#668579_52%,#d3c5ac_100%)]',
-};
 
 type ThreadItem =
   | { kind: 'coach'; text: string }
@@ -90,15 +83,6 @@ function nextOpeningIndex(): number {
   } catch {
     return Date.now();
   }
-}
-
-function seedThread(path: PhilPath, opening: string): ThreadItem[] {
-  const thread: ThreadItem[] = [];
-  for (const [index, beat] of path.beats.entries()) {
-    thread.push({ kind: 'coach', text: index === 0 ? opening : beat.coach });
-    if (beat.input) break;
-  }
-  return thread;
 }
 
 function mergeTranscript(current: string, transcript: string): { text: string; complete: boolean } {
@@ -218,7 +202,16 @@ function SpeakerIcon({ waves = true, className = 'h-4 w-4' }: { waves?: boolean;
  */
 export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const t = useMemo(() => dict(locale).philCoach.experience, [locale]);
+  const pt = useMemo(() => dict(locale).philCoach.page, [locale]);
+  const en = locale === 'en';
   const [session, setSession] = useState<Session | null>(null);
+  /** 输入框下面那排小径里选中的一条（可以不选：不选就是 open，直接开口） */
+  const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
+  /**
+   * 页头那句问话用第几句开场白。首屏固定第一句（服务端渲染出来就有字，不闪）；
+   * 每开一段新对话轮到下一句。
+   */
+  const [openingSlot, setOpeningSlot] = useState(0);
   const [draft, setDraft] = useState('');
   const draftRef = useRef('');
   const [voiceInputNotice, setVoiceInputNotice] = useState('');
@@ -266,7 +259,17 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const [gateError, setGateError] = useState('');
   const [gateCooldown, setGateCooldown] = useState(0);
   const [pendingRetry, setPendingRetry] = useState(false);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  const logRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  /** 发送进行中。用 ref：setLoading 是异步的，连按两下发送（或语音直达撞上手动发送）会发出两份 */
+  const sendingRef = useRef(false);
+  /**
+   * 第几段对话。「新对话」时加一：上一段还在路上的请求回来时对不上号，结果直接丢掉——
+   * 不然旧回复会落进新的空对话里，或者旧请求撞上闸门、报错时把浮层和错误弹在新对话上，
+   * 输入框还会一直锁着（sendingRef 要等旧请求回来才放开）。
+   */
+  const genRef = useRef(0);
   const pendingVoiceContextRef = useRef<VoiceAnalysis | null>(null);
   const retryVoiceContextRef = useRef<VoiceAnalysis | null>(null);
   // 两种语音方式，意图由用户按的按钮决定，不再用「输入框空不空」猜
@@ -355,6 +358,15 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const path = session ? getPhilPath(session.pathId) : undefined;
   const hasConversation = Boolean(session?.thread.length);
   const conversationReady = identityReady && importState !== 'importing';
+  /**
+   * 页头那一句大字问话。还没开口时是这一轮的开场白（导入过资料的带称呼）；
+   * 开口之后就是这段对话的第一句（开场白已经进了对话记录）。
+   */
+  const heading = session
+    ? session.thread[0]?.kind === 'coach' ? session.thread[0].text : ''
+    : getPhilOpening(t.opening, profileKnown ? profileName : '', openingSlot);
+  /** 页头之下的对话：第一句开场白已经当问话显示了，不再重复 */
+  const logItems = session ? (session.thread[0]?.kind === 'coach' ? session.thread.slice(1) : session.thread) : [];
   // 字幕两条路：浏览器听写（Web Speech）逐字出、几乎零延迟；
   // 服务端分段转写以短语为单位刷新，但哪儿都能用。
   //
@@ -518,8 +530,13 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   // 挂载时恢复上一次未走完的对话（去登录/注册回来后，聊过的内容不会丢）
   useEffect(() => {
     const restored = loadSession();
-    if (!restored) return;
-    setSession(current => current ?? restored);
+    if (restored) {
+      setSession(current => current ?? restored);
+      return;
+    }
+    // 有鼠标键盘的设备上，进来光标就在框里，直接能打字。
+    // 手机不自动聚焦：一聚焦就弹键盘，盖住半屏，人还没看清这一页是什么
+    if (window.matchMedia('(pointer: fine)').matches) textareaRef.current?.focus({ preventScroll: true });
   }, []);
 
   // 对话有变化就暂存（仅本次浏览会话）
@@ -541,8 +558,27 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     return () => window.removeEventListener('beforeunload', warn);
   }, [session]);
 
+  /**
+   * 新消息出来时的滚动。输入框跟着对话往下长（不吸底：手机键盘弹起时吸底的框很难伺候），
+   * 所以要保证两件事：最新那一条看得见，输入框也尽量看得见。
+   * 最新一条加上输入框放得进一屏，就让输入框贴着屏幕下沿；放不进（回复很长），
+   * 就把最新一条的开头滚到导航下面，先读它。
+   */
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    if (!session) return;
+    const composer = composerRef.current;
+    const last = logRef.current?.lastElementChild as HTMLElement | null | undefined;
+    if (!composer) return;
+    const behavior: ScrollBehavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
+    if (!last) {
+      composer.scrollIntoView({ behavior, block: 'nearest' });
+      return;
+    }
+    const span = composer.getBoundingClientRect().bottom - last.getBoundingClientRect().top;
+    if (span <= window.innerHeight - 112) composer.scrollIntoView({ behavior, block: 'nearest' });
+    else last.scrollIntoView({ behavior, block: 'start' });
+    // 只在对话长了一截 / 状态变了时滚；session 对象本身每次输入都会换，不能当触发条件
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.thread.length, loading, error, voiceIn.transcribing]);
 
   // 开着朗读时，把最新一条回复念出来（同一条不重复念）。
@@ -697,28 +733,19 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     return request;
   }
 
-  function openingForNextConversation(): string {
-    return getPhilOpening(t.opening, profileKnown ? profileName : '', nextOpeningIndex());
-  }
-
-  function begin(p: PhilPath) {
-    if (!identityReady || importPromiseRef.current) return;
-    liveVoice.cancel();
-    voiceIn.cancel();
-    setDraft('');
-    setVoiceInputNotice('');
-    setCopied(false);
-    setError('');
-    setKeepState('idle');
-    pendingVoiceContextRef.current = null;
-    retryVoiceContextRef.current = null;
-    setSession({ pathId: p.id, thread: seedThread(p, openingForNextConversation()) });
-  }
-
   function reset() {
+    genRef.current += 1;
+    sendingRef.current = false;
+    setPendingRetry(false);
+    setShowGate(false);
     liveVoice.cancel();
     voiceIn.cancel();
     setSession(null);
+    setSelectedPathId(null);
+    // 轮到下一句开场白。计数器是全浏览器共用的，可能正好轮回到眼前这一句，那就再往后挪一句
+    let next = nextOpeningIndex();
+    if (next % 4 === openingSlot % 4) next = nextOpeningIndex();
+    setOpeningSlot(next);
     setDraft('');
     setVoiceInputNotice('');
     setCopied(false);
@@ -752,12 +779,16 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     }
   }
 
-  /** 发送对话线取回复；命中登记闸门时返回 'gate'（不视为错误） */
+  /**
+   * 发送对话线取回复；命中登记闸门时返回 'gate'（不视为错误）。
+   * 回来时已经「新对话」过了（gen 对不上）返回 'stale'，什么都不动
+   */
   async function sendThread(
     thread: ThreadItem[],
     pathId: string,
-    voiceContext: VoiceAnalysis | null = null,
-  ): Promise<'ok' | 'gate'> {
+    voiceContext: VoiceAnalysis | null,
+    gen: number,
+  ): Promise<'ok' | 'gate' | 'stale'> {
     const res = await fetch('/api/phil-coach', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -771,6 +802,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       }),
     });
     const json = await res.json().catch(() => ({}));
+    if (gen !== genRef.current) return 'stale';
     if (res.status === 403 && (json.error === 'member-required' || json.error === 'profile-required')) {
       setGateKind(json.error === 'profile-required' ? 'profile' : 'member');
       if (typeof json.memberId === 'string') setMyMemberId(json.memberId);
@@ -795,31 +827,78 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     answer: string,
     voiceContext: VoiceAnalysis | null,
   ): Promise<boolean> {
-    if (!path || !session || loading) return false;
+    if (loading || sendingRef.current) return false;
 
-    const nextThread: ThreadItem[] = [...session.thread, { kind: 'me', text: answer }];
-    setSession({ ...session, thread: nextThread });
+    let base: Session;
+    if (session && path) {
+      base = session;
+    } else if (!session && conversationReady) {
+      // 第一句话：页头那句问话就是开场白，接上这句，对话就开始了。
+      // 没选小径就是 open——由模型从话里听出 ta 此刻需要哪一种陪伴
+      spokenRef.current = heading;   // 开场白已经在屏幕上了，开着朗读也不再念一遍
+      setCopied(false);
+      setKeepState('idle');
+      retryVoiceContextRef.current = null;
+      base = { pathId: selectedPathId ?? OPEN_PATH_ID, thread: [{ kind: 'coach', text: heading }] };
+    } else {
+      return false;
+    }
+
+    sendingRef.current = true;
+    const gen = genRef.current;
+    const nextThread: ThreadItem[] = [...base.thread, { kind: 'me', text: answer }];
+    setSession({ ...base, thread: nextThread });
     setDraft('');
     setVoiceInputNotice('');
     setError('');
     setLoading(true);
 
     try {
-      const r = await sendThread(nextThread, path.id, voiceContext);
+      const r = await sendThread(nextThread, base.pathId, voiceContext, gen);
       if (r === 'gate') {
         retryVoiceContextRef.current = voiceContext;
         setPendingRetry(true);
         setShowGate(true);
-      } else {
+      } else if (r === 'ok') {
         retryVoiceContextRef.current = null;
       }
     } catch {
-      retryVoiceContextRef.current = null;
-      setError(t.error.send);
+      if (gen === genRef.current) {
+        retryVoiceContextRef.current = null;
+        setError(t.error.send);
+      }
     } finally {
-      setLoading(false);
+      // 已经开了新对话：loading 和 sendingRef 在 reset() 里放开过了，别去动新对话的状态
+      if (gen === genRef.current) {
+        setLoading(false);
+        sendingRef.current = false;
+      }
     }
     return true;
+  }
+
+  /**
+   * 回复到了，光标回到输入框（有鼠标键盘的设备上）：发送时输入框被禁用，焦点会丢，
+   * 不放回去的话每句都要再点一下框才能接着打字。手机不放：一放就弹键盘，挡住刚到的回复
+   */
+  const wasLoadingRef = useRef(false);
+  useEffect(() => {
+    if (wasLoadingRef.current && !loading && !showGate && window.matchMedia('(pointer: fine)').matches) {
+      // 只在人没去别处打字时放回来（比如等回复时去「关于」里写反馈，就别把光标抢走）
+      const here = document.activeElement;
+      if (!here || here === document.body || composerRef.current?.contains(here)) {
+        textareaRef.current?.focus({ preventScroll: true });
+      }
+    }
+    wasLoadingRef.current = loading;
+  }, [loading, showGate]);
+
+  /** 「新对话」：聊过的会散掉，先问一句 */
+  function restart() {
+    if (session?.thread.some(item => item.kind === 'me') && !window.confirm(t.restartConfirm)) return;
+    reset();
+    // 和进页面时一样：手机上不自动聚焦（会弹键盘盖住新的问话和小径）
+    if (window.matchMedia('(pointer: fine)').matches) textareaRef.current?.focus({ preventScroll: true });
   }
 
   async function submit() {
@@ -969,14 +1048,16 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
 
   /** 通过开通后，续上被拦下的动作 */
   async function resumePending() {
-    if (pendingRetry && session && path) {
+    if (pendingRetry && session && path && !sendingRef.current) {
       setPendingRetry(false);
       setLoading(true);
+      sendingRef.current = true;
+      const gen = genRef.current;
       try {
-        const r = await sendThread(session.thread, path.id, retryVoiceContextRef.current);
+        const r = await sendThread(session.thread, path.id, retryVoiceContextRef.current, gen);
         if (r === 'ok') {
           retryVoiceContextRef.current = null;
-        } else {
+        } else if (r === 'gate') {
           /**
            * 重发又撞上闸门：必须把浮层弹回来，不能只把 pendingRetry 置回去。
            *
@@ -988,9 +1069,12 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
           setShowGate(true);
         }
       } catch {
-        setError(t.error.resend);
+        if (gen === genRef.current) setError(t.error.resend);
       } finally {
-        setLoading(false);
+        if (gen === genRef.current) {
+          setLoading(false);
+          sendingRef.current = false;
+        }
       }
     }
   }
@@ -1027,23 +1111,23 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const coachTurns = session ? session.thread.filter(item => item.kind === 'coach').length : 0;
 
   const gateOverlay = showGate ? (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto bg-black/55 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center overflow-y-auto bg-pc-ink/40 p-4 backdrop-blur-[3px]">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="phil-coach-gate-title"
-        className="relative w-full max-w-[560px] rounded-2xl border border-coral-soft/25 bg-[#131a15] p-8 shadow-[0_24px_80px_rgba(0,0,0,0.55)] max-md:p-6"
+        className="relative w-full max-w-[560px] rounded-2xl border border-pc-ink/10 bg-pc-paper p-8 text-pc-ink shadow-[0_24px_80px_rgba(29,27,31,0.22)] max-md:p-6"
       >
         <button
           onClick={dismissGate}
           type="button"
           aria-label={t.gate.close}
-          className="absolute right-4 top-3 text-2xl leading-none text-white/35 transition-colors hover:text-white"
+          className="absolute right-2 top-1.5 grid h-11 w-11 place-items-center text-2xl leading-none text-pc-ink-3 transition-colors hover:text-pc-ink"
         >
           ×
         </button>
 
-        <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
+        <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-pc-plum">
           {gateKind === 'profile' ? t.gate.profile.eyebrow : t.gate.eyebrow}
         </div>
         <h3 id="phil-coach-gate-title" className="text-xl font-medium">
@@ -1058,21 +1142,21 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
 
         {gateKind === 'profile' ? (
           <>
-            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">{t.gate.profile.body}</p>
+            <p className="mt-3 text-[14px] leading-[1.95] text-pc-ink-2">{t.gate.profile.body}</p>
             <div className="mt-6">
               {/* 引到本人节点页的编辑器，不是重新走注册——那条路会撞 email-taken */}
               <Link
                 href={myMemberId ? `/creators/${myMemberId}` : '/login'}
-                className="inline-block rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] no-underline"
+                className="inline-block rounded-full bg-pc-ink px-6 py-2.5 text-[14px] font-medium text-pc-ivory no-underline"
               >
                 {t.gate.profile.cta}
               </Link>
             </div>
-            <p className="mt-5 text-[12px] leading-relaxed text-white/32">{t.gate.profile.note}</p>
+            <p className="mt-5 text-[12px] leading-relaxed text-pc-ink-3">{t.gate.profile.note}</p>
           </>
         ) : gateStep === 'email' ? (
           <>
-            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">{t.gate.body}</p>
+            <p className="mt-3 text-[14px] leading-[1.95] text-pc-ink-2">{t.gate.body}</p>
             <div className="mt-6">
               <input
                 value={gateEmail}
@@ -1086,7 +1170,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                 aria-label={t.gate.emailPlaceholder}
                 maxLength={120}
                 placeholder={t.gate.emailPlaceholder}
-                className="w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
+                className="w-full rounded-xl border border-pc-line bg-white px-4 py-3 text-[16px] text-pc-ink placeholder:text-pc-ink-3 focus:border-pc-plum focus:outline-none"
               />
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-4">
@@ -1094,20 +1178,20 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                 onClick={sendGateCode}
                 disabled={!gateEmail.trim() || gateBusy}
                 type="button"
-                className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-40"
+                className="rounded-full bg-pc-ink px-6 py-2.5 text-[14px] font-medium text-pc-ivory transition-opacity disabled:opacity-40"
               >
                 {gateBusy ? t.gate.sending : t.gate.cta}
               </button>
-              {gateError && <span role="status" aria-live="polite" className="text-[13px] text-coral-soft">{gateError}</span>}
+              {gateError && <span role="status" aria-live="polite" className="text-[13px] text-pc-brick">{gateError}</span>}
             </div>
-            <p className="mt-5 text-[12px] leading-relaxed text-white/32">{t.gate.privacy}</p>
+            <p className="mt-5 text-[12px] leading-relaxed text-pc-ink-3">{t.gate.privacy}</p>
           </>
         ) : gateStep === 'code' ? (
           <>
-            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">
+            <p className="mt-3 text-[14px] leading-[1.95] text-pc-ink-2">
               {t.gate.codeSentTo(gateEmail.trim())}
               <br />
-              <span className="text-white/35">{t.gate.codeHint}</span>
+              <span className="text-pc-ink-3">{t.gate.codeHint}</span>
             </p>
             <input
               value={gateCode}
@@ -1123,20 +1207,20 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
               maxLength={8}
               autoFocus
               placeholder={t.gate.codePlaceholder}
-              className="mt-5 w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-center font-mono text-[20px] tracking-[0.4em] text-white placeholder:tracking-normal placeholder:font-sans placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
+              className="mt-5 w-full rounded-xl border border-pc-line bg-white px-4 py-3 text-center font-mono text-[20px] tracking-[0.4em] text-pc-ink placeholder:tracking-normal placeholder:font-sans placeholder:text-[16px] placeholder:text-pc-ink-3 focus:border-pc-plum focus:outline-none"
             />
             <div className="mt-4 flex flex-wrap items-center gap-4">
               <button
                 onClick={verifyGateCode}
                 disabled={gateCode.replace(/\s+/g, '').length !== 6 || gateBusy}
                 type="button"
-                className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-40"
+                className="rounded-full bg-pc-ink px-6 py-2.5 text-[14px] font-medium text-pc-ivory transition-opacity disabled:opacity-40"
               >
                 {gateBusy ? t.gate.verifying : t.gate.codeCta}
               </button>
-              {gateError && <span role="status" aria-live="polite" className="text-[13px] text-coral-soft">{gateError}</span>}
+              {gateError && <span role="status" aria-live="polite" className="text-[13px] text-pc-brick">{gateError}</span>}
             </div>
-            <div className="mt-5 flex items-center justify-between text-[12px] text-white/32">
+            <div className="mt-5 flex items-center justify-between text-[12px] text-pc-ink-3">
               <button
                 onClick={() => {
                   setGateStep('email');
@@ -1151,7 +1235,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                   setGateCooldown(0);
                 }}
                 type="button"
-                className="underline-offset-4 transition-colors hover:text-white hover:underline"
+                className="underline-offset-4 transition-colors hover:text-pc-ink hover:underline"
               >
                 {t.gate.changeEmail}
               </button>
@@ -1159,7 +1243,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                 onClick={sendGateCode}
                 disabled={gateCooldown > 0 || gateBusy}
                 type="button"
-                className="underline-offset-4 transition-colors hover:text-white hover:underline disabled:no-underline disabled:hover:text-white/32"
+                className="underline-offset-4 transition-colors hover:text-pc-ink hover:underline disabled:no-underline disabled:hover:text-pc-ink-3"
               >
                 {gateCooldown > 0 ? t.gate.resendIn(gateCooldown) : t.gate.resend}
               </button>
@@ -1172,7 +1256,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
            * 在填之前是灰的，整屏读起来像「得先取个名字才能往下」。
            */
           <>
-            <p className="mt-3 text-[14px] leading-[1.95] text-white/55">{t.gate.newBody}</p>
+            <p className="mt-3 text-[14px] leading-[1.95] text-pc-ink-2">{t.gate.newBody}</p>
             {/**
               * 两颗按钮原来是并排的，各配一行说明之后必须改成上下摞——
               * 并排的话说明只能挤在按钮下方半个格子里，两行还会互相串行。
@@ -1183,24 +1267,24 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                 <button
                   onClick={() => setGateStep('name')}
                   type="button"
-                  className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity"
+                  className="rounded-full bg-pc-ink px-6 py-2.5 text-[14px] font-medium text-pc-ivory transition-opacity"
                 >
                   {t.gate.lightJoin}
                 </button>
-                <p className="mt-2 text-[12.5px] leading-relaxed text-white/45">{t.gate.lightDesc}</p>
+                <p className="mt-2 text-[12.5px] leading-relaxed text-pc-ink-3">{t.gate.lightDesc}</p>
               </div>
               <div>
                 <button
                   onClick={continueToFullJoin}
                   type="button"
-                  className="rounded-full border border-white/20 px-6 py-2.5 text-[14px] font-medium text-white/80 transition-colors hover:border-white/40 hover:text-white"
+                  className="rounded-full border border-pc-ink/25 px-6 py-2.5 text-[14px] font-medium text-pc-ink transition-colors hover:border-pc-ink/50"
                 >
                   {t.gate.fullJoin}
                 </button>
-                <p className="mt-2 text-[12.5px] leading-relaxed text-white/45">{t.gate.fullDesc}</p>
+                <p className="mt-2 text-[12.5px] leading-relaxed text-pc-ink-3">{t.gate.fullDesc}</p>
               </div>
             </div>
-            <p className="mt-5 text-[12px] leading-relaxed text-white/32">{t.gate.newPrivacy}</p>
+            <p className="mt-5 text-[12px] leading-relaxed text-pc-ink-3">{t.gate.newPrivacy}</p>
           </>
         ) : (
           <>
@@ -1215,14 +1299,14 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
               }}
               maxLength={60}
               aria-label={t.gate.nameTitle}
-              className="mt-5 w-full rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-[14px] text-white placeholder:text-white/28 focus:border-coral-soft/60 focus:outline-none"
+              className="mt-5 w-full rounded-xl border border-pc-line bg-white px-4 py-3 text-[16px] text-pc-ink placeholder:text-pc-ink-3 focus:border-pc-plum focus:outline-none"
             />
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <button
                 onClick={finishLightJoin}
                 disabled={!gateName.trim() || gateBusy}
                 type="button"
-                className="rounded-full bg-coral-soft px-6 py-2.5 text-[14px] font-medium text-[#20140f] transition-opacity disabled:opacity-40"
+                className="rounded-full bg-pc-ink px-6 py-2.5 text-[14px] font-medium text-pc-ivory transition-opacity disabled:opacity-40"
               >
                 {gateBusy ? t.gate.joining : t.gate.lightJoin}
               </button>
@@ -1233,149 +1317,127 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                 }}
                 disabled={gateBusy}
                 type="button"
-                className="text-[12px] text-white/32 underline-offset-4 transition-colors hover:text-white hover:underline disabled:hover:text-white/32"
+                className="text-[12px] text-pc-ink-3 underline-offset-4 transition-colors hover:text-pc-ink hover:underline disabled:hover:text-pc-ink-3"
               >
                 {t.gate.newBack}
               </button>
-              {gateError && <span role="status" aria-live="polite" className="text-[13px] text-coral-soft">{gateError}</span>}
+              {gateError && <span role="status" aria-live="polite" className="text-[13px] text-pc-brick">{gateError}</span>}
             </div>
-            <p className="mt-5 text-[12px] leading-relaxed text-white/32">{t.gate.newPrivacy}</p>
+            <p className="mt-5 text-[12px] leading-relaxed text-pc-ink-3">{t.gate.newPrivacy}</p>
           </>
         )}
       </div>
     </div>
   ) : null;
 
-  if (!session || !path) {
-    return (
-      <div>
-        {gateOverlay}
-        <div className="mb-8 flex items-center gap-4 text-[12px] text-white/36">
-          <span className="h-px w-10 bg-white/20" />
-          <span>{t.chooseHint}</span>
-        </div>
-        {loggedIn && (
-          <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-white/40">
-            <span>
-              {importState === 'importing'
-                ? t.profile.importing
-                : profileKnown
-                  ? t.profile.known
-                  : t.profile.unknown}
-            </span>
-            <button
-              onClick={importProfile}
-              disabled={importState === 'importing'}
-              type="button"
-              className="text-coral-soft underline-offset-4 transition-colors hover:text-white hover:underline disabled:opacity-50"
-            >
-              {profileKnown ? t.profile.reimport : t.profile.import}
-            </button>
-          </div>
-        )}
-        <div className="grid grid-cols-2 gap-6 max-md:grid-cols-1">
-          {PHIL_PATHS.map(p => (
-            <button
-              key={p.id}
-              onClick={() => begin(p)}
-              disabled={!conversationReady}
-              className={`group relative overflow-hidden rounded-lg border border-white/12 p-7 text-left shadow-[0_18px_60px_rgba(0,0,0,0.16)] transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0 ${MOOD_GRADIENT[p.mood]}`}
-            >
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_24%_16%,rgba(255,255,255,0.24),transparent_36%),linear-gradient(180deg,transparent_0%,rgba(5,17,11,0.42)_100%)]" />
-              <div className="relative">
-                <div className="mb-4 h-px w-10 bg-white/50" />
-                <h3
-                  className="text-[1.5rem] font-medium leading-snug text-white"
-                  style={{ fontFamily: 'var(--font-display)' }}
-                >
-                  {t.paths[p.id as PathId].label}
-                </h3>
-                <p className="mt-3 text-[14px] leading-relaxed text-white/78">{t.paths[p.id as PathId].hint}</p>
-                <span className="mt-6 inline-flex items-center gap-2 text-[13px] text-white/82">
-                  {conversationReady ? t.enter : t.entering}
-                  <span className="transition-transform group-hover:translate-x-1">→</span>
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const busyVoice = liveVoice.listening || voiceIn.requesting || voiceIn.recording || voiceIn.transcribing;
+  /** 发不了的时候：正在回应 / 正在录音 / 框里没字 / 还没开口而身份还没确认完 */
+  const sendDisabled = loading || busyVoice || !draft.trim() || (!session && !conversationReady);
+  const pathLabel = session && session.pathId !== OPEN_PATH_ID
+    ? t.paths[session.pathId as PathId]?.label ?? ''
+    : '';
+  const selectedPath = selectedPathId ? t.paths[selectedPathId as PathId] : null;
+
+  // 书名：中文竖排，像书封；英文横排（竖排的拉丁字母读不了）。
+  // 宽屏上竖排的书名挂在对话那一栏的左边，不占那一栏的高度
+  const title = en ? (
+    <h1 className="m-0 mb-3 font-book text-[30px] font-normal leading-[1.2] text-pc-ink lg:mb-4 lg:text-[40px]">
+      {pt.title}
+    </h1>
+  ) : (
+    <div className="flex shrink-0 items-start gap-2 lg:absolute lg:right-[calc(100%+64px)] lg:top-0 lg:gap-3">
+      <h1 className="m-0 font-book text-[26px] font-medium leading-[1.2] tracking-[0.2em] text-pc-ink [writing-mode:vertical-rl] lg:text-[40px] lg:tracking-[0.24em]">
+        {pt.title}
+      </h1>
+      <span className="self-end font-sans text-[11px] tracking-[0.18em] text-pc-ink-2 [writing-mode:vertical-rl] lg:text-[12px]">
+        {pt.byline}
+      </span>
+    </div>
+  );
+
+  const toolbarBtn = 'grid shrink-0 place-items-center transition-colors disabled:opacity-40';
 
   return (
-    <div>
+    <div className="relative">
       {gateOverlay}
-      <div className="mb-7 flex items-center justify-between gap-4">
-        <div>
-          <div className="text-[11px] font-medium uppercase tracking-[0.2em] text-coral-soft">
-            {t.paths[path.id as PathId].label}
-          </div>
-          <div className="mt-2 text-[12px] text-white/30">{t.ephemeral}</div>
+
+      {/* 开口之后：这是哪一种对话、不会被保存；右边随时可以重新开始 */}
+      {session && (
+        <div className="mb-5 flex items-center justify-between gap-4 text-[12.5px]">
+          <p className="m-0 min-w-0 text-pc-ink-2">
+            {pathLabel && <span className="mr-2 font-medium text-pc-plum">{pathLabel}</span>}
+            {t.ephemeral}
+          </p>
+          <button
+            onClick={restart}
+            type="button"
+            className="inline-flex min-h-9 shrink-0 items-center rounded-full border border-pc-ink/15 px-3.5 text-pc-ink-2 transition-colors hover:border-pc-ink/35 hover:text-pc-ink"
+          >
+            {t.restart}
+          </button>
         </div>
-        <button
-          onClick={reset}
-          className="text-[13px] text-white/40 underline-offset-4 transition-colors hover:text-white"
+      )}
+
+      {/* 书名 + 那一句问话（开场白）。手机上两样并排，问话贴着书名的下沿 */}
+      <div className={en ? '' : 'flex items-end gap-5 lg:block'}>
+        {title}
+        <p
+          id="pc-question"
+          className="m-0 min-w-0 font-book text-[20px] leading-[1.6] text-pc-ink lg:text-[28px] lg:leading-[1.5]"
         >
-          {t.switchPath}
-        </button>
+          {heading}
+        </p>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 max-md:p-4">
-        <div className="flex flex-col gap-4">
-          {session.thread.map((item, i) =>
-            item.kind === 'coach' ? (
-              <div key={i} className="max-w-[86%] self-start">
-                <div className="mb-1 text-[10px] tracking-[0.2em] text-white/28">
-                  phil-coach
-                </div>
-                <div className="rounded-2xl rounded-tl-sm border border-white/10 bg-white/[0.06] px-5 py-3.5 text-[16px] leading-[1.9] text-white/82">
-                  {item.text}
-                </div>
-              </div>
-            ) : (
-              <div key={i} className="max-w-[86%] self-end">
-                <div className="mb-1 text-right text-[10px] uppercase tracking-[0.2em] text-white/28">
-                  {t.me}
-                </div>
-                <div className="whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-coral-soft/85 px-5 py-3.5 text-[16px] leading-[1.9] text-[#20140f]">
-                  {item.text}
-                </div>
-              </div>
-            ),
-          )}
-          {/* 语音直达：转写还没回来时先把气泡放上屏——等待发生在对话里，而不是输入框里 */}
-          {voiceIn.transcribing && voiceMode === 'direct' && (
-            <div className="max-w-[86%] self-end">
-              <div className="mb-1 text-right text-[10px] uppercase tracking-[0.2em] text-white/28">
-                {t.me}
-              </div>
-              <div className="animate-pulse whitespace-pre-wrap rounded-2xl rounded-tr-sm bg-coral-soft/45 px-5 py-3.5 text-[16px] leading-[1.9] text-[#20140f]/75">
-                {liveCaption || t.transcribing}
-              </div>
+      {/* 对话记录。phil-coach 的话不加气泡，像书里的字；自己的话放在淡紫的气泡里 */}
+      <div
+        ref={logRef}
+        role="log"
+        aria-live="polite"
+        aria-busy={loading}
+        className="flex flex-col gap-6 [&:not(:empty)]:mt-8 [&>*]:scroll-mt-[96px]"
+      >
+        {logItems.map((item, i) =>
+          item.kind === 'coach' ? (
+            <div key={i} className="max-w-[92%] self-start whitespace-pre-line text-[16.5px] leading-[1.95] text-pc-ink [overflow-wrap:anywhere]">
+              <span className="sr-only">phil-coach：</span>
+              {item.text}
             </div>
-          )}
-          {loading && (
-            <div className="max-w-[86%] self-start">
-              <div className="mb-1 text-[10px] tracking-[0.2em] text-white/28">
-                phil-coach
-              </div>
-              <div className="rounded-2xl rounded-tl-sm border border-white/10 bg-white/[0.06] px-5 py-3.5 text-[16px] leading-[1.9] text-white/48">
-                {t.thinking}
-              </div>
+          ) : (
+            <div
+              key={i}
+              className="max-w-[82%] self-end whitespace-pre-wrap rounded-[20px] rounded-br-md bg-pc-veil px-4 py-2.5 text-[16px] leading-[1.8] text-pc-ink [overflow-wrap:anywhere]"
+            >
+              <span className="sr-only">{t.me}：</span>
+              {item.text}
             </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
+          ),
+        )}
+        {/* 语音直达：转写还没回来时先把气泡放上屏——等待发生在对话里，而不是输入框里 */}
+        {voiceIn.transcribing && voiceMode === 'direct' && (
+          <div className="flex max-w-[82%] items-start gap-2 self-end whitespace-pre-wrap rounded-[20px] rounded-br-md bg-pc-veil px-4 py-2.5 text-[16px] leading-[1.8] text-pc-ink-2 [overflow-wrap:anywhere]">
+            <span aria-hidden="true" className="mt-[0.7em] h-1.5 w-1.5 shrink-0 rounded-full bg-pc-plum motion-safe:animate-pulse" />
+            <span className="min-w-0">{liveCaption || t.transcribing}</span>
+          </div>
+        )}
+        {loading && (
+          <div className="flex items-center gap-2 self-start text-[15px] leading-[1.9] text-pc-ink-2">
+            <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-pc-plum motion-safe:animate-pulse" />
+            {t.thinking}
+          </div>
+        )}
+      </div>
 
-        <div className="mt-6 border-t border-white/8 pt-5">
+      {/* 提示：发送失败、麦克风、自动播放 */}
+      {(error || voiceIn.error || voiceInputNotice || voiceOut.error || voiceOut.playbackBlocked) && (
+        <div className="mt-6 space-y-2">
           {error && (
-            <div className="mb-3 rounded-xl border border-coral-soft/25 bg-coral-soft/10 px-4 py-3 text-[13px] text-coral-soft">
+            <div role="alert" className="rounded-xl border border-pc-brick/25 bg-pc-brick-bg px-4 py-3 text-[13.5px] text-pc-brick">
               {error}
             </div>
           )}
           {voiceIn.error && (
-            <div role="alert" className="mb-3 text-[12px] text-coral-soft/90">
+            <div role="alert" className="text-[13px] text-pc-brick">
               {voiceIn.error}
               {/* 一路静音多半是虚拟声卡（Cast、Krisp、Loopback…）抢了默认输入。
                   与其让人去浏览器设置里翻，不如就地把设备列出来点一下。 */}
@@ -1386,7 +1448,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                       key={device.id}
                       type="button"
                       onClick={() => voiceIn.chooseInputDevice(device.id)}
-                      className="rounded-full border border-coral-soft/40 px-2.5 py-1 text-[11.5px] text-coral-soft transition-colors hover:bg-coral-soft/12"
+                      className="rounded-full border border-pc-line px-2.5 py-1 text-[12px] text-pc-plum transition-colors hover:bg-pc-veil"
                     >
                       {device.label}
                     </button>
@@ -1396,174 +1458,178 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
             </div>
           )}
           {voiceInputNotice && (
-            <div role="status" className="mb-3 text-[12px] text-coral-soft/90">
-              {voiceInputNotice}
-            </div>
+            <div role="status" className="text-[13px] text-pc-ink-2">{voiceInputNotice}</div>
           )}
           {voiceOut.error && (
-            <div role="alert" className="mb-3 text-[12px] text-coral-soft/90">{voiceOut.error}</div>
+            <div role="alert" className="text-[13px] text-pc-brick">{voiceOut.error}</div>
           )}
           {voiceOut.playbackBlocked && (
-            <div role="status" className="mb-3 flex flex-wrap items-center gap-2 text-[12px] text-white/55">
+            <div role="status" className="flex flex-wrap items-center gap-2 text-[13px] text-pc-ink-2">
               {t.voice.autoplayBlocked}
               <button
                 onClick={voiceOut.resume}
                 type="button"
-                className="rounded-full border border-coral-soft/40 px-2.5 py-1 text-coral-soft transition-colors hover:bg-coral-soft/12"
+                className="rounded-full border border-pc-line px-2.5 py-1 text-pc-plum transition-colors hover:bg-pc-veil"
               >
                 {t.voice.autoplayCta}
               </button>
             </div>
           )}
-          <div
-            className={`relative rounded-2xl border transition-colors ${
-              voicePanel || dictating
-                ? 'border-coral-soft/55 bg-coral-soft/[0.07]'
-                : 'border-white/12 bg-white/[0.04] focus-within:border-coral-soft/50'
-            }`}
-          >
-            {voicePanel ? (
-              /* 录音态：一整块都能点，再点一次就结束——手指不用去瞄小按钮 */
-              <div className="relative">
+        </div>
+      )}
+
+      {/* 输入框：进来就在这里，不用往下翻 */}
+      <div
+        ref={composerRef}
+        className={`mt-6 scroll-mb-6 rounded-[22px] border shadow-[0_10px_36px_rgba(60,52,90,0.10)] transition-colors lg:mt-7 ${
+          voicePanel || dictating
+            ? 'border-pc-plum bg-[#f1eef6]'
+            : 'border-pc-line bg-pc-paper focus-within:border-pc-plum focus-within:ring-2 focus-within:ring-pc-plum/20'
+        }`}
+      >
+        {voicePanel ? (
+          /* 录音态：一整块都能点，再点一次就结束——手指不用去瞄小按钮 */
+          <div className="relative">
+            {!voiceIn.transcribing && (
+              <button
+                onClick={cancelVoice}
+                type="button"
+                aria-label={t.voice.cancelRecording}
+                title={t.voice.cancel}
+                className="absolute right-2 top-2 z-10 grid h-11 w-11 place-items-center rounded-full text-pc-ink-3 transition-colors hover:bg-pc-ink/5 hover:text-pc-ink"
+              >
+                <CloseIcon />
+              </button>
+            )}
+            <button
+              onClick={finishVoice}
+              disabled={!voiceIn.recording}
+              type="button"
+              aria-label={voiceIn.recording ? t.voice.speakStop : t.voice.speakPreparing}
+              className="flex w-full flex-col items-center gap-5 px-4 py-9 disabled:cursor-default"
+            >
+              <span
+                className={`relative grid h-24 w-24 place-items-center rounded-full bg-pc-plum ${
+                  voiceIn.transcribing ? 'motion-safe:animate-pulse' : ''
+                }`}
+              >
+                {voiceIn.recording && (
+                  <span className="absolute inset-0 rounded-full bg-pc-plum/20 motion-safe:animate-ping" />
+                )}
+                <span className="relative">
+                  <WaveBars
+                    level={voiceIn.level}
+                    active={voiceIn.recording}
+                    maxHeight={40}
+                    barWidth={5}
+                    barClassName="bg-pc-paper/90"
+                  />
+                </span>
+              </span>
+              <span className="text-center">
+                <span className="block text-[16px] text-pc-ink">
+                  {voiceIn.requesting
+                    ? t.voice.opening
+                    : t.voice.listening(formatSeconds(voiceIn.elapsed))}
+                </span>
+                {voiceIn.recording && (
+                  <span className="mt-1.5 block text-[12.5px] text-pc-ink-2">
+                    {t.voice.speakHint}
+                  </span>
+                )}
+                {voiceIn.recording && liveCaption && (
+                  <span className="mx-auto mt-3 line-clamp-2 block max-w-[480px] px-2 text-[14px] leading-[1.8] text-pc-ink-2">
+                    {liveCaption}
+                  </span>
+                )}
+              </span>
+            </button>
+          </div>
+        ) : (
+          <>
+            <textarea
+              ref={textareaRef}
+              value={displayedDraft}
+              onChange={e => {
+                draftRef.current = e.target.value;
+                setDraft(e.target.value);
+                setVoiceInputNotice('');
+                pendingVoiceContextRef.current = null;
+              }}
+              onKeyDown={e => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !e.nativeEvent.isComposing) void submit();
+              }}
+              disabled={loading}
+              readOnly={dictating}
+              rows={3}
+              maxLength={1200}
+              aria-labelledby={session ? undefined : 'pc-question'}
+              aria-label={session ? t.replyLabel : undefined}
+              placeholder={dictating ? t.voice.dictatingPlaceholder : t.voice.draftPlaceholder}
+              className="block w-full resize-none rounded-[22px] border-0 bg-transparent px-4 pb-1 pt-3.5 text-[16px] leading-[1.65] text-pc-ink placeholder:text-pc-ink-3 focus:outline-none disabled:opacity-60 lg:px-5 lg:text-[17px]"
+            />
+            {dictating ? (
+              /* 听写中：按钮行原地变一条紧凑控制条——输入框不让位，字在上面实时出现 */
+              <div className="flex min-h-12 items-center gap-3 px-3 pb-3">
                 {!voiceIn.transcribing && (
                   <button
                     onClick={cancelVoice}
                     type="button"
-                    aria-label={t.voice.cancelRecording}
+                    aria-label={t.voice.dictateCancel}
                     title={t.voice.cancel}
-                    className="absolute right-2 top-2 z-10 grid h-11 w-11 place-items-center rounded-full text-white/30 transition-colors hover:bg-white/10 hover:text-white"
+                    className={`${toolbarBtn} h-11 w-11 rounded-full text-pc-ink-3 hover:bg-pc-ink/5 hover:text-pc-ink`}
                   >
                     <CloseIcon />
                   </button>
                 )}
-                <button
-                  onClick={finishVoice}
-                  disabled={!voiceIn.recording}
-                  type="button"
-                  aria-label={voiceIn.recording ? t.voice.speakStop : t.voice.speakPreparing}
-                  className="flex w-full flex-col items-center gap-5 px-4 py-10 disabled:cursor-default"
-                >
-                  <span
-                    className={`relative grid h-28 w-28 place-items-center rounded-full bg-coral-soft/90 ${
-                      voiceIn.transcribing ? 'animate-pulse' : ''
-                    }`}
-                  >
-                    {voiceIn.recording && (
-                      <span className="absolute inset-0 animate-ping rounded-full bg-coral-soft/25" />
-                    )}
-                    <span className="relative">
-                      <WaveBars
-                        level={voiceIn.level}
-                        active={voiceIn.recording}
-                        maxHeight={46}
-                        barWidth={5}
-                        barClassName="bg-[#24140f]/85"
-                      />
-                    </span>
-                  </span>
-                  <span className="text-center">
-                    <span className="block text-[16px] text-white/80">
-                      {voiceIn.requesting
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <WaveBars level={voiceIn.level} active={voiceIn.recording} maxHeight={20} barClassName="bg-pc-plum/80" />
+                  <span className="truncate text-[13px] text-pc-plum">
+                    {voiceIn.transcribing
+                      ? t.voice.converting
+                      : voiceIn.requesting
                         ? t.voice.opening
                         : t.voice.listening(formatSeconds(voiceIn.elapsed))}
-                    </span>
-                    {voiceIn.recording && (
-                      <span className="mt-1.5 block text-[12.5px] text-white/40">
-                        {t.voice.speakHint}
-                      </span>
-                    )}
-                    {voiceIn.recording && liveCaption && (
-                      <span className="mx-auto mt-3 line-clamp-2 block max-w-[480px] px-2 text-[13.5px] leading-[1.8] text-white/60">
-                        {liveCaption}
-                      </span>
-                    )}
                   </span>
+                </div>
+                <button
+                  /* 还没录起来时它是「退出」——否则一旦卡在开麦克风这一步就出不来了 */
+                  onClick={voiceIn.recording ? finishVoice : cancelVoice}
+                  disabled={voiceIn.transcribing}
+                  type="button"
+                  aria-label={voiceIn.recording ? t.voice.dictateDone : t.voice.dictateExit}
+                  title={voiceIn.recording ? t.voice.done : t.voice.exit}
+                  className={`${toolbarBtn} h-11 w-11 rounded-full bg-pc-ink text-pc-ivory`}
+                >
+                  <span aria-hidden="true" className="block h-3.5 w-3.5 rounded-[3px] bg-current" />
                 </button>
               </div>
             ) : (
-              <>
-                <textarea
-                  value={displayedDraft}
-                  onChange={e => {
-                    draftRef.current = e.target.value;
-                    setDraft(e.target.value);
-                    setVoiceInputNotice('');
-                    pendingVoiceContextRef.current = null;
-                  }}
-                  onKeyDown={e => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit();
-                  }}
-                  disabled={loading}
-                  readOnly={dictating}
-                  rows={3}
-                  maxLength={1200}
-                  placeholder={dictating ? t.voice.dictatingPlaceholder : t.voice.draftPlaceholder}
-                  className="w-full resize-none rounded-2xl border-0 bg-transparent px-4 pb-1 pt-3.5 text-[16px] leading-relaxed text-white placeholder:text-white/28 focus:outline-none disabled:opacity-55"
-                />
-                {dictating ? (
-                  /* 听写中：按钮行原地变一条紧凑控制条——输入框不让位，字在上面实时出现 */
-                  <div className="flex items-center gap-3 px-3 pb-3">
-                    {!voiceIn.transcribing && (
-                      <button
-                        onClick={cancelVoice}
-                        type="button"
-                        aria-label={t.voice.dictateCancel}
-                        title={t.voice.cancel}
-                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-white/40 transition-colors hover:bg-white/10 hover:text-white"
-                      >
-                        <CloseIcon />
-                      </button>
-                    )}
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <WaveBars level={voiceIn.level} active={voiceIn.recording} maxHeight={20} />
-                      <span className="truncate text-[12.5px] text-coral-soft/90">
-                        {voiceIn.transcribing
-                          ? t.voice.converting
-                          : voiceIn.requesting
-                            ? t.voice.opening
-                            : t.voice.listening(formatSeconds(voiceIn.elapsed))}
-                      </span>
-                    </div>
-                    <button
-                      /* 还没录起来时它是「退出」——否则一旦卡在开麦克风这一步就出不来了 */
-                      onClick={voiceIn.recording ? finishVoice : cancelVoice}
-                      disabled={voiceIn.transcribing}
-                      type="button"
-                      aria-label={voiceIn.recording ? t.voice.dictateDone : t.voice.dictateExit}
-                      title={voiceIn.recording ? t.voice.done : t.voice.exit}
-                      className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-coral-soft text-[#24140f] transition-opacity disabled:opacity-45"
-                    >
-                      <span aria-hidden="true" className="block h-3.5 w-3.5 rounded-[3px] bg-current" />
-                    </button>
-                  </div>
-                ) : (
-                <div className="flex items-center justify-between gap-2 px-3 pb-3">
-                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  {/* 朗读开关：和麦克风放在一起，说和听在同一排 */}
+              /* min-h-12 先把按钮那一行的高度留出来：语音按钮要等浏览器确认支持才出现，不留会跳一下 */
+              <div className="flex min-h-12 items-center justify-between gap-2 px-3 pb-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  {/* 语音回复开关；手机上只留图标 */}
                   <button
                     onClick={() => voiceOut.setEnabled(!voiceOut.enabled)}
                     aria-pressed={voiceOut.enabled}
                     type="button"
-                    title={
+                    title={voiceOut.enabled ? t.voice.readOn : t.voice.readOff}
+                    className={`inline-flex h-10 items-center gap-1.5 rounded-full border px-3 text-[12.5px] transition-colors ${
                       voiceOut.enabled
-                        ? t.voice.readOn
-                        : t.voice.readOff
-                    }
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] transition-colors ${
-                      voiceOut.enabled
-                        ? 'border-coral-soft/55 bg-coral-soft/12 text-coral-soft'
-                        : 'border-white/12 bg-white/[0.04] text-white/45 hover:text-white'
+                        ? 'border-pc-plum bg-pc-veil text-pc-plum'
+                        : 'border-pc-ink/15 text-pc-ink-2 hover:text-pc-ink'
                     }`}
                   >
                     <SpeakerIcon waves={voiceOut.enabled} />
-                    {voiceOut.enabled
-                      ? voiceOut.loading
-                        ? t.voice.readPreparing
-                        : t.voice.readStateOn
-                      : t.voice.readStateOff}
+                    <span className="max-sm:sr-only">
+                      {voiceOut.enabled
+                        ? voiceOut.loading
+                          ? t.voice.readPreparing
+                          : t.voice.readStateOn
+                        : t.voice.readStateOff}
+                    </span>
                   </button>
-                  {/* 换嗓音：只在开着朗读时出现，一颗按钮在两个嗓音之间轮换
-                      （手机宽度放不下两颗并排的音色） */}
+                  {/* 换嗓音：只在开着朗读时出现，一颗按钮在两个嗓音之间轮换 */}
                   {voiceOut.enabled && (
                     <button
                       onClick={() => {
@@ -1572,135 +1638,183 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
                       }}
                       type="button"
                       title={t.voice.switchVoice}
-                      className="rounded-full px-2.5 py-1.5 text-[12px] text-white/45 transition-colors hover:bg-white/[0.06] hover:text-white"
+                      className="h-10 shrink-0 whitespace-nowrap rounded-full px-2.5 text-[12px] text-pc-ink-2 transition-colors hover:bg-pc-ink/5 hover:text-pc-ink"
                     >
                       {PHIL_COACH_VOICES.find(v => v.id === voiceOut.voiceId)?.label}
                     </button>
                   )}
-                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
                   {voiceIn.supported && (
                     /* 两个语音入口，像 Gemini：🎤 听写进输入框（可改再发），声波直达（说完就发） */
-                    <div className="flex shrink-0 items-center gap-2">
+                    <>
                       <button
                         onClick={() => void startVoice('dictate')}
                         disabled={loading || voiceBusy || displayedDraft.length >= 1200}
                         type="button"
                         aria-label={t.voice.dictateLabel}
                         title={t.voice.dictateTitle}
-                        className="inline-flex h-12 min-w-[58px] flex-col items-center justify-center gap-0.5 rounded-2xl border border-white/14 bg-white/[0.05] px-2 text-white/70 transition-colors hover:bg-white/12 hover:text-white disabled:opacity-40"
+                        className={`${toolbarBtn} h-12 min-w-[52px] gap-0.5 rounded-2xl border border-pc-ink/15 px-2 text-pc-ink-2 hover:bg-pc-ink/5 hover:text-pc-ink`}
                       >
                         <MicrophoneIcon />
                         <span className="text-[10px] leading-none">{t.voice.dictateShort}</span>
                       </button>
                       <button
                         onClick={() => void startVoice('direct')}
-                        disabled={loading || voiceBusy}
+                        disabled={loading || voiceBusy || (!session && !conversationReady)}
                         type="button"
                         aria-label={t.voice.speakLabel}
                         title={t.voice.speakTitle}
-                        className="inline-flex h-12 min-w-[58px] flex-col items-center justify-center gap-0.5 rounded-2xl bg-coral-soft/90 px-2 text-[#24140f] transition-colors hover:bg-coral-soft disabled:opacity-40"
+                        className={`${toolbarBtn} h-12 min-w-[52px] gap-0.5 rounded-2xl bg-pc-veil px-2 text-pc-plum hover:bg-[#d8d1ea]`}
                       >
                         <VoiceWaveIcon />
                         <span className="text-[10px] leading-none">{t.voice.speakShort}</span>
                       </button>
-                    </div>
+                    </>
                   )}
+                  <button
+                    onClick={() => void submit()}
+                    disabled={sendDisabled}
+                    type="button"
+                    className="inline-flex h-12 shrink-0 items-center rounded-full bg-pc-ink px-5 text-[14px] font-medium text-pc-ivory transition-colors hover:bg-[#35313b] disabled:bg-pc-ink/15 disabled:text-pc-ink-3"
+                  >
+                    {loading ? t.sending : !session && !conversationReady ? t.start.preparing : t.send}
+                  </button>
                 </div>
-                )}
-              </>
+              </div>
             )}
-          </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
-            <span className="text-[12px] text-white/45">
-              {polishing
-                ? t.tidying
-                : displayedDraft.length >= 1200
-                  ? t.draftLimit
-                  : t.draftCount(displayedDraft.length)}
-            </span>
-            <div className="flex flex-wrap gap-3">
-              {hasConversation && loggedIn && session.thread.some(item => item.kind === 'me') && (
-                <button
-                  onClick={keepThread}
-                  disabled={keepState === 'saving' || keepState === 'saved'}
-                  type="button"
-                  className="rounded-full border border-coral-soft/40 bg-coral-soft/10 px-5 py-2.5 text-[14px] text-coral-soft transition-colors hover:bg-coral-soft/20 disabled:opacity-60"
-                >
-                  {keepState === 'saved'
-                    ? t.keep.done
-                    : keepState === 'saving'
-                      ? t.keep.saving
-                      : keepState === 'error'
-                        ? t.keep.failed
-                        : t.keep.idle}
-                </button>
-              )}
-              {hasConversation && (
-                <button
-                  onClick={copyThread}
-                  type="button"
-                  className="rounded-full border border-white/16 bg-white/[0.06] px-5 py-2.5 text-[14px] text-white/70 transition-colors hover:bg-white/12 hover:text-white"
-                >
-                  {copied ? t.copied : t.copy}
-                </button>
-              )}
-              <button
-                onClick={submit}
-                disabled={
-                  loading ||
-                  liveVoice.listening ||
-                  voiceIn.requesting ||
-                  voiceIn.recording ||
-                  voiceIn.transcribing ||
-                  !draft.trim()
-                }
-                type="button"
-                className="rounded-full bg-white px-6 py-2.5 text-[14px] font-medium text-[#141a12] transition-opacity disabled:opacity-35"
-              >
-                {loading ? t.sending : t.send}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 flex flex-wrap gap-3">
-        <button
-          onClick={reset}
-          type="button"
-          className="rounded-full border border-white/16 bg-white/[0.06] px-5 py-2.5 text-[14px] text-white/78 transition-colors hover:bg-white/12 hover:text-white"
-        >
-          {t.againPath}
-        </button>
-        {!loggedIn && (
-          <Link
-            href="/#join"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-full bg-coral-soft px-5 py-2.5 text-[14px] font-medium text-[#20140f] no-underline transition-opacity hover:opacity-90"
-          >
-            {t.join}
-          </Link>
+          </>
         )}
       </div>
 
-      {/*
-        对话走到收尾之后的一句邀请。聊满 INVITE_AFTER_TURNS 轮才出现——
-        短对话不打扰，只有真聊进去的人才会看到。
-        只对「已经是成员、但卡片还薄」的人出现，
-        而且刻意做成一行浅色小字 + 一个链接——不弹窗、不拦人、不预勾选，
-        可以完全忽略。刚聊完一场好对话的人答应的意愿，远高于在墙上被拦住的那一秒。
-      */}
-      {loggedIn && !profileComplete && coachTurns >= INVITE_AFTER_TURNS && (
-        <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4">
-          <p className="text-[13px] leading-[1.9] text-white/50">{t.inviteAfterClose}</p>
-          <Link
-            href={myMemberId ? `/creators/${myMemberId}` : '/login'}
-            className="mt-2 inline-block text-[13px] text-coral-soft no-underline underline-offset-4 hover:underline"
-          >
-            {t.inviteAfterCloseCta} →
-          </Link>
-        </div>
+      {/* 输入框下沿：顺稿中 / 快到字数上限；宽屏上有字时提示快捷键 */}
+      <div className="mt-2 min-h-5 text-right text-[12px] text-pc-ink-3">
+        {polishing
+          ? t.tidying
+          : displayedDraft.length >= 1200
+            ? t.draftLimit
+            : displayedDraft.length >= 1000
+              ? t.draftCount(displayedDraft.length)
+              : displayedDraft.length > 0
+                ? <span className="max-lg:hidden">{t.draftCount(displayedDraft.length)}</span>
+                : null}
+      </div>
+
+      {!session ? (
+        <>
+          {/* 小径：可选的方向，按一下选中、再按取消。不选也能直接开口 */}
+          <div className="mt-4">
+            <p id="pc-paths" className="m-0 mb-2.5 text-[12.5px] text-pc-ink-2">{t.start.pathsLabel}</p>
+            <div className="flex flex-wrap gap-2" role="group" aria-labelledby="pc-paths">
+              {PHIL_PATHS.map(p => {
+                const on = selectedPathId === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setSelectedPathId(on ? null : p.id)}
+                    className={`inline-flex min-h-11 items-center rounded-full border px-4 text-[13.5px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pc-plum lg:min-h-10 ${
+                      on
+                        ? 'border-pc-ink bg-pc-ink text-pc-ivory'
+                        : 'border-pc-ink/15 bg-pc-paper/60 text-pc-ink-2 hover:border-pc-ink/30 hover:text-pc-ink'
+                    }`}
+                  >
+                    {t.paths[p.id as PathId].label}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedPath?.hint && (
+              <p className="m-0 mt-2.5 text-[12.5px] text-pc-ink-2">{selectedPath.hint}</p>
+            )}
+          </div>
+
+          <p className="m-0 mt-6 text-[12.5px] leading-[1.8] text-pc-ink-2">
+            {t.start.trust} ·{' '}
+            <a href="#about" className="whitespace-nowrap text-pc-plum underline decoration-pc-plum/40 underline-offset-4 hover:decoration-pc-plum">
+              {t.start.trustMore} ↓
+            </a>
+          </p>
+
+          {/* 只有登录成员看得到：phil-coach 有没有读过你的资料 */}
+          {loggedIn && (
+            <p className="m-0 mt-2 text-[12.5px] leading-[1.8] text-pc-ink-2">
+              {importState === 'importing'
+                ? t.profile.importing
+                : profileKnown
+                  ? t.profile.known
+                  : t.profile.unknown}{' '}
+              <button
+                onClick={importProfile}
+                disabled={importState === 'importing'}
+                type="button"
+                className="text-pc-plum underline decoration-pc-plum/40 underline-offset-4 hover:decoration-pc-plum disabled:opacity-50"
+              >
+                {profileKnown ? t.profile.reimport : t.profile.import}
+              </button>
+            </p>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
+            {loggedIn && session.thread.some(item => item.kind === 'me') && (
+              <button
+                onClick={keepThread}
+                disabled={keepState === 'saving' || keepState === 'saved'}
+                type="button"
+                className="min-h-9 text-pc-plum underline decoration-pc-plum/40 underline-offset-4 hover:decoration-pc-plum disabled:no-underline disabled:opacity-70"
+              >
+                {keepState === 'saved'
+                  ? t.keep.done
+                  : keepState === 'saving'
+                    ? t.keep.saving
+                    : keepState === 'error'
+                      ? t.keep.failed
+                      : t.keep.idle}
+              </button>
+            )}
+            {hasConversation && (
+              <button
+                onClick={copyThread}
+                type="button"
+                className="min-h-9 text-pc-ink-2 underline decoration-pc-ink/25 underline-offset-4 hover:text-pc-ink"
+              >
+                {copied ? t.copied : t.copy}
+              </button>
+            )}
+            {!loggedIn && (
+              <Link
+                href="/#join"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-h-9 leading-9 text-pc-plum underline decoration-pc-plum/40 underline-offset-4 hover:decoration-pc-plum"
+              >
+                {t.join}
+              </Link>
+            )}
+          </div>
+
+          {/*
+            对话走到收尾之后的一句邀请。聊满 INVITE_AFTER_TURNS 轮才出现——
+            短对话不打扰，只有真聊进去的人才会看到。
+            只对「已经是成员、但卡片还薄」的人出现，
+            而且刻意做成一行浅色小字 + 一个链接——不弹窗、不拦人、不预勾选，
+            可以完全忽略。刚聊完一场好对话的人答应的意愿，远高于在墙上被拦住的那一秒。
+          */}
+          {loggedIn && !profileComplete && coachTurns >= INVITE_AFTER_TURNS && (
+            <div className="mt-6 rounded-2xl border border-pc-ink/10 bg-pc-paper/70 px-5 py-4">
+              <p className="m-0 text-[13.5px] leading-[1.9] text-pc-ink-2">{t.inviteAfterClose}</p>
+              <Link
+                href={myMemberId ? `/creators/${myMemberId}` : '/login'}
+                className="mt-2 inline-block text-[13.5px] text-pc-plum no-underline underline-offset-4 hover:underline"
+              >
+                {t.inviteAfterCloseCta} →
+              </Link>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

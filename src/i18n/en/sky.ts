@@ -89,7 +89,7 @@ export const sky: typeof zhSky = {
     title: 'There can be a light here for you too.',
     body: 'Share what you’re working on — someone may be looking for exactly this.',
     cta: 'Light my own star',
-    toForest: 'Or walk into the Creator Forest →',
+    toForest: 'Or meet the creators →',
   },
 
   note: 'Each star’s position, size and brightness are generated stably from the creator’s ID. Size only simulates apparent brightness in a night sky — it does not indicate popularity, payment, tier or recommendation weight.',

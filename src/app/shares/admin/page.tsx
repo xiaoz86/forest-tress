@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: '分享管理 · 附近森林',
-  description: '编辑附近森林林间分享内容。',
+  description: '编辑附近森林社区广场的 Aha Moment 内容。',
 };
 
 export default async function ShareAdminPage() {
@@ -30,7 +30,7 @@ export default async function ShareAdminPage() {
             </div>
             <h1 className="text-2xl font-medium">需要管理员权限</h1>
             <p className="mt-4 text-sm leading-relaxed text-white/52">
-              登录管理员节点后，可以编辑林间分享，并上传视频、图片和海报。
+              登录管理员节点后，可以编辑社区广场的 Aha Moment，并上传视频、图片和海报。
             </p>
             <Link
               href="/login"
@@ -74,7 +74,7 @@ export default async function ShareAdminPage() {
               className="text-[clamp(2rem,4vw,3.4rem)] font-light leading-tight"
               style={{ fontFamily: 'var(--font-display)' }}
             >
-              编辑林间分享
+              编辑 Aha Moment
             </h1>
             <p className="mt-5 text-[16px] leading-[2] text-white/52">
               首页展示一段真实分享，更多页承接其他超级个体的作品、产品、活动和体验。

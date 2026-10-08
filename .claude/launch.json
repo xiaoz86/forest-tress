@@ -4,28 +4,56 @@
     {
       "name": "dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "dev-proxy",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "P=$(scutil --proxy | awk '/HTTPSProxy :/{h=$3} /HTTPSPort :/{p=$3} END{if(h) print \"http://\" h \":\" p}'); if [ -n \"$P\" ]; then export HTTPS_PROXY=$P HTTP_PROXY=$P NO_PROXY=localhost,127.0.0.1,::1 NODE_USE_ENV_PROXY=1; fi; exec npm run dev"
+      ],
       "port": 3000,
       "autoPort": true
     },
     {
       "name": "dev-default-content",
       "runtimeExecutable": "env",
-      "runtimeArgs": ["NEXT_PUBLIC_SUPABASE_URL=", "npm", "run", "dev"],
+      "runtimeArgs": [
+        "NEXT_PUBLIC_SUPABASE_URL=",
+        "npm",
+        "run",
+        "dev"
+      ],
       "port": 3100,
       "autoPort": true
     },
     {
       "name": "dev-no-mail",
       "runtimeExecutable": "env",
-      "runtimeArgs": ["NOTIFY_FROM=", "npm", "run", "dev"],
+      "runtimeArgs": [
+        "NOTIFY_FROM=",
+        "npm",
+        "run",
+        "dev"
+      ],
       "port": 3200,
       "autoPort": true
     },
     {
       "name": "dev-test-mail",
       "runtimeExecutable": "env",
-      "runtimeArgs": ["ORDER_NOTIFY_EMAILS=1826741794@qq.com", "npm", "run", "dev"],
+      "runtimeArgs": [
+        "ORDER_NOTIFY_EMAILS=1826741794@qq.com",
+        "npm",
+        "run",
+        "dev"
+      ],
       "port": 3300,
       "autoPort": true
     }

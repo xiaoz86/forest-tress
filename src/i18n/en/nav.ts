@@ -11,10 +11,11 @@ export const nav: typeof zhNav = {
   brand: 'Nearby Forest',
   links: {
     meditations: 'Explore',
-    philCoach: 'Within',
-    shares: 'Create',
+    philCoach: 'Inner Dialogue',
+    square: 'Community',
+    creators: 'Creators',
     // 和 Nearby Forest 成对。原来是光秃秃的 'Sky'，没说这是谁的天
-    creators: 'Nearby Sky',
+    sky: 'Nearby Sky',
     about: 'About',
     contact: 'Contact us',
   },

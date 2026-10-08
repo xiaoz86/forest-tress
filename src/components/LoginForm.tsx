@@ -78,9 +78,12 @@ export default function LoginForm({
   locale,
   /** ?err= 带回来的登录链接错误。服务端算好的，这边只负责摆在标题下面 */
   linkError,
+  /** 登录完回到哪里（登录页校验过的站内路径）；没有就去自己的资料页 */
+  next,
 }: {
   locale: Locale;
   linkError?: string | null;
+  next?: string | null;
 }) {
   const t = useMemo(() => dict(locale).login, [locale]);
   const [step, setStep] = useState<'email' | 'code'>('email');
@@ -199,7 +202,7 @@ export default function LoginForm({
       if (res.ok && json.memberId) {
         // 整页跳转而不是 router.push：导航栏的登录态是挂载时问一次服务器的，
         // 软跳转它不会重新问，会显示成还没登录。
-        window.location.href = `/creators/${json.memberId}`;
+        window.location.href = next || `/creators/${json.memberId}`;
         return;
       }
       if (res.ok && json.registered === false) {

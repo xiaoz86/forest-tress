@@ -73,21 +73,21 @@ export const home: typeof zhHome = {
       },
       {
         icon: '伴',
-        title: 'Companion',
+        title: 'Inner Dialogue',
         body: 'phil-coach is a companion that remembers you. It helps you sort out what you feel, see the choices in front of you, and find the next step.',
         cta: 'Start a conversation',
       },
       {
-        icon: '见',
-        title: 'People',
-        body: 'Browse the creators already here, and meet through matches, small-table conversations, and gatherings.',
-        cta: 'See the creator forest',
+        icon: '创',
+        title: 'Creators',
+        body: 'Every creator here has a website of their own: who they are, what they are doing, and what you could do together.',
+        cta: 'Meet the creators',
       },
       {
-        icon: '创',
-        title: 'Creations',
-        body: 'Put your course, writing, event, work, or project where it can be seen, and find the people who will support it.',
-        cta: 'See what is growing',
+        icon: '聚',
+        title: 'Community',
+        body: 'Events started by members, and everyone\'s Aha Moments: join one, or bring your own.',
+        cta: 'Visit the community square',
       },
     ],
   },
@@ -96,7 +96,7 @@ export const home: typeof zhHome = {
     headingTop: 'People here are already',
     headingBottom: 'doing these things.',
     lede: 'Every node is a real person. You can see what they are making, what they can offer, and who they hope to meet right now.',
-    link: 'Enter the creator forest',
+    link: 'Meet the creators',
     showcase: {
       growing: 'Growing in the forest',
       cityFallback: 'Nearby',
@@ -365,7 +365,7 @@ export const home: typeof zhHome = {
   footer: {
     tagline: 'Where independent people connect, move, and make things together.',
     about: 'Where Nearby Forest comes from',
-    creators: 'The creator forest',
+    creators: 'Creators',
     copyright: '© 2026 Nearby Forest Community',
   },
 };

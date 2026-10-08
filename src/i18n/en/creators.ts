@@ -1,16 +1,13 @@
 import type { creators as zhCreators } from '@/i18n/zh/creators';
 
 export const creators: typeof zhCreators = {
-  metaTitle: 'Creator Forest · Nearby Forest',
+  metaTitle: 'Creators · Nearby Forest',
 
   // 作品书架入口
   shelf: {
-    ariaLabel: 'View creator shelf',
-    imageAlt: 'Nearby Forest · feature walkthrough',
     eyebrow: 'Creator Shelf',
-    title: 'A shelf where works-in-progress live',
     body: 'Newsletters, podcasts, products, essays, and project fragments will slowly grow beside each tree.',
-    cta: 'See what’s new',
+    cta: 'Read the launch notes',
   },
 
   // 一棵树都还没有时
@@ -30,6 +27,7 @@ export const creators: typeof zhCreators = {
   tree: {
     unnamed: 'An unnamed tree',
     closer: 'Come closer',
+    visitSpace: 'Visit their space',
     network: (name: string) => `Keyword network for ${name}`,
   },
 

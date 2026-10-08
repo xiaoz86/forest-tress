@@ -82,7 +82,7 @@ export function suggestionsForPage(context: XiaoyaPageContext): XiaoyaSuggestion
     case 'creator-profile-edit':
     case 'work-editor':
     case 'creator-profile':
-      candidates.push(safeSuggestion(en ? 'Explore the creator forest' : '看看创造者森林', '/creators'));
+      candidates.push(safeSuggestion(en ? 'Meet the creators' : '看看创造者平台', '/creators'));
       break;
     case 'creator-directory':
       candidates.push(safeSuggestion(en ? 'Plant your own node' : '种下自己的节点', '/#join'));
@@ -99,7 +99,7 @@ export function suggestionsForPage(context: XiaoyaPageContext): XiaoyaSuggestion
       break;
     case 'share-gallery':
     case 'share-submission':
-      candidates.push(safeSuggestion(en ? 'Explore forest stories' : '看看林间分享', '/shares'));
+      candidates.push(safeSuggestion(en ? 'Visit the community square' : '看看社区广场', '/shares'));
       break;
     case 'forest-about':
       candidates.push(safeSuggestion(en ? 'Learn about the community' : '了解生态社区', '/about#community'));
@@ -107,7 +107,7 @@ export function suggestionsForPage(context: XiaoyaPageContext): XiaoyaSuggestion
     default:
       candidates.push(
         safeSuggestion(en ? 'Learn about Nearby Forest' : '了解附近森林', '/about'),
-        safeSuggestion(en ? 'Explore the creator forest' : '看看创造者森林', '/creators'),
+        safeSuggestion(en ? 'Meet the creators' : '看看创造者平台', '/creators'),
       );
   }
   return candidates.filter((item): item is XiaoyaSuggestion => item !== null).slice(0, 2);

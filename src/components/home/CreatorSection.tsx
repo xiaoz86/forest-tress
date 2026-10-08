@@ -19,7 +19,7 @@ export default function CreatorSection({ nodes, t }: Props) {
         <div className="mb-12 grid grid-cols-[1fr_0.85fr] items-end gap-10 max-md:grid-cols-1 max-md:gap-5">
           <div>
             <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
-              Creator Forest
+              Creator Platform
             </p>
             <h2
               className="text-[clamp(2rem,4.2vw,3.2rem)] font-normal leading-[1.2] tracking-[-0.03em] text-ink"

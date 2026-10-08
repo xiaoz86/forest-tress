@@ -13,9 +13,13 @@ type Props = {
    * 所以只传 locale——它仍然是服务端算好的，这边不读 cookie，不会闪一下中文。
    */
   locale: Locale;
+  /** 从「去创作」哪一项进来的：Aha! 还是写文章。审核的人在投稿标题上方看得出来 */
+  kind?: 'aha' | 'article';
+  /** 没登录时「去登录」的地址（带着登录完回来的位置） */
+  loginHref?: string;
 };
 
-export default function ShareSubmitForm({ isLoggedIn, locale }: Props) {
+export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', loginHref = '/login' }: Props) {
   const t = useMemo(() => dict(locale).shares.submit, [locale]);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
@@ -31,7 +35,7 @@ export default function ShareSubmitForm({ isLoggedIn, locale }: Props) {
           {t.signInBody}
         </p>
         <a
-          href="/login"
+          href={loginHref}
           className="mt-6 inline-flex rounded-full bg-forest-deep px-5 py-2.5 text-sm font-medium text-white no-underline"
         >
           {t.signInCta}
@@ -68,6 +72,7 @@ export default function ShareSubmitForm({ isLoggedIn, locale }: Props) {
       onSubmit={submit}
       className="rounded-lg border border-forest-deep/10 bg-white/72 p-7"
     >
+      <input type="hidden" name="kind" value={kind} />
       <div className="mb-3 text-[11px] font-medium tracking-[0.18em] text-coral uppercase">
         {t.eyebrow}
       </div>
