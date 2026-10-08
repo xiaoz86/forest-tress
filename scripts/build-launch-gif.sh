@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
 # Build a feature-highlight GIF from the static screenshots.
-# Output → public/launch-screenshots/feature-tour.gif
+# 截图先用 scripts/capture-screenshots.mjs 截好（存在 public/launch-screenshots/<版本>/）。
+# Output → public/launch-screenshots/feature-tour.gif（/launch 的头图和分享图都用它）
+# 上一版（2026-05）的 GIF 留在 feature-tour-2026-05.gif，给存档的旧发布说明用。
 
 set -e
 DIR="public/launch-screenshots"
+SRC="${SRC:-$DIR/2026-10}"
 WORK="$DIR/_gif_frames"
 mkdir -p "$WORK"
 
-# Frames in display order (each gets 2.0s)
+# Frames in display order (each gets 2.0s)：按导航走一遍，个人网站空间多停两张
 FRAMES=(
-  "01-hero.png"
-  "02-forest.png"
-  "03-detail-hero.png"
-  "04-detail-works.png"
-  "08-detail-works-editor.png"
-  "06-join-form.png"
-  "09-join-works-section.png"
-  "05-detail-network.png"
+  "01-home.png"
+  "02-creators.png"
+  "03-space.png"
+  "13-space-offer.png"
+  "04-space-tune.png"
+  "06-square.png"
+  "07-phil-coach.png"
+  "09-meditations.png"
+  "10-sky.png"
+  "14-xiaoya.png"
 )
 
 # Re-encode every frame to a fixed 900×640 canvas (scale-fit + center-pad)
@@ -26,7 +31,7 @@ i=0
 for f in "${FRAMES[@]}"; do
   i=$((i+1))
   out=$(printf "%s/f%02d.png" "$WORK" "$i")
-  ffmpeg -y -i "$DIR/$f" \
+  ffmpeg -y -i "$SRC/$f" \
     -vf "scale=w=900:h=640:force_original_aspect_ratio=decrease:flags=lanczos,pad=900:640:(ow-iw)/2:(oh-ih)/2:color=#fafaf7" \
     -loglevel error "$out"
 done
