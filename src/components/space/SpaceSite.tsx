@@ -15,6 +15,8 @@ import {
   ValuesEditor, WorksEditor,
 } from '@/components/space/edit/EditKit';
 import NotMe from '@/components/space/tune/NotMe';
+import WorkPeek from '@/components/space/WorkPeek';
+import { CopyLink } from '@/components/space/interact/RegistrationActions';
 import {
   LEARNING_KIND_LABEL, serviceMeta, type ChapterKey, type DraftBlock, type Effective, type LearningItem,
 } from '@/lib/space/edits';
@@ -122,8 +124,32 @@ function Folded<T>({ items, render, wrap }: {
   );
 }
 
+/**
+ * 「公众号：斜杠少年小 Z」→「斜杠少年小 Z」。公众号多半没有网页地址：没填链接时，告诉访客在微信里搜什么
+ */
+function wechatName(title: string): string | null {
+  const m = /^(?:微信)?公众号\s*[:：·\-—]?\s*(.+)$/.exec(title.trim());
+  const name = m?.[1].trim().replace(/^[「『《“"]|[」』》”"]$/g, '').trim();
+  return name || null;
+}
+
+function WechatHint({ w }: { w: Work }) {
+  const name = w.url ? null : wechatName(w.title);
+  if (!name) return null;
+  return (
+    <span className="sp-wx">
+      在微信里搜「{name}」
+      <CopyLink href={name} raw label="复制名字" textClassName="sp-wx-copy" />
+    </span>
+  );
+}
+
+/** 没有链接、但有一张能显示的封面：点开就地看大图（海报上常有二维码） */
+const peekImage = (w: Work) => (!w.url && isDisplayableImage(w.image_url) ? w.image_url : null);
+
 function Plate({ w }: { w: Work }) {
   const img = isDisplayableImage(w.image_url) ? w.image_url : null;
+  const peek = peekImage(w);
   const body = (
     <>
       {img && (
@@ -135,12 +161,16 @@ function Plate({ w }: { w: Work }) {
         <span className="sp-plate-t">{w.title}</span>
         {w.desc && <span className="sp-plate-d">{w.desc}</span>}
         {w.url && <span className="sp-go-link">去看看 ↗</span>}
+        {peek && <span className="sp-go-link">看大图 ↗</span>}
       </figcaption>
     </>
   );
   return (
     <figure className={`sp-plate ${img ? '' : 'is-text'}`}>
-      {w.url ? <a href={w.url} target="_blank" rel="noreferrer noopener">{body}</a> : body}
+      {w.url ? <a href={w.url} target="_blank" rel="noreferrer noopener">{body}</a>
+        : peek ? <WorkPeek src={peek} title={w.title}>{body}</WorkPeek>
+        : body}
+      <WechatHint w={w} />
     </figure>
   );
 }
@@ -155,12 +185,19 @@ function Entry({ w, action, image }: { w: Work; action: string; image?: boolean 
       <span className="sp-entry-t">{w.title}</span>
       {w.desc && <span className="sp-entry-d">{w.desc}</span>}
       {w.url && <span className="sp-go-link">{action}</span>}
+      {peekImage(w) && <span className="sp-go-link">看图 ↗</span>}
     </>
   );
+  const peek = peekImage(w);
   return w.url ? (
     <a className="sp-entry" href={w.url} target="_blank" rel="noreferrer noopener">{body}</a>
+  ) : peek ? (
+    <div className="sp-entry-wrap">
+      <WorkPeek className="sp-entry" src={peek} title={w.title}>{body}</WorkPeek>
+      <WechatHint w={w} />
+    </div>
   ) : (
-    <div className="sp-entry">{body}</div>
+    <div className="sp-entry">{body}<WechatHint w={w} /></div>
   );
 }
 
@@ -408,10 +445,17 @@ export default function SpaceSite({
                   <span className="sp-index-t">{w.title}</span><span className="sp-dots" aria-hidden />
                   <span className="sp-index-v">{linkVerb(w.title)} ↗</span>
                 </a>
+              ) : peekImage(w) ? (
+                // 没有链接、只有一张海报（公众号、播客常这样）：点开看大图，微信里长按识别二维码
+                <WorkPeek src={peekImage(w)!} title={w.title}>
+                  <span className="sp-index-t">{w.title}</span><span className="sp-dots" aria-hidden />
+                  <span className="sp-index-v">看图 ↗</span>
+                </WorkPeek>
               ) : (
                 <span className="sp-index-t">{w.title}</span>
               )}
               {w.desc && <small>{w.desc}</small>}
+              <WechatHint w={w} />
             </li>
           )} />
         </div>
