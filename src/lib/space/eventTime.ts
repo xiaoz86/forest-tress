@@ -53,6 +53,25 @@ export function eventAnchor(eventId: string): string {
   return `e-${eventId.slice(0, 8)}`;
 }
 
+/**
+ * 单独分享一场活动的链接：发起人的网站 + ?e=（发到微信、信息里时，预览卡片显示这一场的标题、时间和封面）
+ * + #锚点（打开就滚到这一场）。hostPath 是 /@短链 或 /space/<id>，也可以是完整地址。
+ */
+export function eventShareText(
+  e: { startsAt: string; endsAt?: string | null; mode: 'online' | 'offline' | 'both'; place: string },
+  hostName: string, en = false,
+): string {
+  const mode = (en ? MODE_LABEL_EN : MODE_LABEL)[e.mode];
+  const where = e.place ? `${mode} · ${e.place}` : mode;
+  const host = hostName ? (en ? ` · hosted by ${hostName}` : ` · ${hostName} 发起`) : '';
+  return `${formatEventTime(e.startsAt, e.endsAt, undefined, en)}${en ? ' (Beijing time)' : '（北京时间）'} · ${where}${host}`;
+}
+
+export function eventSharePath(hostPath: string, eventId: string): string {
+  const base = hostPath.split('#')[0].split('?')[0];
+  return `${base}?e=${eventId.slice(0, 8)}#${eventAnchor(eventId)}`;
+}
+
 /** ISO → datetime-local 输入框的值（北京时间的「YYYY-MM-DDTHH:mm」） */
 export function isoToLocalInput(iso: string | null | undefined): string {
   if (!iso) return '';

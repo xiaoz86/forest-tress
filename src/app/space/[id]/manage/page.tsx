@@ -118,7 +118,7 @@ export default async function ManagePage({ params, searchParams }: Props) {
           <VisibilityPanel memberId={g.memberId}
             initial={{ visibility: s.visibility, greetingsOpen: s.greetingsOpen, bookingsOpen: s.bookingsOpen }} />
         )}
-        {tab === 'events' && <EventsPanel memberId={g.memberId} />}
+        {tab === 'events' && <EventsPanel memberId={g.memberId} hostName={g.node.name || ''} />}
         {tab === 'inbox' && <InboxPanel memberId={g.memberId} />}
       </main>
     </div>

@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { eventAnchor, formatEventTime, formatFee, formatMoment, isoToLocalInput, localInputToIso, MODE_LABEL } from '@/lib/space/eventTime';
+import { formatEventTime, formatFee, formatMoment, isoToLocalInput, localInputToIso, MODE_LABEL, eventSharePath, eventShareText } from '@/lib/space/eventTime';
 import { LIMITS, type EventMode, type EventStatus, type Registration, type RegistrationStatus, type SpaceEvent } from '@/lib/space/types';
 import { CopyLink } from '@/components/space/interact/RegistrationActions';
+import ShareEvent from '@/components/space/interact/ShareEvent';
 import './events-panel.css';
 import { shrinkImage } from '@/lib/space/shrinkImage';
 
@@ -66,12 +67,13 @@ const msgOf = (d: Record<string, unknown>, fallback: string) => (typeof d.messag
  * 管理页「活动」面板：收款码、活动的新建与编辑、每个活动的报名名单。
  * 报名人的联系方式只在这里出现（只有本人和管理员进得来）。
  */
-export default function EventsPanel({ memberId }: { memberId: string }) {
+export default function EventsPanel({ memberId, hostName = '' }: { memberId: string; hostName?: string }) {
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [payQr, setPayQr] = useState(false);
   const [loadErr, setLoadErr] = useState('');
   const [editing, setEditing] = useState<string | 'new' | null>(null);
   const [pageUrl, setPageUrl] = useState('');
+  const [published, setPublished] = useState(false);
   const [notices, setNotices] = useState<Notice[]>([]);
   const q = `id=${encodeURIComponent(memberId)}`;
 
@@ -88,6 +90,7 @@ export default function EventsPanel({ memberId }: { memberId: string }) {
     setGroups((rg.data.groups as Group[]) || []);
     const urls = st.data.urls as { pageUrl?: string } | undefined;
     if (urls?.pageUrl) setPageUrl(urls.pageUrl);
+    setPublished(!!(st.data.settings as { published?: boolean } | undefined)?.published);
   }, [q]);
 
   /** 操作完：刷新数据，把要通知的人列出来 */
@@ -125,7 +128,7 @@ export default function EventsPanel({ memberId }: { memberId: string }) {
         )}
         <ul className="sep-events">
           {groups?.map(g => (
-            <EventRow key={g.event.id} group={g} memberId={memberId} payQr={payQr} pageUrl={pageUrl}
+            <EventRow key={g.event.id} group={g} memberId={memberId} payQr={payQr} pageUrl={pageUrl} published={published} hostName={hostName}
               editing={editing === g.event.id}
               onEdit={() => setEditing(g.event.id)} onClose={() => setEditing(null)}
               reload={load} after={after} />
@@ -341,8 +344,8 @@ function EventForm({ memberId, initial, payQr, active, onDone, onClose }: {
 
 // ─────────────── 一个活动 + 报名名单 ───────────────
 
-function EventRow({ group, memberId, payQr, pageUrl, editing, onEdit, onClose, reload, after }: {
-  group: Group; memberId: string; payQr: boolean; pageUrl: string; editing: boolean;
+function EventRow({ group, memberId, payQr, pageUrl, published, hostName, editing, onEdit, onClose, reload, after }: {
+  group: Group; memberId: string; payQr: boolean; pageUrl: string; published: boolean; hostName: string; editing: boolean;
   onEdit: () => void; onClose: () => void; reload: () => Promise<void>; after: (d: Record<string, unknown>) => void;
 }) {
   const { event: e, registrations: regs, counts } = group;
@@ -401,8 +404,13 @@ function EventRow({ group, memberId, payQr, pageUrl, editing, onEdit, onClose, r
           {open ? '收起名单' : `报名名单（${active}${bits.length ? `：${bits.join('、')}` : ''}）`}
         </button>
         {e.status !== 'cancelled' && <button type="button" className="st-textbtn sep-tb" onClick={onEdit}>编辑</button>}
-        {e.status === 'open' && pageUrl && (
-          <CopyLink href={`${pageUrl}#${eventAnchor(e.id)}`} label="复制报名链接" textClassName="st-textbtn sep-tb" />
+        {/* 分享这一场（链接带 ?e=，发出去的预览卡片是这一场）。网站还没发布时不给：那时链接打开是 404 */}
+        {e.status === 'open' && pageUrl && published && (
+          <ShareEvent
+            path={eventSharePath(pageUrl, e.id)}
+            title={e.title}
+            text={eventShareText(e, hostName)}
+          />
         )}
         {e.status !== 'cancelled' ? (
           <button type="button" className="st-textbtn sep-tb sep-danger" onClick={del}>{regs.length ? '取消活动' : '删掉'}</button>

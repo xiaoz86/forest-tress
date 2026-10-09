@@ -1,12 +1,18 @@
 'use client';
 
 import { useEffect, useId, useState, type FormEvent } from 'react';
-import { eventAnchor, formatEventTime, formatFee, formatMoment, MODE_LABEL } from '@/lib/space/eventTime';
+import { eventAnchor, eventSharePath, eventShareText, formatEventTime, formatFee, formatMoment, MODE_LABEL } from '@/lib/space/eventTime';
 import { LIMITS, type PublicEvent, type RegistrationStatus } from '@/lib/space/types';
 import { CopyLink } from './RegistrationActions';
+import ShareEvent from './ShareEvent';
 import './events.css';
 
-type Props = { memberId: string; events: PublicEvent[]; preview: boolean; viewerName?: string };
+type Props = {
+  memberId: string; events: PublicEvent[]; preview: boolean; viewerName?: string;
+  /** 这个人网站对外的地址（有短链用短链）：单独分享一场活动时用 */
+  sharePath: string;
+  hostName: string;
+};
 
 type Result = {
   token: string;
@@ -26,14 +32,14 @@ const DESC_FOLD = 140;
  * 网站「一起做点什么」那一章里的近期活动，每个活动可以就地报名。
  * 没有开放报名的活动时什么都不渲染。
  */
-export default function EventList({ memberId, events, preview, viewerName }: Props) {
+export default function EventList({ memberId, events, preview, viewerName, sharePath, hostName }: Props) {
   if (!events.length) return null;
   return (
     <div className="spe" data-member={memberId}>
       <p className="sp-lead">近期活动——</p>
       {preview && <p className="spe-preview">这是你自己的预览，报名会真的记下来，测完可以在管理页删掉</p>}
       <ol className="spe-list">
-        {events.map(e => <EventItem key={e.id} event={e} viewerName={viewerName} />)}
+        {events.map(e => <EventItem key={e.id} event={e} viewerName={viewerName} sharePath={sharePath} hostName={hostName} />)}
       </ol>
     </div>
   );
@@ -49,7 +55,9 @@ function placeText(e: PublicEvent): string {
   return e.place ? `${mode} · ${e.place}` : mode;
 }
 
-function EventItem({ event: e, viewerName }: { event: PublicEvent; viewerName?: string }) {
+function EventItem({ event: e, viewerName, sharePath, hostName }: {
+  event: PublicEvent; viewerName?: string; sharePath: string; hostName: string;
+}) {
   const anchor = eventAnchor(e.id);
   const [hit, setHit] = useState(false);
   const [open, setOpen] = useState(false);
@@ -60,6 +68,15 @@ function EventItem({ event: e, viewerName }: { event: PublicEvent; viewerName?: 
   const seats = seatsText(e);
   const longDesc = [...e.desc].length > DESC_FOLD;
   const desc = longDesc && !unfold ? `${[...e.desc].slice(0, DESC_FOLD).join('')}…` : e.desc;
+  // 分享出去的那一句：标题之外，带上时间、地点和谁发起的
+  const share = (
+    <ShareEvent
+      variant="space"
+      path={eventSharePath(sharePath, e.id)}
+      title={e.title}
+      text={eventShareText(e, hostName)}
+    />
+  );
 
   // 带着 #e-xxxxxxxx 打开（主人单独发出去的活动链接）：滚到这场活动，并亮一下
   useEffect(() => {
@@ -135,6 +152,7 @@ function EventItem({ event: e, viewerName }: { event: PublicEvent; viewerName?: 
             {full ? '排队' : '报名'}
           </button>
           {mine && <a className="spe-link" href={`/space/r/${mine}`}>查看我的报名</a>}
+          {share}
         </div>
       )}
     </li>

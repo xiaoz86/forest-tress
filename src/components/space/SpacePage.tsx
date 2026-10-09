@@ -234,7 +234,10 @@ export default async function SpacePage({ memberId: rawId, searchParams: sp, via
         contacts={contacts} contactHint={contactHint(node, settings, visible)}
         hasEvents={events.length > 0}
         slots={{
-          events: <EventList memberId={memberId} events={events} preview={preview} viewerName={viewerName} />,
+          events: (
+            <EventList memberId={memberId} events={events} preview={preview} viewerName={viewerName}
+              sharePath={settings.slug ? `/@${settings.slug}` : `/space/${memberId}`} hostName={node.name || ''} />
+          ),
           // 关掉了打招呼就不传：SpaceSite 会把首屏、页眉的主行动换成别的真能走的路
           greet: settings.greetingsOpen
             ? <GreetForm memberId={memberId} hostName={node.name} open preview={preview} viewerName={viewerName} />

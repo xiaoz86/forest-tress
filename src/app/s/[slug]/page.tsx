@@ -42,11 +42,13 @@ function withQuery(path: string, sp: SearchParams): string {
   return s ? `${path}?${s}` : path;
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const hit = await lookup((await params).slug);
   // 旧短链：页面本身会跳走，这里不给这个人的标题
   if (!hit?.current) return { title: '附近森林', robots: { index: false, follow: false } };
-  return buildSpaceMetadata(hit.settings.id);
+  const e = (await searchParams).e;
+  // ?e=：单独分享出去的一场活动，预览卡片换成这一场
+  return buildSpaceMetadata(hit.settings.id, { event: typeof e === 'string' ? e : null });
 }
 
 export default async function ShortLinkPage({ params, searchParams }: Props) {

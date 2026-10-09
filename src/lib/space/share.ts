@@ -4,6 +4,9 @@ import type { Metadata } from 'next';
 import { getSiteOrigin } from '@/lib/notify';
 import type { NodeCard } from '@/lib/supabase';
 import { fetchMember, previewAccess } from './access';
+import { list } from './db';
+import { formatEventTime, formatFee, MODE_LABEL } from './eventTime';
+import { coverUrlOf, isEventPublic, isStarted } from './events';
 import { richness } from './portrait';
 import { resolveThemeId, type RecommendInput } from './recommend';
 import { effectiveDraft } from './edits';
@@ -141,7 +144,23 @@ export function shareDescription(f: ShareFacts): string {
 
 const QUIET: Metadata = { title: '附近森林', robots: { index: false, follow: false } };
 
-export async function buildSpaceMetadata(memberId: string): Promise<Metadata> {
+/**
+ * 单独分享出去的那一场活动（链接里的 ?e=前 8 位）。只认对所有人公开、正在报名的：
+ * 「一起做点什么」设成只给成员看的，或者活动还是草稿、已取消、已结束，预览卡片里就不透出它。
+ */
+async function sharedEvent(memberId: string, settings: SpaceSettings, short: string | null | undefined) {
+  if (!short || !/^[0-9a-f]{8}$/i.test(short) || settings.visibility.offer !== 'public') return null;
+  try {
+    const key = short.toLowerCase();
+    const hits = await list('events', e => e.memberId === memberId && e.id.startsWith(key));
+    // 已经开始的不算：卡片上写着「在附近森林报名」，点进去却报不了名
+    return hits.find(e => isEventPublic(e) && !isStarted(e)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function buildSpaceMetadata(memberId: string, opts: { event?: string | null } = {}): Promise<Metadata> {
   const id = (memberId || '').trim().toLowerCase();
   if (!isMemberId(id)) return QUIET;
   let node: NodeCard | null;
@@ -167,6 +186,31 @@ export async function buildSpaceMetadata(memberId: string): Promise<Metadata> {
   }
   const facts = shareFacts(node, rec);
   const urls = spaceUrls(id, settings, rec, node);
+
+  // 分享的是其中一场活动：标题、摘要、预览图都换成这一场（发到微信、信息、Telegram 里看到的就是它）
+  const ev = await sharedEvent(id, settings, opts.event);
+  if (ev) {
+    const short = ev.id.slice(0, 8);
+    const evTitle = `${ev.title} · ${facts.name} 发起`;
+    const place = ev.place ? `${MODE_LABEL[ev.mode]} · ${ev.place}` : MODE_LABEL[ev.mode];
+    const evDesc = `${formatEventTime(ev.startsAt, ev.endsAt)}（北京时间）· ${place} · ${formatFee(ev.feeCents)}。在附近森林报名。`;
+    const evUrl = `${urls.pageUrl}?e=${short}`;
+    const cover = coverUrlOf(ev);
+    const image = cover
+      ? { url: `${getSiteOrigin()}${cover}`, alt: ev.title }
+      : { url: urls.ogImageUrl, width: 1200, height: 630, alt: evTitle };
+    return {
+      title: evTitle,
+      description: evDesc,
+      alternates: { canonical: urls.pageUrl },
+      openGraph: {
+        type: 'website', url: evUrl, title: evTitle, description: evDesc,
+        siteName: '附近森林', locale: 'zh_CN', images: [image],
+      },
+      twitter: { card: 'summary_large_image', title: evTitle, description: evDesc, images: [image.url] },
+    };
+  }
+
   const title = `${facts.name} · 附近森林`;
   const description = shareDescription(facts);
   return {

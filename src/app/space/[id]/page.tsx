@@ -12,10 +12,12 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { id } = await params;
   if (!isMemberId(id)) return { robots: { index: false, follow: false } };
-  return buildSpaceMetadata(id.toLowerCase());
+  const e = (await searchParams).e;
+  // ?e=：单独分享出去的一场活动，预览卡片换成这一场
+  return buildSpaceMetadata(id.toLowerCase(), { event: typeof e === 'string' ? e : null });
 }
 
 /**

@@ -77,3 +77,36 @@
 .spe-item.is-hit { background: var(--sp-accent-soft); box-shadow: 0 0 0 12px var(--sp-accent-soft); border-radius: 2px; }
 .spe-started { margin: 0; color: var(--sp-meta); }
 .spe .rc-copy { color: var(--sp-accent-text); }
+
+/* 分享这一场：一颗描边的小胶囊，跟在「报名」后面；点开后链接那一块整行铺在下面 */
+.spe-share { display: contents; }
+.sp button.spe-share-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px;
+  border: 1px solid var(--sp-line); border-radius: 999px; background: transparent; cursor: pointer;
+  font: 14px/1 var(--sp-body); color: var(--sp-ink-soft); transition: color 0.15s, border-color 0.15s;
+}
+.sp button.spe-share-btn:hover { color: var(--sp-accent-text); border-color: var(--sp-accent-text); }
+.sp button.spe-share-btn.is-done { color: var(--sp-accent-text); border-color: var(--sp-accent-text); }
+.sp button.spe-share-btn:focus-visible, .sp button.spe-share-copy:focus-visible { outline: 2px solid var(--sp-accent-text); outline-offset: 2px; }
+.spe-share-panel {
+  flex-basis: 100%; padding: 10px 12px;
+  border: 1px solid var(--sp-line); border-radius: min(var(--sp-radius), 12px); background: var(--sp-bg);
+}
+.spe-share-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.spe-share-row .spe-small { flex: 1 1 9rem; min-width: 0; }
+.spe-share-tools { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.sp button.spe-share-x {
+  display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 999px;
+  background: transparent; cursor: pointer; font: 18px/1 var(--sp-body); color: var(--sp-meta);
+}
+.sp button.spe-share-x:hover { color: var(--sp-ink); }
+.sp button.spe-share-x:focus-visible { outline: 2px solid var(--sp-accent-text); outline-offset: 2px; }
+.sp button.spe-share-copy {
+  flex-shrink: 0; min-height: 34px; padding: 0 12px; border: 1px solid var(--sp-line); border-radius: 999px;
+  background: transparent; cursor: pointer; font: 13px/1 var(--sp-body); color: var(--sp-ink);
+}
+.spe-share-url {
+  margin: 6px 0 0; font-size: 13.5px; line-height: 1.7; color: var(--sp-ink);
+  word-break: break-all; -webkit-user-select: all; user-select: all;
+}
+

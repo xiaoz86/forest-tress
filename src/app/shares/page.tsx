@@ -8,6 +8,7 @@ import { tr } from '@/lib/contentTranslate';
 import { getLocale, type Locale } from '@/lib/locale';
 import ShareSubmitForm from '@/components/ShareSubmitForm';
 import CreateMenu from '@/components/square/CreateMenu';
+import ShareEvent, { SHARE_EN, SHARE_ZH } from '@/components/space/interact/ShareEvent';
 import { isAdminId } from '@/lib/admin';
 import { getAuthenticatedMemberId } from '@/lib/session';
 import { fetchShareContent, getPublishedShares, getShareBadgeLabel, type ShareEntry } from '@/lib/shares';
@@ -15,7 +16,7 @@ import Image from 'next/image';
 import { createClient } from '@supabase/supabase-js';
 import { canSeeContacts } from '@/lib/memberTrust';
 import { canOptimize } from '@/lib/space/image';
-import { formatEventTime, formatFee, MODE_LABEL, MODE_LABEL_EN } from '@/lib/space/eventTime';
+import { eventSharePath, eventShareText, formatEventTime, formatFee, MODE_LABEL, MODE_LABEL_EN } from '@/lib/space/eventTime';
 import { countdown, listSquareEvents, type SquareEvent } from '@/lib/space/square';
 import type { NodeCard } from '@/lib/supabase';
 
@@ -235,6 +236,12 @@ function EventRow({ e, q, en }: { e: SquareEvent; q: ReturnType<typeof dict>['sh
             <span className="ml-auto text-[13.5px] text-text-secondary max-md:ml-0">
               {full ? q.full : <>{q.signedUp}{e.taken}/{e.capacity ?? q.unlimited}</>}
             </span>
+            <ShareEvent
+              path={eventSharePath(e.host.href, e.id)}
+              title={e.title}
+              text={eventShareText(e, hostName, en)}
+              copy={en ? SHARE_EN : SHARE_ZH}
+            />
           </div>
         </div>
       </div>
