@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, type ReactNode } from 'react';
+import { CopyLink } from '@/components/space/interact/RegistrationActions';
 
 /**
  * 没有链接、但有封面图的作品（公众号、播客常常只有一张带二维码的海报）：点一下就地看大图。
@@ -8,11 +9,13 @@ import { useRef, type ReactNode } from 'react';
  *
  * 外面是一个普通的图片链接：脚本没跑起来、或者浏览器不支持 <dialog> 时，照样能在新页面里打开这张图。
  */
-export default function WorkPeek({ src, title, className, children }: {
+export default function WorkPeek({ src, title, className, children, wechat }: {
   src: string;
   title: string;
   className?: string;
   children: ReactNode;
+  /** 公众号的名字：大图下面顺带告诉访客也可以在微信里搜它 */
+  wechat?: string | null;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   return (
@@ -44,6 +47,12 @@ export default function WorkPeek({ src, title, className, children }: {
           <figcaption>
             <span>{title}</span>
             <small>图里有二维码的话，在微信里长按就能识别</small>
+            {wechat && (
+              <small className="sp-wx">
+                也可以在微信里搜「{wechat}」
+                <CopyLink href={wechat} raw label="复制名字" textClassName="sp-wx-copy" />
+              </small>
+            )}
           </figcaption>
         </figure>
         <form method="dialog">

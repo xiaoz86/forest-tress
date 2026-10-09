@@ -134,7 +134,8 @@ function wechatName(title: string): string | null {
 }
 
 function WechatHint({ w }: { w: Work }) {
-  const name = w.url ? null : wechatName(w.title);
+  // 有封面的走「去看看」弹出的大图，搜索提示放在大图下面，不在这里再摆一行
+  const name = w.url || peekImage(w) ? null : wechatName(w.title);
   if (!name) return null;
   return (
     <span className="sp-wx">
@@ -161,14 +162,14 @@ function Plate({ w }: { w: Work }) {
         <span className="sp-plate-t">{w.title}</span>
         {w.desc && <span className="sp-plate-d">{w.desc}</span>}
         {w.url && <span className="sp-go-link">去看看 ↗</span>}
-        {peek && <span className="sp-go-link">看大图 ↗</span>}
+        {peek && <span className="sp-go-link">去看看 ↗</span>}
       </figcaption>
     </>
   );
   return (
     <figure className={`sp-plate ${img ? '' : 'is-text'}`}>
       {w.url ? <a href={w.url} target="_blank" rel="noreferrer noopener">{body}</a>
-        : peek ? <WorkPeek src={peek} title={w.title}>{body}</WorkPeek>
+        : peek ? <WorkPeek src={peek} title={w.title} wechat={wechatName(w.title)}>{body}</WorkPeek>
         : body}
       <WechatHint w={w} />
     </figure>
@@ -185,7 +186,7 @@ function Entry({ w, action, image }: { w: Work; action: string; image?: boolean 
       <span className="sp-entry-t">{w.title}</span>
       {w.desc && <span className="sp-entry-d">{w.desc}</span>}
       {w.url && <span className="sp-go-link">{action}</span>}
-      {peekImage(w) && <span className="sp-go-link">看图 ↗</span>}
+      {peekImage(w) && <span className="sp-go-link">去看看 ↗</span>}
     </>
   );
   const peek = peekImage(w);
@@ -193,7 +194,7 @@ function Entry({ w, action, image }: { w: Work; action: string; image?: boolean 
     <a className="sp-entry" href={w.url} target="_blank" rel="noreferrer noopener">{body}</a>
   ) : peek ? (
     <div className="sp-entry-wrap">
-      <WorkPeek className="sp-entry" src={peek} title={w.title}>{body}</WorkPeek>
+      <WorkPeek className="sp-entry" src={peek} title={w.title} wechat={wechatName(w.title)}>{body}</WorkPeek>
       <WechatHint w={w} />
     </div>
   ) : (
@@ -447,9 +448,9 @@ export default function SpaceSite({
                 </a>
               ) : peekImage(w) ? (
                 // 没有链接、只有一张海报（公众号、播客常这样）：点开看大图，微信里长按识别二维码
-                <WorkPeek src={peekImage(w)!} title={w.title}>
+                <WorkPeek src={peekImage(w)!} title={w.title} wechat={wechatName(w.title)}>
                   <span className="sp-index-t">{w.title}</span><span className="sp-dots" aria-hidden />
-                  <span className="sp-index-v">看图 ↗</span>
+                  <span className="sp-index-v">去看看 ↗</span>
                 </WorkPeek>
               ) : (
                 <span className="sp-index-t">{w.title}</span>

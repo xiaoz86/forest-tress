@@ -701,8 +701,11 @@ body { margin: 0; }
 .sp-peek-box { margin: 0; }
 .sp-peek-box img { display: block; width: 100%; height: auto; max-height: 78vh; object-fit: contain; background: var(--sp-accent-soft); }
 .sp-peek-box figcaption { display: grid; gap: 4px; padding: 12px 16px 16px; }
-.sp-peek-box figcaption span { font-family: var(--sp-head); font-size: 17px; line-height: 1.5; }
-.sp-peek-box figcaption small { font-size: 13px; line-height: 1.6; color: var(--sp-meta); }
+.sp-peek-box figcaption > span { font-family: var(--sp-head); font-size: 17px; line-height: 1.5; }
+/* 弹窗挂在列表项里：写具体一点，压住 .sp-index small 那类外层样式 */
+.sp-peek-box figcaption > small { display: block; margin: 0; font-size: 13px; line-height: 1.6; color: var(--sp-meta); }
+.sp-peek-box figcaption > small.sp-wx { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; }
+.sp-peek-box .sp-wx .rc-copy { font: inherit; }
 .sp-peek form { margin: 0; }
 .sp-peek-close {
   position: absolute; top: 10px; right: 10px; width: 44px; height: 44px; border: 0; border-radius: 999px;
