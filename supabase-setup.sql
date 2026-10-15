@@ -520,3 +520,28 @@ alter table sky_constellations enable row level security;
 -- 默认 true：星空是这批人的另一种看法，不是新的信息披露；
 -- 而且迁移前的老行没有这个值，判成 false 会让整片天空当场空掉。
 alter table node_cards add column if not exists in_sky boolean not null default true;
+
+
+-- ============================================================
+-- 2026-10-15 phil-coach 免费期与续期
+-- ============================================================
+
+-- 免费期本身不存：按节点卡的 created_at 现算（规则见 src/lib/philCoachAccess.ts）——
+-- 11 月 15 日前成为成员的送 3 个月（老成员从 10 月 15 日算起），之后注册的送 14 天。
+-- 这张表只记「续期」：成员到期后点「申请继续使用」，主理人或 Wendy 在邮件里点「通过」，
+-- 再开 3 个月。
+--
+-- renew_token：一次申请一个 token，邮件里的「通过」链接带着它；通过时清空。
+-- 两个人都点了，第二个人看到「已经续过了」，不会续出 6 个月。
+-- 表还没建的时候，代码读不到就放行，所以先上线代码、后跑这段也不会把人拦住。
+create table if not exists phil_coach_access (
+  member_id uuid primary key references node_cards(id) on delete cascade,
+  free_until date,                  -- 续期后免费到哪一天（北京时间，含当天）；没续过为空
+  renew_token text,                 -- 等待通过的续期申请；为空 = 没有待处理的申请
+  renew_requested_at timestamptz,
+  renew_approved_at timestamptz,
+  updated_at timestamptz default now()
+);
+
+-- 和 program_orders 一样：开 RLS 不加 policy = 只有服务端能读写。
+alter table phil_coach_access enable row level security;

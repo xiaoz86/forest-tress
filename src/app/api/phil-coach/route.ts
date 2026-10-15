@@ -7,6 +7,7 @@ import { getPhilPath } from '@/lib/philCoach';
 import { COACH_WISDOM } from '@/lib/philCoachWisdom';
 import { fetchRelevantKnowledge } from '@/lib/philCoachKnowledge';
 import { GUEST_COOKIE, fetchMemoryBlock, guestActive, memoryClient } from '@/lib/philCoachMemory';
+import { loadAccess } from '@/lib/philCoachAccess';
 import { normalizeVoiceAnalysis } from '@/lib/philCoachVoice';
 import { isProfileComplete } from '@/lib/memberTrust';
 import type { NodeCard } from '@/lib/supabase';
@@ -212,6 +213,22 @@ export async function POST(request: Request) {
       }
     }
     // Supabase 不可用时放行——对话可用性优先于闸门严格性
+  }
+
+  /**
+   * 免费期（见 lib/philCoachAccess）：到期的成员和没登录的访客一样，每段对话先免费聊几句，
+   * 再往下才请 ta 申请续期。不从第一句就拦——那样的话退出登录反而能多聊，说不过去。
+   * 读不到免费期（表还没建、库不可用）就放行。
+   */
+  if (memberIdRaw && assistantTurns >= GUEST_FREE_TURNS) {
+    const sb = memoryClient();
+    const access = sb ? await loadAccess(sb, memberIdRaw) : null;
+    if (access && !access.active) {
+      return NextResponse.json(
+        { error: 'trial-ended', memberId: memberIdRaw, access },
+        { status: 403 },
+      );
+    }
   }
 
   // 第二道：是成员了，但卡片还是薄的，聊到 40 轮就该把自己填完整

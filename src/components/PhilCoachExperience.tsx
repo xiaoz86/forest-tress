@@ -9,6 +9,7 @@ import {
   useServerSpeechInput,
 } from '@/lib/voiceServer';
 import type { VoiceAnalysis } from '@/lib/philCoachVoice';
+import type { PhilAccess } from '@/lib/philCoachAccess';
 import { dict } from '@/i18n';
 import type { Locale } from '@/lib/locale';
 import {
@@ -234,9 +235,10 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
    * 被哪一道闸拦下的。
    *   member  —— 8 轮，还不是成员：先验证邮箱，再登录或选择登记方式
    *   profile —— 40 轮，是成员但卡片还薄：请他把节点卡填完
+   *   trial   —— 8 轮，是成员但免费期过了：请他申请继续使用（规则见 lib/philCoachAccess）
    */
-  const [gateKind, setGateKind] = useState<'member' | 'profile'>('member');
-  const gateKindRef = useRef<'member' | 'profile'>('member');
+  const [gateKind, setGateKind] = useState<'member' | 'profile' | 'trial'>('member');
+  const gateKindRef = useRef<'member' | 'profile' | 'trial'>('member');
   /** 我们自己发起的跳转，用来让 beforeunload 那道提示放行 */
   const leavingOnPurposeRef = useRef(false);
   /** 浮层第三步的称呼框。不能靠 autoFocus，见下面那个 effect */
@@ -252,6 +254,13 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const [myMemberId, setMyMemberId] = useState('');
   /** 卡片填完了没有。薄卡片的人才会在收尾处看到那句邀请。 */
   const [profileComplete, setProfileComplete] = useState(true);
+  /**
+   * 免费期（只有登录成员有）。页面上不常驻显示，只给免费期浮层的文案用，
+   * 以及回到页面时判断「续期通过了没有」。读不到就是 null。
+   */
+  const [access, setAccess] = useState<PhilAccess | null>(null);
+  const accessRef = useRef<PhilAccess | null>(null);
+  const [renewState, setRenewState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
   const [gateName, setGateName] = useState('');
   const [gateEmail, setGateEmail] = useState('');
   const [gateCode, setGateCode] = useState('');
@@ -592,6 +601,39 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     voiceOut.speak(last.text);
   }, [session, voiceOut, voiceIn.recording, voiceIn.requesting]);
 
+  function updateAccess(next: PhilAccess | null) {
+    accessRef.current = next;
+    setAccess(next);
+  }
+
+  /** 免费期浮层里那颗「申请继续使用」 */
+  async function requestRenewal() {
+    if (renewState === 'sending') return;
+    setRenewState('sending');
+    try {
+      const res = await fetch('/api/phil-coach/access/renew', { method: 'POST' });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        // 登录在别处失效了：换成登录浮层；登录回来，被拦下的那句会自动重发
+        setRenewState('idle');
+        setGateKind('member');
+        setGateStep('email');
+        return;
+      }
+      if (json.access) updateAccess(json.access);
+      if (json.access?.active) {
+        // 免费期其实已经恢复了（比如在另一台设备上申请、已经通过）：
+        // 收起浮层，pendingRetry 那个 effect 会把被拦下的那句重发出去
+        setRenewState('idle');
+        setShowGate(false);
+        return;
+      }
+      setRenewState(res.ok ? 'sent' : 'failed');
+    } catch {
+      setRenewState('failed');
+    }
+  }
+
   /**
    * 服务器会话是登录态的唯一来源；记忆接口只负责资料和记忆。
    * 这样即使记忆表临时查询失败，也不会把已有登录会话误判成游客。
@@ -604,7 +646,10 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       const memberId = typeof sessionJson?.memberId === 'string' ? sessionJson.memberId : '';
       setLoggedIn(Boolean(memberId));
       setMyMemberId(memberId);
-      if (!memberId) return false;
+      if (!memberId) {
+        updateAccess(null);
+        return false;
+      }
 
       try {
         const memoryResponse = await fetch('/api/phil-coach/memory', { cache: 'no-store' });
@@ -612,6 +657,7 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
         const json = await memoryResponse.json();
         setProfileName(normalizePhilProfileName(json.profileName));
         setProfileComplete(Boolean(json.profileComplete));
+        updateAccess(json.access ?? null);
         const mems: { path_id?: string }[] = json.memories ?? [];
         setProfileKnown(mems.some(m => m.path_id === PROFILE_PATH));
         // 第一次：还没有任何记忆时，默认把注册资料导入为「关于我」种子
@@ -659,10 +705,21 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     const refreshOnReturn = () => {
       if (document.visibilityState !== 'visible') return;
       void refreshIdentity().then(authenticated => {
-        if (!authenticated) return;
+        if (!authenticated) {
+          // 免费期浮层开着、人却在别处退出了：申请要登录，换成登录浮层
+          if (gateKindRef.current === 'trial') {
+            setGateKind('member');
+            setGateStep('email');
+          }
+          return;
+        }
         if (gateKindRef.current === 'member') {
           setShowGate(false);
           setGateStep('email');
+        }
+        // 续期在邮件里通过了，人回到这页：浮层收起，被拦下的那句自动重发
+        if (gateKindRef.current === 'trial' && accessRef.current?.active) {
+          setShowGate(false);
         }
       });
     };
@@ -803,6 +860,13 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     });
     const json = await res.json().catch(() => ({}));
     if (gen !== genRef.current) return 'stale';
+    if (res.status === 403 && json.error === 'trial-ended') {
+      setGateKind('trial');
+      // 每次被拦都从头来：上一回的「没申请上」不该留到这一回；已申请过的由 access.renewalPending 说
+      setRenewState('idle');
+      if (json.access) updateAccess(json.access);
+      return 'gate';
+    }
     if (res.status === 403 && (json.error === 'member-required' || json.error === 'profile-required')) {
       setGateKind(json.error === 'profile-required' ? 'profile' : 'member');
       if (typeof json.memberId === 'string') setMyMemberId(json.memberId);
@@ -1128,10 +1192,12 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
         </button>
 
         <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.2em] text-pc-plum">
-          {gateKind === 'profile' ? t.gate.profile.eyebrow : t.gate.eyebrow}
+          {gateKind === 'trial' ? t.gate.trial.eyebrow : gateKind === 'profile' ? t.gate.profile.eyebrow : t.gate.eyebrow}
         </div>
         <h3 id="phil-coach-gate-title" className="text-xl font-medium">
-          {gateKind === 'profile'
+          {gateKind === 'trial'
+            ? t.gate.trial.title
+            : gateKind === 'profile'
             ? t.gate.profile.title
             : gateStep === 'name'
               ? t.gate.nameTitle
@@ -1140,7 +1206,35 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
               : t.gate.title}
         </h3>
 
-        {gateKind === 'profile' ? (
+        {gateKind === 'trial' ? (
+          <>
+            <p className="mt-3 text-[14px] leading-[1.95] text-pc-ink-2">
+              {access ? t.gate.trial.body(t.access.formatDay(access.freeUntil)) : t.gate.trial.bodyNoDate}
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-4">
+              {access?.renewalPending || renewState === 'sent' ? (
+                <p role="status" aria-live="polite" className="m-0 text-[14px] leading-[1.9] text-pc-plum">
+                  {renewState === 'sent' ? t.gate.trial.sent : t.gate.trial.pending}
+                </p>
+              ) : (
+                <>
+                  <button
+                    onClick={requestRenewal}
+                    disabled={renewState === 'sending'}
+                    type="button"
+                    className="rounded-full bg-pc-ink px-6 py-2.5 text-[14px] font-medium text-pc-ivory transition-opacity disabled:opacity-40"
+                  >
+                    {renewState === 'sending' ? t.gate.trial.sending : t.gate.trial.cta}
+                  </button>
+                  {renewState === 'failed' && (
+                    <span role="status" aria-live="polite" className="text-[13px] text-pc-brick">{t.gate.trial.failed}</span>
+                  )}
+                </>
+              )}
+            </div>
+            <p className="mt-5 text-[12px] leading-relaxed text-pc-ink-3">{t.gate.trial.note}</p>
+          </>
+        ) : gateKind === 'profile' ? (
           <>
             <p className="mt-3 text-[14px] leading-[1.95] text-pc-ink-2">{t.gate.profile.body}</p>
             <div className="mt-6">

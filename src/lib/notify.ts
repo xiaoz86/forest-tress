@@ -41,7 +41,9 @@ type CriticalEmailKind =
   | 'login-link'
   | 'login-code'
   | 'program-claim'
-  | 'space-inbox';
+  | 'space-inbox'
+  | 'phil-renew'
+  | 'phil-renewed';
 
 type ResendMessage = {
   from: string;
@@ -854,6 +856,101 @@ export async function notifyPhilGuest(params: {
   } catch (err) {
     console.error('[notify] guest send failed', err);
   }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// phil-coach 免费期到了：成员申请续期 → 主理人点「通过」→ 告诉成员
+// ──────────────────────────────────────────────────────────────────
+
+/** 收件人和登记、反馈通知同一份名单：主理人 + Wendy；可用 PHIL_FEEDBACK_EMAILS 覆盖 */
+function philRecipients(): string[] {
+  const override = process.env.PHIL_FEEDBACK_EMAILS?.trim();
+  return override
+    ? override.split(',').map(s => s.trim()).filter(Boolean)
+    : Array.from(new Set([...getRecipients(), 'wendyjhwu@hotmail.com']));
+}
+
+/** 成员申请继续使用 phil-coach。你或 Wendy 任一人点「通过」即可，另一人再点不会重复续。 */
+export async function notifyPhilAccessRenewal(params: {
+  name: string;
+  email: string;
+  memberId: string;
+  /** 现在的免费期最后一天，已经格式化好，如「2027 年 1 月 15 日」 */
+  freeUntil: string;
+  expired: boolean;
+  approveUrl: string;
+  /** 每次申请一个，用作发信的去重键 */
+  token: string;
+}): Promise<EmailSendResult> {
+  const from = process.env.NOTIFY_FROM?.trim() || '';
+  const name = params.name || '一位成员';
+  const subject = `🌿 ${name} 申请继续使用 phil-coach（点一下即续 3 个月）`;
+  const status = params.expired
+    ? `免费期已在 ${params.freeUntil} 结束。`
+    : `免费期到 ${params.freeUntil}，快到期了。`;
+  const nodeUrl = `${getSiteOrigin()}/creators/${encodeURIComponent(params.memberId)}`;
+  const text = [
+    `${name} 申请继续使用 phil-coach。`,
+    status,
+    `邮箱：${params.email || '（未填）'}`,
+    `节点页：${nodeUrl}`,
+    ``,
+    `点击通过，再开 3 个月（你或 Wendy 任一人点即可，重复点击不会多续）：`,
+    params.approveUrl,
+  ].join('\n');
+  const html = `<!DOCTYPE html>
+<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:26px 30px;box-shadow:0 4px 20px rgba(26,46,26,0.06);">
+    <h2 style="margin:0 0 14px;font-size:17px;color:#2d4a2d;">🌿 ${escape(name)} 申请继续使用 phil-coach</h2>
+    <p style="font-size:14px;color:#2a2a2a;margin:0 0 6px;">${escape(status)}</p>
+    <p style="font-size:14px;color:#2a2a2a;margin:0 0 6px;">邮箱：<strong>${escape(params.email || '（未填）')}</strong></p>
+    <p style="font-size:13px;margin:0 0 16px;"><a href="${escape(nodeUrl)}" style="color:#6b8f5e;">看 ta 的节点页</a></p>
+    <p style="text-align:center;margin:20px 0;">
+      <a href="${escape(params.approveUrl)}" style="display:inline-block;padding:12px 28px;background:#2d4a2d;color:#fff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">✓ 通过，再开 3 个月</a>
+    </p>
+    <p style="font-size:12px;color:#8a8a8a;margin:0;text-align:center;">你或 Wendy 任一人点即可；重复点击不会多续。通过后会发邮件告诉 ta。</p>
+  </div>
+</body></html>`;
+  return sendCriticalEmail(
+    'phil-renew',
+    { from, to: philRecipients(), subject, html, text },
+    `phil-renew-${params.token}`,
+  );
+}
+
+/**
+ * 续期通过了：告诉成员本人可以接着聊了。
+ * 这封信由主理人点击触发，语言跟收件人存下的 node_cards.locale 走，不跟点击的人走。
+ */
+export async function notifyPhilAccessRenewed(params: {
+  to: string;
+  name: string;
+  /** 新的免费期最后一天，形如 2027-04-19 */
+  freeUntil: string;
+  locale: Locale;
+  /** 同一次通过只发一封 */
+  idempotencyKey: string;
+}): Promise<EmailSendResult> {
+  const from = process.env.NOTIFY_FROM?.trim() || '';
+  const d = dict(params.locale);
+  const t = d.email.philRenewed;
+  const date = d.philCoach.experience.access.formatDay(params.freeUntil);
+  const link = `${getSiteOrigin()}/phil-coach`;
+  const lines = [t.hello(params.name), t.body(date), t.closing];
+  const html = `<!DOCTYPE html>
+<html><body style="margin:0;padding:24px;background:#f0f5ec;font-family:${EMAIL_FONT};">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;padding:26px 30px;box-shadow:0 4px 20px rgba(26,46,26,0.06);font-size:15px;line-height:1.8;color:#23331f;">
+    ${lines.map(l => `<p style="margin:0 0 10px;">${escape(l)}</p>`).join('')}
+    <p style="margin:22px 0 0;"><a href="${escape(link)}" style="display:inline-block;padding:11px 22px;border-radius:999px;background:#2d4a2d;color:#fff;font-weight:600;font-size:14px;text-decoration:none;">${escape(t.cta)}</a></p>
+    <p style="margin:26px 0 0;font-size:12.5px;color:#8a917f;">${escape(t.footer)}</p>
+  </div>
+</body></html>`;
+  const text = `${lines.join('\n')}\n\n${t.cta}\n${link}`;
+  return sendCriticalEmail(
+    'phil-renewed',
+    { from, to: [params.to], subject: t.subject(date), html, text },
+    params.idempotencyKey,
+  );
 }
 
 // ──────────────────────────────────────────────────────────────────

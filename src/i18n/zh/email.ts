@@ -114,4 +114,17 @@ export const email = {
     textCta: (url: string) => `去看看 TA 的主页：${url}`,
     textUnsubscribe: (url: string) => `不想再收到这类推荐：${url}`,
   },
+
+  /**
+   * phil-coach 续期通过了：发给成员本人。
+   * 由主理人点击触发，所以和撮合介绍信一样读收件人自己存下的 node_cards.locale。
+   */
+  philRenewed: {
+    subject: (date: string) => `🌿 你的 phil-coach 已经续上了，可以用到 ${date}`,
+    hello: (name: string) => (name ? `${name}，你好：` : '你好：'),
+    body: (date: string) => `你申请继续使用 phil-coach，已经为你续上了，现在可以免费用到 ${date}。`,
+    closing: '想说话的时候，随时回来。',
+    cta: '回到向内对话',
+    footer: '这封信来自附近森林。',
+  },
 };

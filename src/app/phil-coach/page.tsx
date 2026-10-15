@@ -58,6 +58,7 @@ function faqItems(t: T): { question: string; answer: ReactNode }[] {
         </>
       ),
     },
+    { question: t.faq.free.question, answer: <p className="m-0">{t.faq.free.answer}</p> },
     { question: t.faq.therapy.question, answer: <p className="m-0">{t.faq.therapy.answer}</p> },
   ];
 }

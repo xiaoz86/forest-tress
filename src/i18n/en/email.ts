@@ -85,4 +85,13 @@ export const email: typeof zhEmail = {
     textCta: (url: string) => `Visit their page: ${url}`,
     textUnsubscribe: (url: string) => `Stop receiving these introductions: ${url}`,
   },
+
+  philRenewed: {
+    subject: (date: string) => `🌿 Your phil-coach is renewed — free until ${date}`,
+    hello: (name: string) => (name ? `Hi ${name},` : 'Hi,'),
+    body: (date: string) => `You asked to keep using phil-coach, and it’s done: it’s free for you until ${date}.`,
+    closing: 'Come back whenever you want to talk.',
+    cta: 'Back to Inner Dialogue',
+    footer: 'This email comes from Nearby Forest.',
+  },
 };

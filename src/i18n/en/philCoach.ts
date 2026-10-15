@@ -103,6 +103,12 @@ export const philCoach: typeof zhPhilCoach = {
         ' (sign up), you can tap “Keep this part” on the part of a conversation that mattered — saved only with your explicit yes, onto your own node page, visible only to you and deletable any time. Next time, phil-coach picks the thread back up: “Last time you said you wanted to try sleeping earlier — how did that go?” Anything you don’t keep, it meets you fresh.',
     },
 
+    free: {
+      question: 'How long is it free?',
+      answer:
+        'Join the forest on or before November 15 (Beijing time) and phil-coach is free for 3 months — if you were already here before October 15, your 3 months start on October 15; otherwise they start the day you join. Join after November 15 and you get 14 days free. When your free period ends, the conversation will show “Ask to keep using it”; tap it, and once we approve, you get another 3 months and we’ll email you.',
+    },
+
     therapy: {
       question: 'How is this different from therapy?',
       answer:
@@ -123,6 +129,19 @@ export const philCoach: typeof zhPhilCoach = {
       choice: { label: 'I’m stuck on a choice', hint: 'I can’t let go of either side' },
       mirror: { label: 'I want to meet who I am right now', hint: 'Stop for a moment and see yourself as you are' },
       open: { label: 'Just talking', hint: '' },
+    },
+
+    access: {
+      /** 2027-01-15 → January 15, 2027 */
+      formatDay: (day: string) => {
+        const [y, m, d] = day.split('-').map(Number);
+        return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          timeZone: 'UTC',
+        });
+      },
     },
 
     profile: {
@@ -259,6 +278,20 @@ export const philCoach: typeof zhPhilCoach = {
         body: 'We’ve talked for a while now. Before we go further, please fill in your node card — what you’re working on, what you care about, who you’re looking for. Only then can the forest tell who to introduce you to.',
         cta: 'Complete my card',
         note: 'Edit it on your own page — a few minutes. Come back and we’ll carry on.',
+      },
+      trial: {
+        eyebrow: 'Your free period has ended',
+        title: 'Want to keep talking with phil-coach?',
+        body: (date: string) =>
+          `Your free period ended on ${date}. Tap below to ask for more time — once Nearby Forest approves, we’ll add another 3 months and email you.`,
+        bodyNoDate:
+          'Your free period has ended. Tap below to ask for more time — once Nearby Forest approves, we’ll add another 3 months and email you.',
+        cta: 'Ask to keep using it',
+        sending: 'Asking…',
+        sent: 'Request sent. We’ll email you once it’s approved — then come back and carry on.',
+        pending: 'You’ve already asked — we’ll email you as soon as it’s approved.',
+        failed: 'That didn’t go through. Try again in a moment.',
+        note: 'This conversation is still here. To keep it, close this and tap “Keep this for yourself” to copy it.',
       },
       error: {
         code: 'That code isn’t right, or it has expired. You can send a new one.',

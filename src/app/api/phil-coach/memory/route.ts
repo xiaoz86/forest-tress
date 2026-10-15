@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isProfileComplete } from '@/lib/memberTrust';
 import type { NodeCard } from '@/lib/supabase';
 import { getAuthenticatedMemberId } from '@/lib/session';
+import { loadAccess } from '@/lib/philCoachAccess';
 import { createChatCompletion } from '@/lib/llm';
 import { PROFILE_PATH, normalizePhilProfileName } from '@/lib/philCoach';
 import {
@@ -24,7 +25,7 @@ export async function GET() {
   const sb = memoryClient();
   if (!sb) return NextResponse.json({ error: 'not-configured' }, { status: 500 });
 
-  const [{ data, error }, { data: node }] = await Promise.all([
+  const [{ data, error }, { data: node }, access] = await Promise.all([
     sb
       .from('phil_coach_memories')
       .select('id, content, takeaway, path_id, created_at')
@@ -32,6 +33,8 @@ export async function GET() {
       .order('created_at', { ascending: false })
       .limit(MAX_MEMORIES_PER_NODE),
     sb.from('node_cards').select('name, doing, topics, email').eq('id', memberId).maybeSingle(),
+    // 免费期：页面不常驻显示，只用来在回到页面时判断续期通过了没有；读不到就是 null
+    loadAccess(sb, memberId),
   ]);
   if (error) return NextResponse.json({ error: 'query-failed' }, { status: 500 });
   const hasProfile = (data ?? []).some(memory => memory.path_id === PROFILE_PATH);
@@ -43,6 +46,7 @@ export async function GET() {
     profileName,
     memberId,
     profileComplete: isProfileComplete(node as NodeCard | null),
+    access,
   });
 }
 
