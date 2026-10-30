@@ -32,7 +32,7 @@ export function getLLMConfig(): LLMConfig | null {
       provider: 'deepseek',
       apiKey: deepseekKey,
       baseUrl: (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/+$/, ''),
-      model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-flash',
     };
   }
 

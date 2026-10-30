@@ -28,7 +28,7 @@ if (!key) {
   process.exit(1);
 }
 const baseUrl = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/+$/, '');
-const model = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
+const model = process.env.DEEPSEEK_MODEL || 'deepseek-flash';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

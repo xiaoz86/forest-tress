@@ -23,7 +23,7 @@ if (!key) {
   process.exit(1);
 }
 const baseUrl = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/+$/, '');
-const model = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
+const model = process.env.DEEPSEEK_MODEL || 'deepseek-flash';
 
 // 整站统一的译法。加新词就往这里加，别让同一个词在不同页面变成三种英文。
 const GLOSSARY = `
