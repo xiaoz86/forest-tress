@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { DashscopeError, getDashscopeConfig, toDashscopeError } from '@/lib/dashscope';
 import {
+  bailianTtsGainDb,
   bailianTtsInstruction,
   resolveBailianVoice,
   streamTtsPcm,
@@ -116,6 +117,7 @@ export async function POST(request: Request) {
         text,
         voice: bailianVoice,
         instruction: bailianTtsInstruction(tone),
+        gainDb: bailianTtsGainDb(voiceKey),
         config: bailian,
         signal: request.signal,
         onDone: ({ audioBytes, usage, cancelled }) => {

@@ -25,7 +25,7 @@ import {
   type DashscopeConfig,
 } from './dashscope.ts';
 import type { SpeechTone } from './philCoachSpeechSign.ts';
-import { createPcmAligner, createPcmSilenceTrimmer } from './wavPcm.ts';
+import { createPcmAligner, createPcmLeveler, createPcmSilenceTrimmer } from './wavPcm.ts';
 
 type Env = Record<string, string | undefined>;
 
@@ -53,6 +53,19 @@ export function bailianTtsInstruction(tone: SpeechTone, env: Env = process.env):
  * 前端只传 female / male 两个键名，这里映射到百炼复刻得到的 voice_id。
  * 认不出的键名回落到 female；任意字符串不会被透传给上游。没配返回 null。
  */
+/**
+ * 每把嗓音的响度提升（dB），见 createPcmLeveler。复刻的女声天生比男声轻约 2 dB、
+ * 两者都只有约 −18~−20 dBFS，手机外放听不清；默认女声 +7、男声 +4，处理后两把嗓音都在约 −13~−14 dBFS。
+ * 可以用 DASHSCOPE_TTS_GAIN_DB_FEMALE / DASHSCOPE_TTS_GAIN_DB_MALE 调，范围 0–12，0 就是不处理。
+ */
+export function bailianTtsGainDb(voiceKey: unknown, env: Env = process.env): number {
+  const male = voiceKey === 'male';
+  const raw = (male ? env.DASHSCOPE_TTS_GAIN_DB_MALE : env.DASHSCOPE_TTS_GAIN_DB_FEMALE)?.trim();
+  const parsed = raw ? Number(raw) : NaN;
+  const value = Number.isFinite(parsed) ? parsed : male ? 4 : 7;
+  return Math.max(0, Math.min(12, value));
+}
+
 export function resolveBailianVoice(voiceKey: unknown, env: Env = process.env): string | null {
   const key = voiceKey === 'male' ? 'MALE' : 'FEMALE';
   return env[`DASHSCOPE_TTS_VOICE_${key}`]?.trim() || null;
@@ -188,6 +201,7 @@ export async function streamTtsPcm({
   signal,
   firstAudioTimeoutMs = 8_000,
   totalTimeoutMs = 45_000,
+  gainDb = 0,
   onDone,
 }: {
   text: string;
@@ -197,6 +211,8 @@ export async function streamTtsPcm({
   signal?: AbortSignal;
   firstAudioTimeoutMs?: number;
   totalTimeoutMs?: number;
+  /** 响度提升（dB），0 就是不处理；见 bailianTtsGainDb */
+  gainDb?: number;
   onDone?: (info: TtsStreamDone) => void;
 }): Promise<TtsPcmStream> {
   const cfg = config === undefined ? getDashscopeConfig() : config;
@@ -269,6 +285,8 @@ export async function streamTtsPcm({
   const aligner = createPcmAligner();
   // 裁掉每段首尾的静音（见 createPcmSilenceTrimmer）：不然首字节到了还要再等一秒才出声
   const trimmer = createPcmSilenceTrimmer({ sampleRate: TTS_SAMPLE_RATE });
+  // 再把响度提上来（尖峰用限幅器压住，不会爆音）：手机外放、iPhone 走 <audio> 时网页没法再加音量
+  const leveler = createPcmLeveler({ sampleRate: TTS_SAMPLE_RATE, gainDb });
   const pending: Uint8Array[] = [];
   const enqueue = (bytes: Uint8Array) => {
     if (!bytes.length) return;
@@ -292,7 +310,7 @@ export async function streamTtsPcm({
         continue;
       }
       const aligned = aligner.push(event.pcm);
-      if (aligned.length) enqueue(trimmer.push(aligned));
+      if (aligned.length) enqueue(leveler.push(trimmer.push(aligned)));
     }
   };
 
@@ -305,7 +323,7 @@ export async function streamTtsPcm({
       absorb(parser.push(decoder.decode()));
       absorb(parser.flush());
       aligner.flush();
-      enqueue(trimmer.flush());
+      enqueue(leveler.push(trimmer.flush()));
       return false;
     }
     absorb(parser.push(decoder.decode(value, { stream: true })));

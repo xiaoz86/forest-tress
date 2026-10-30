@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DashscopeError, getDashscopeConfig } from '../src/lib/dashscope.ts';
 import {
+  bailianTtsGainDb,
   bailianTtsInstruction,
   createTtsSseParser,
   DEFAULT_TTS_INSTRUCTION,
   resolveBailianVoice,
   streamTtsPcm,
 } from '../src/lib/dashscopeTts.ts';
-import { createPcmAligner, createPcmSilenceTrimmer } from '../src/lib/wavPcm.ts';
+import { createPcmAligner, createPcmLeveler, createPcmSilenceTrimmer } from '../src/lib/wavPcm.ts';
 
 const CONFIG = getDashscopeConfig({ DASHSCOPE_API_KEY: 'sk-test', DASHSCOPE_WORKSPACE_ID: 'ws-test' })!;
 
@@ -289,4 +290,56 @@ test('静音裁剪：低于阈值的轻声不算出声，超过阈值的才算',
   const loud = new Uint8Array(4_800);
   new DataView(loud.buffer).setInt16(100, 2000, true);
   assert.ok(trimmer.push(loud).length > 0);
+});
+
+// ── 响度均衡 ──────────────────────────────────────────────
+
+function sinePcm(amplitude: number, ms: number, sampleRate = 24_000): Uint8Array {
+  const n = Math.round((sampleRate * ms) / 1000);
+  const out = new Uint8Array(n * 2);
+  const view = new DataView(out.buffer);
+  for (let i = 0; i < n; i += 1) view.setInt16(i * 2, Math.round(Math.sin((2 * Math.PI * 220 * i) / sampleRate) * amplitude * 32767), true);
+  return out;
+}
+const peakOf = (bytes: Uint8Array) => {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let p = 0;
+  for (let i = 0; i < bytes.length; i += 2) p = Math.max(p, Math.abs(view.getInt16(i, true)));
+  return p;
+};
+
+test('响度均衡：gainDb 为 0 原样返回；轻声按增益放大（+6 dB ≈ ×2）', () => {
+  const quiet = sinePcm(0.05, 300);
+  assert.equal(createPcmLeveler({ sampleRate: 24_000, gainDb: 0 }).push(quiet), quiet);
+  const out = createPcmLeveler({ sampleRate: 24_000, gainDb: 6 }).push(quiet);
+  const ratio = peakOf(out) / peakOf(quiet);
+  assert.ok(ratio > 1.95 && ratio < 2.05, `放大倍数 ${ratio}`);
+});
+
+test('响度均衡：响的地方永远不超过 −1 dBFS，不会削波', () => {
+  const loud = sinePcm(0.95, 500);
+  const out = createPcmLeveler({ sampleRate: 24_000, gainDb: 12 }).push(loud);
+  assert.ok(peakOf(out) <= Math.round(10 ** (-1 / 20) * 32767), `峰值 ${peakOf(out)}`);
+  assert.equal(out.length, loud.length);
+});
+
+test('响度均衡：按任意块大小处理，结果和一次处理完全一样（状态跨块保留）', () => {
+  const pcm = new Uint8Array([...sinePcm(0.9, 200), ...sinePcm(0.1, 300), ...sinePcm(0.95, 100)]);
+  const whole = createPcmLeveler({ sampleRate: 24_000, gainDb: 6 }).push(pcm);
+  for (const chunk of [2, 482, 4_800, 9_998]) {
+    const leveler = createPcmLeveler({ sampleRate: 24_000, gainDb: 6 });
+    const parts: number[] = [];
+    for (let i = 0; i < pcm.length; i += chunk) parts.push(...leveler.push(pcm.subarray(i, i + chunk)));
+    assert.deepEqual(Uint8Array.from(parts), whole, `块大小 ${chunk}`);
+  }
+});
+
+test('响度提升：默认女声 +7、男声 +4；可以用环境变量调，限制在 0–12，写错了用默认', () => {
+  assert.equal(bailianTtsGainDb('female', {}), 7);
+  assert.equal(bailianTtsGainDb('male', {}), 4);
+  assert.equal(bailianTtsGainDb('anything', {}), 7);
+  assert.equal(bailianTtsGainDb('female', { DASHSCOPE_TTS_GAIN_DB_FEMALE: '8' }), 8);
+  assert.equal(bailianTtsGainDb('male', { DASHSCOPE_TTS_GAIN_DB_MALE: '20' }), 12);
+  assert.equal(bailianTtsGainDb('male', { DASHSCOPE_TTS_GAIN_DB_MALE: '-3' }), 0);
+  assert.equal(bailianTtsGainDb('female', { DASHSCOPE_TTS_GAIN_DB_FEMALE: 'abc' }), 7);
 });

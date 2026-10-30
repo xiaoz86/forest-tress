@@ -195,6 +195,51 @@ export function createPcmSilenceTrimmer({
   };
 }
 
+/**
+ * 流式响度均衡：先整体提 gainDb，再用峰值限幅器把超过 ceilingDb 的地方压住（PCM16LE 单声道，偶数长度）。
+ *
+ * 为什么要它：复刻出来的女声说话时平均只有约 −20 dBFS，而峰值已经到 −2 dBFS——
+ * 峰值没有余量，不能直接放大；手机外放时（尤其 iPhone 上走 <audio>，网页没法再加音量）就听不清。
+ * 做法是提音量、同时把少数尖峰压下去：女声 +7 dB 后约 −13~−14 dBFS，只有少数尖峰被限幅，听不出失真。
+ *
+ * 限幅器：包络立即跟上峰值、按 releaseMs 慢慢回落，增益 = ceiling / 包络。
+ * 包络永远不小于当前采样，所以输出一定不超过 ceiling——不会削波，也就没有爆音。
+ * 状态跨块保留：一句话被网络切成多少块，结果都和一次处理完全一样。
+ */
+export function createPcmLeveler({
+  sampleRate,
+  gainDb,
+  ceilingDb = -1,
+  releaseMs = 80,
+}: {
+  sampleRate: number;
+  gainDb: number;
+  ceilingDb?: number;
+  releaseMs?: number;
+}) {
+  const gain = 10 ** (gainDb / 20);
+  const ceiling = 10 ** (ceilingDb / 20) * 32767;
+  const releaseCoef = Math.exp(-1 / ((sampleRate * releaseMs) / 1000));
+  let envelope = 0;
+  return {
+    push(bytes: Uint8Array): Uint8Array {
+      if (!bytes.length || gainDb === 0) return bytes;
+      const out = new Uint8Array(bytes.length);
+      const src = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const dst = new DataView(out.buffer);
+      for (let i = 0; i + 1 < bytes.length; i += 2) {
+        const v = src.getInt16(i, true) * gain;
+        const a = v < 0 ? -v : v;
+        // 衰减后的包络也不能低于当前采样，否则这个采样会冲过上限
+        envelope = Math.max(a, envelope * releaseCoef);
+        const y = envelope > ceiling ? (v * ceiling) / envelope : v;
+        dst.setInt16(i, Math.max(-32768, Math.min(32767, Math.round(y))), true);
+      }
+      return out;
+    },
+  };
+}
+
 /** 裸 PCM16LE 单声道 → 带 44 字节头的 WAV（iOS 回退播放、调试落盘用） */
 export function pcm16ToWav(pcm: Uint8Array, sampleRate: number): Uint8Array {
   const out = new Uint8Array(44 + pcm.length);
