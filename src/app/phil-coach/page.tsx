@@ -1,12 +1,16 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import Nav from '@/components/Nav';
 import PhilCoachExperience from '@/components/PhilCoachExperience';
 import PhilFeedback from '@/components/PhilFeedback';
 import { dict, type Dictionary } from '@/i18n';
 import { getLocale } from '@/lib/locale';
 import { PHIL_ROLES } from '@/lib/philCoach';
+import { clientIpFromHeaders } from '@/lib/memoryRateLimit';
+import { getVoiceTicketSecret, issueVoiceTicket } from '@/lib/philCoachVoiceTicket';
+import { resolveVoiceStack } from '@/lib/voiceStack';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = dict(await getLocale()).philCoach;
@@ -74,13 +78,19 @@ export default async function PhilCoachPage() {
   const locale = await getLocale();
   const t = dict(locale).philCoach;
   const faqs = faqItems(t);
+  // 语音链路走哪条线：在服务端按环境变量算好，结果只有枚举和布尔值，不含任何密钥
+  const voiceStack = resolveVoiceStack(process.env);
+  // 浏览器直连识别的进门票（绑这次打开页面的 IP，12 小时）：/voice/token 只给拿着票的签令牌。
+  // 没开直连时不签，组件也就不会去要令牌
+  const ticketSecret = voiceStack.asrDirect ? getVoiceTicketSecret() : null;
+  const voiceTicket = ticketSecret ? issueVoiceTicket(clientIpFromHeaders(await headers()), ticketSecret) : null;
 
   return (
     <>
       <Nav />
       <main className="pc-cover min-h-[100svh] px-5 pb-24 pt-[92px] text-pc-ink md:px-8 md:pt-[112px] lg:pt-[200px]">
         <div className="relative mx-auto max-w-[680px]">
-          <PhilCoachExperience locale={locale} />
+          <PhilCoachExperience locale={locale} voiceStack={voiceStack} voiceTicket={voiceTicket} />
 
           <section id="about" aria-labelledby="pc-about" className="mt-24 scroll-mt-24 border-t border-pc-ink/10 pt-10 max-md:mt-20">
             <h2 id="pc-about" className="m-0 font-book text-[20px] font-normal text-pc-ink">

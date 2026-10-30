@@ -1,8 +1,14 @@
+import { randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getAuthenticatedMemberId } from '@/lib/session';
 import { getLocale } from '@/lib/locale';
-import { createChatCompletion, getLLMConfig, type ChatMessage } from '@/lib/llm';
+import {
+  createChatCompletion,
+  createChatCompletionStream,
+  getLLMConfig,
+  type ChatMessage,
+} from '@/lib/llm';
 import { getPhilPath } from '@/lib/philCoach';
 import { COACH_WISDOM } from '@/lib/philCoachWisdom';
 import { fetchRelevantKnowledge } from '@/lib/philCoachKnowledge';
@@ -10,6 +16,16 @@ import { GUEST_COOKIE, fetchMemoryBlock, guestActive, memoryClient } from '@/lib
 import { loadAccess } from '@/lib/philCoachAccess';
 import { normalizeVoiceAnalysis } from '@/lib/philCoachVoice';
 import { isProfileComplete } from '@/lib/memberTrust';
+import {
+  createReplyEventStream,
+  createSpeechSigner,
+  deterministicReplyStream,
+  replyStreamHeaders,
+  wantsReplyStream,
+  type SpeechSigner,
+} from '@/lib/philCoachStream';
+import { getSpeechSigningSecret } from '@/lib/philCoachSpeechSign';
+import { resolveVoiceStack, type VoiceStack } from '@/lib/voiceStack';
 import type { NodeCard } from '@/lib/supabase';
 
 /** 没身份时的免费轮数（约一条小径的长度）。超过要走轻两步成为成员。 */
@@ -25,6 +41,10 @@ const GUEST_FREE_TURNS = 8;
 const THIN_PROFILE_TURNS = 40;
 
 export const runtime = 'nodejs';
+// 流式回复：模型最长 50 秒，前面还有闸门、知识库、记忆共三到五次 Supabase 查询（都没有单独的超时）。
+// 留足余量：到了 maxDuration 平台会直接掐掉函数，前端收不到 error 事件、onSettled 也记不上日志。
+// 这个值对不流式的旧路径同样生效（它原来用平台默认值，线上 45 秒的调用能跑通），所以不能卡得比它紧。
+export const maxDuration = 90;
 
 type ClientMessage = {
   role: 'user' | 'assistant';
@@ -123,6 +143,16 @@ function cleanMessage(input: unknown): ClientMessage | null {
   };
 }
 
+/**
+ * 流式回复里给每一段签名（交给 /api/phil-coach/speak 念）。
+ * 没有可用的 TTS（百炼没选上、也没有 SiliconFlow）或没有签名密钥时返回 null：
+ * 照样流文字，只是不发 sentence 事件，meta.speak 为 false。
+ */
+function speechSignerFor(stack: VoiceStack): SpeechSigner | null {
+  const canSpeak = stack.tts === 'bailian' || Boolean(process.env.SILICONFLOW_API_KEY?.trim());
+  return canSpeak ? createSpeechSigner(getSpeechSigningSecret()) : null;
+}
+
 function buildPathContext(pathId: unknown): string {
   if (typeof pathId !== 'string') return '';
   const path = getPhilPath(pathId);
@@ -161,16 +191,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'message-required' }, { status: 400 });
   }
 
+  /**
+   * 流式回复按 Accept 协商（见 lib/philCoachStream）：前端写了 application/x-ndjson、
+   * 而且开关开着（没配百炼时默认关）才流。下面所有的拦截——三道闸门、模型没配、
+   * 连不上模型——都发生在开流之前，返回的仍是原来的 JSON 和状态码（危机词改成确定性的事件流）。
+   * 流开了以后模型中途失败，才以一条 error 事件结束。
+   * 不要流式的请求，从这里往下一个字节都不变。
+   */
+  const stack = resolveVoiceStack(process.env);
+  const wantsStream = wantsReplyStream(request.headers.get('accept'), stack);
+  const requestId = randomUUID();
+
   const locale = await getLocale();
 
   const latestUserText = messages[messages.length - 1].content;
   if (CRISIS_RE.test(latestUserText)) {
     // 这句不能走模型，也不能只有中文——正是这一句要保证对方读得懂
+    const crisisReply =
+      locale === 'en'
+        ? 'I hear how much pain you are in right now. Please do not carry this alone — reach out to someone you trust, or call your local emergency or crisis line right now. You can start by picking up your phone and sending one line to someone who will answer: "I am in danger and I need you with me."'
+        : '我听见你现在真的很难受。先别一个人扛着，请立刻联系身边可信任的人，或拨打当地急救/危机援助电话。你可以先把手机拿起来，给一个能马上回应你的人发一句：“我现在很危险，需要你陪我。”';
+    if (wantsStream) {
+      // 流式下也是确定性的：一条 delta、念这段的签名句子、一条 done，不调模型
+      return new Response(
+        deterministicReplyStream({ requestId, reply: crisisReply, signer: speechSignerFor(stack), tone: 'steady' }),
+        { headers: replyStreamHeaders(requestId) },
+      );
+    }
     return NextResponse.json({
-      reply:
-        locale === 'en'
-          ? 'I hear how much pain you are in right now. Please do not carry this alone — reach out to someone you trust, or call your local emergency or crisis line right now. You can start by picking up your phone and sending one line to someone who will answer: "I am in danger and I need you with me."'
-          : '我听见你现在真的很难受。先别一个人扛着，请立刻联系身边可信任的人，或拨打当地急救/危机援助电话。你可以先把手机拿起来，给一个能马上回应你的人发一句：“我现在很危险，需要你陪我。”',
+      reply: crisisReply,
     });
   }
 
@@ -296,6 +345,43 @@ export async function POST(request: Request) {
           : m.content,
     })),
   ];
+
+  if (wantsStream) {
+    const upstream = await createChatCompletionStream({
+      messages: chatMessages,
+      temperature: 0.72,
+      maxTokens: 700,
+      timeoutMs: 50000,
+    });
+    // 连上游都没连上：流还没开，照旧回 JSON 502，前端按 content-type 分辨
+    if (!upstream) {
+      return NextResponse.json({ error: 'llm-failed' }, { status: 502 });
+    }
+    const stream = createReplyEventStream({
+      requestId,
+      chunks: upstream.chunks,
+      cancel: upstream.cancel,
+      signer: speechSignerFor(stack),
+      tone: 'soft',
+      // 前端断开（被打断、开了新对话）就中止上游，不让模型对着空气继续写、继续计费
+      signal: request.signal,
+      onSettled: info => {
+        // 只记时长和计数，不记任何文字
+        const line = [
+          '[phil-coach] stream',
+          requestId.slice(0, 8),
+          info.outcome,
+          `first=${info.firstDeltaMs ?? '-'}ms`,
+          `total=${info.totalMs}ms`,
+          `chars=${info.chars}`,
+          `sentences=${info.sentences}`,
+        ].join(' ');
+        if (info.outcome === 'error') console.error(line);
+        else console.info(line);
+      },
+    });
+    return new Response(stream, { headers: replyStreamHeaders(requestId) });
+  }
 
   const reply = await createChatCompletion({
     messages: chatMessages,

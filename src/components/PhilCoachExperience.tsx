@@ -7,9 +7,24 @@ import {
   PHIL_COACH_VOICES,
   useServerSpeech,
   useServerSpeechInput,
+  type PhilVoiceId,
 } from '@/lib/voiceServer';
+import {
+  buildReplyRequest,
+  isReplyStream,
+  readNdjson,
+  useStreamingSpeech,
+  type PhilStreamEvent,
+  type ReplySpeech,
+  type SignedSentence,
+  type StreamingSpeechMessages,
+} from '@/lib/voiceStream';
+import { realtimeVoiceResult, useRealtimeAsr, type RealtimeAsrSession } from '@/lib/voiceRealtime';
+import { asrLanguageForLocale } from '@/lib/asrEvents';
 import type { VoiceAnalysis } from '@/lib/philCoachVoice';
 import type { PhilAccess } from '@/lib/philCoachAccess';
+// 只拿类型：voiceStack.ts 会顺带引进服务端模块（node:https），不能进前端包
+import type { VoiceStack } from '@/lib/voiceStack';
 import { dict } from '@/i18n';
 import type { Locale } from '@/lib/locale';
 import {
@@ -96,6 +111,56 @@ function mergeTranscript(current: string, transcript: string): { text: string; c
 
 function appendTranscript(current: string, transcript: string): string {
   return mergeTranscript(current, transcript).text;
+}
+
+/**
+ * 没传开关时的样子：就是今天线上的链路。
+ * 和 lib/voiceStack 的 LEGACY_VOICE_STACK 一致——那个文件引了服务端模块，客户端只能拿它的类型。
+ */
+const LEGACY_VOICE_STACK: VoiceStack = {
+  asr: 'siliconflow',
+  asrDirect: false,
+  tts: 'siliconflow',
+  streamReply: false,
+};
+
+type PhilSpeech = {
+  /** 按句朗读（流式回复）还是旧的整段朗读 */
+  streaming: boolean;
+  enabled: boolean;
+  setEnabled: (v: boolean) => void;
+  voiceId: PhilVoiceId;
+  setVoice: (id: PhilVoiceId) => void;
+  speaking: boolean;
+  loading: boolean;
+  playbackBlocked: boolean;
+  error: string;
+  speak: (text: string) => void;
+  resume: () => void;
+  stop: () => void;
+  /** 在用户手势里解锁播放（旧链路什么都不做）；unlockOnly：解锁完就挂起，等回复到了再恢复 */
+  prime: (options?: { unlockOnly?: boolean }) => void;
+  /** 流式回复边到边念；旧链路返回 null */
+  startReply: () => ReplySpeech | null;
+  /** 记下一条回复的签名段，打开朗读时按段补念（旧链路什么都不做） */
+  remember: (reply: string, sentences: SignedSentence[]) => void;
+};
+
+const noop = () => {};
+const noReply = () => null;
+
+/**
+ * 朗读按开关分派：流式回复开着（配了百炼，或显式打开）才用按句朗读；
+ * 否则原样交出 useServerSpeech——没配百炼时，朗读的每一个行为都和改造前一样。
+ * 两个 hook 都要调（hook 不能按条件调）；没用上的那个什么都不建、不发请求、不碰音频。
+ */
+function usePhilSpeech(streaming: boolean, messages: StreamingSpeechMessages): PhilSpeech {
+  const legacy = useServerSpeech();
+  const stream = useStreamingSpeech({ messages });
+  if (!streaming) {
+    return { ...legacy, streaming: false, prime: noop, startReply: noReply, remember: noop };
+  }
+  return { ...stream, streaming: true };
 }
 
 /** 声音的可视化：几根随音量跳动的竖条，让人看见自己在被听见。
@@ -201,7 +266,23 @@ function SpeakerIcon({ waves = true, className = 'h-4 w-4' }: { waves?: boolean;
  * 这也不违反「客户端不要自己判断语言」：locale 仍是服务端算好的，
  * 这里不读 cookie，不会先渲染中文再闪成英文。
  */
-export default function PhilCoachExperience({ locale }: { locale: Locale }) {
+export default function PhilCoachExperience({
+  locale,
+  voiceStack,
+  voiceTicket = null,
+}: {
+  locale: Locale;
+  /**
+   * 语音链路的开关（服务端 resolveVoiceStack 算好的，不含密钥）。没传、或者全是旧值时，
+   * 这个组件的每一个行为都和改造前一样：不发 Accept 协商头、不连百炼、朗读走旧 hook。
+   */
+  voiceStack?: VoiceStack;
+  /** 浏览器直连识别的进门票（页面渲染时签的，绑 IP）；没有就不走直连 */
+  voiceTicket?: string | null;
+}) {
+  const stack = voiceStack ?? LEGACY_VOICE_STACK;
+  /** 对话走 NDJSON 流式回复，朗读跟着改成按句（两件事绑在一起：句子是流里切出来的） */
+  const streamMode = stack.streamReply;
   const t = useMemo(() => dict(locale).philCoach.experience, [locale]);
   const pt = useMemo(() => dict(locale).philCoach.page, [locale]);
   const en = locale === 'en';
@@ -296,12 +377,23 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   const starveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const peakLevelRef = useRef(0);
   const voiceStartLockRef = useRef(false);
+  /**
+   * 浏览器直连百炼（开关 asrDirect）：字幕来自它的 .text，定稿来自它的 completed。
+   * 它一出问题就接回下面原来的字幕方案；这两个记号保证只接一次、且等录音真的跑起来再接。
+   */
+  const realtime = useRealtimeAsr(stack.asrDirect, {
+    ticket: voiceTicket,
+    language: asrLanguageForLocale(locale),
+  });
+  const legacyCaptionsRef = useRef(false);
+  const micLiveRef = useRef(false);
   const liveVoice = useSpeechInput(text => {
     captionSeenRef.current = true;
     setCaption(current => appendTranscript(current, text));
   });
   const voiceIn = useServerSpeechInput(result => {
     setCaption('');
+    realtime.clear();
     const mode = voiceModeRef.current;
     voiceModeRef.current = null;
     setVoiceMode(null);
@@ -360,9 +452,24 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     }
   };
 
-  const voiceOut = useServerSpeech();
+  const speechMessages = useMemo<StreamingSpeechMessages>(
+    () => ({ unavailable: t.voice.speechUnavailable, playFailed: t.voice.speechPlayFailed }),
+    [t],
+  );
+  const voiceOut = usePhilSpeech(streamMode, speechMessages);
   const spokenRef = useRef<string>('');
   const importPromiseRef = useRef<Promise<void> | null>(null);
+  /** 流式回复：正在长出来的那条（还没写进 thread） */
+  const [streamingText, setStreamingText] = useState('');
+  /** 对话请求的中止口：新对话、卸载时掐掉，服务端随之中止上游模型 */
+  const replyAbortRef = useRef<AbortController | null>(null);
+  /** 有一条回复正在流：朗读 effect 让路，由流自己按句念 */
+  const replyStreamRef = useRef<symbol | null>(null);
+  // 流的读取循环是异步的，读 state 会读到发请求那一刻的旧值，所以这两样用 ref 跟着
+  const speechEnabledRef = useRef(false);
+  const voiceCaptureRef = useRef(false);
+  /** 页面在后台：先不念，回到前台再补（只在流式模式下用） */
+  const [pageHidden, setPageHidden] = useState(false);
 
   const path = session ? getPhilPath(session.pathId) : undefined;
   const hasConversation = Boolean(session?.thread.length);
@@ -403,7 +510,10 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
   // 显示源不跟着切的话，请求照发、字却永远不出现。
   // 一旦退回服务端，以服务端从录音开头重建的字幕为准；否则旧的浏览器定稿会
   // 一直挡在前面，让服务端明明在出字、输入框却看起来没有更新。
-  const liveCaption = voiceIn.partial || appendTranscript(caption, liveVoice.interim);
+  // 浏览器直连百炼时，字幕来自它（排在最后：直连坏了、原来的方案接上并出字之后，以原来的为准；
+  // 接上之前先留着直连已经出过的字，别让字幕一下子空掉）。没开直连时它永远是空串。
+  const liveCaption =
+    voiceIn.partial || appendTranscript(caption, liveVoice.interim) || realtime.caption;
   const voiceBusy = voiceIn.requesting || voiceIn.recording || voiceIn.transcribing;
   // 直达：大面板只管「正在录」这一段，录音一停立即退场——
   // 等待由对话里的占位气泡承担，面板再留着就是同一状态出现两遍，
@@ -420,7 +530,13 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     voiceStartLockRef.current = true;
     // 它正念着的时候开录，麦克风会把它自己的话录回输入框——
     // 手机外放尤其明显，回声消除挡不住。开录第一件事就是让它闭嘴。
+    // （按句朗读时这一下就是统一打断：停掉排上的声音、中止还在路上的 /speak；回复的文字流不动，让它写完。）
     voiceOut.stop();
+    // 这一下是用户手势：直接发模式的回复要在录完之后才到，那时已经不在手势里了，趁现在解锁播放。
+    // 只解锁、不留着：解锁完播放用的 AudioContext 就挂起，录音期间不和录音那个同时跑
+    // （iOS 上两个同时 running 容易让外放变小、走听筒）。回复到了再恢复——解锁过的上下文不在手势里也能恢复。
+    // 听写不用：录完还要再点一次发送，那一下会解锁。
+    if (voiceOut.enabled && mode === 'direct') voiceOut.prime({ unlockOnly: true });
     voiceModeRef.current = mode;
     setVoiceMode(mode);
     setCaption('');
@@ -430,33 +546,74 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       clearTimeout(starveTimerRef.current);
       starveTimerRef.current = null;
     }
+    // 浏览器直连百炼：和开麦克风并发地「拿地址 → 连上 → session.update」，期间的 PCM 由它先攒着。
+    // 没开直连时 begin 返回 null，下面一切照旧。
+    legacyCaptionsRef.current = false;
+    micLiveRef.current = false;
+    const direct = realtime.begin(() => {
+      // 直连坏了：录音已经在跑就立刻接回原来的字幕；还没跑起来，等 start 回来再接
+      if (micLiveRef.current) startLegacyCaptions();
+    });
     // Web Speech 在跑就先不花钱做分段转写，等看门狗判定
     try {
       const started = await voiceIn.start({
-        partials: !useWebSpeechCaptions,
+        // 直连时字幕全靠它，分段上传先不开（坏了再 armPartials 接上，PCM 从开录就在攒）
+        partials: direct ? false : !useWebSpeechCaptions,
         // 灰色麦克风只是听写，不需要等较慢的语气分析；直达模式才保留声音观察。
         analysis: mode === 'direct',
+        ...(direct ? directCapture(direct, mode) : {}),
       });
       if (!started || voiceModeRef.current !== mode) {
+        if (direct) realtime.cancel();
         voiceModeRef.current = null;
         setVoiceMode(null);
+        return;
+      }
+      if (direct) {
+        micLiveRef.current = true;
+        if (direct.failed) startLegacyCaptions();
         return;
       }
       // 一定要等麦克风到手再起浏览器听写。两个都在抢麦克风，同时发起的话
       // 两套权限流程会叠在一起——Mac Chrome 上表现为卡在「正在打开麦克风…」。
       if (!useWebSpeechCaptions) return;
-      liveVoice.start();
-      // 看门狗现在只是兜底。正常的失败（没权限、没麦克风、连不上 Google）都会
-      // 触发 error 事件，下面那个 effect 会立刻切走，不必白等这几秒。
-      // 留着它是为了「不报错也不出字」那种装死的情况。
-      if (captionWatchdogRef.current) clearTimeout(captionWatchdogRef.current);
-      captionWatchdogRef.current = setTimeout(() => {
-        if (captionSeenRef.current) return;
-        fallbackToServerCaptions();
-      }, CAPTION_WATCHDOG_MS);
+      startWebSpeechCaptions();
     } finally {
       voiceStartLockRef.current = false;
     }
+  };
+  /**
+   * 直连百炼时交给采音层的两样：PCM 订阅口（边采边推），和定稿的捷径——
+   * 停止后等它的 completed（最多 3 秒），拿到就不再整段上传；拿不到返回 null，采音层照旧上传 /voice。
+   * 直接发模式用 completed 的情绪生成 voiceContext（neutral 不生成），听写不需要。
+   */
+  const directCapture = (session: RealtimeAsrSession, mode: 'dictate' | 'direct') => ({
+    onPcm: session.push,
+    quickFinal: async () => realtimeVoiceResult(await session.finish(), mode === 'direct'),
+    // 录满自动停时没有「点停」那一下带过去的字幕，收口时从这里取（整段上传也失败时兜底）
+    liveText: () => session.caption,
+  });
+  /** 浏览器听写（WebKit）：麦克风到手之后再起，挂一个看门狗 */
+  const startWebSpeechCaptions = () => {
+    liveVoice.start();
+    // 看门狗现在只是兜底。正常的失败（没权限、没麦克风、连不上 Google）都会
+    // 触发 error 事件，下面那个 effect 会立刻切走，不必白等这几秒。
+    // 留着它是为了「不报错也不出字」那种装死的情况。
+    if (captionWatchdogRef.current) clearTimeout(captionWatchdogRef.current);
+    captionWatchdogRef.current = setTimeout(() => {
+      if (captionSeenRef.current) return;
+      fallbackToServerCaptions();
+    }, CAPTION_WATCHDOG_MS);
+  };
+  /**
+   * 直连百炼坏了（拿不到地址、握手失败、出错、迟迟不 ready）：接回没开直连时会用的那套字幕。
+   * 一段录音只接一次。定稿不用管——采音层收口时会发现直连没结果，自己整段上传。
+   */
+  const startLegacyCaptions = () => {
+    if (legacyCaptionsRef.current) return;
+    legacyCaptionsRef.current = true;
+    if (useWebSpeechCaptions) startWebSpeechCaptions();
+    else voiceIn.armPartials();
   };
   /** 收掉浏览器听写，接上服务端分段转写。PCM 从开录就在攒，所以字幕从头出，不会缺一截。 */
   const fallbackToServerCaptions = () => {
@@ -481,6 +638,8 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       starveTimerRef.current = null;
     }
     liveVoice.cancel();
+    // 已经点了停：直连这时再出问题也不用接字幕了，收口时会自己整段上传
+    micLiveRef.current = false;
     // 完整录音仍是定稿；浏览器字幕只在音频链路失败时兜底，用户说过的话不丢。
     voiceIn.stop(liveCaption);
   };
@@ -494,6 +653,8 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
       starveTimerRef.current = null;
     }
     liveVoice.cancel();
+    micLiveRef.current = false;
+    realtime.cancel();
     setCaption('');
     voiceModeRef.current = null;
     setVoiceMode(null);
@@ -586,20 +747,53 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     const span = composer.getBoundingClientRect().bottom - last.getBoundingClientRect().top;
     if (span <= window.innerHeight - 112) composer.scrollIntoView({ behavior, block: 'nearest' });
     else last.scrollIntoView({ behavior, block: 'start' });
-    // 只在对话长了一截 / 状态变了时滚；session 对象本身每次输入都会换，不能当触发条件
+    // 只在对话长了一截 / 状态变了时滚；session 对象本身每次输入都会换，不能当触发条件。
+    // 流式回复的气泡只在出现那一下滚（逐字长的时候不追着滚，人正在读）
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.thread.length, loading, error, voiceIn.transcribing]);
+  }, [session?.thread.length, loading, error, voiceIn.transcribing, streamingText !== '']);
 
   // 开着朗读时，把最新一条回复念出来（同一条不重复念）。
   // 正在录音就先别念——念出来会被麦克风录回去，成了它在跟自己说话。
+  //
+  // 按句朗读时，这里只管「补念」：正在流的那条由流自己边到边念（念过的会写进 spokenRef），
+  // 这里等它写完再看；打开朗读开关时，上一条按它的签名段念（签名过期就退回旧 /tts）。
+  // 页面在后台时先不念，回到前台再补。
   useEffect(() => {
     if (!voiceOut.enabled || !session) return;
     if (voiceIn.recording || voiceIn.requesting) return;
+    if (voiceOut.streaming && (replyStreamRef.current !== null || pageHidden)) return;
     const last = [...session.thread].reverse().find(item => item.kind === 'coach');
     if (!last || last.text === spokenRef.current) return;
     spokenRef.current = last.text;
     voiceOut.speak(last.text);
-  }, [session, voiceOut, voiceIn.recording, voiceIn.requesting]);
+  }, [session, voiceOut, voiceIn.recording, voiceIn.requesting, pageHidden, loading]);
+
+  // 流的读取循环里要知道「此刻」开没开朗读、是不是正在录音
+  useEffect(() => {
+    speechEnabledRef.current = voiceOut.enabled;
+  }, [voiceOut.enabled]);
+  useEffect(() => {
+    voiceCaptureRef.current = voiceIn.recording || voiceIn.requesting;
+  }, [voiceIn.recording, voiceIn.requesting]);
+
+  // 页面藏到后台就打断朗读（只在按句朗读时；旧链路保持原样，后台照念）
+  const stopSpeech = voiceOut.stop;
+  useEffect(() => {
+    if (!streamMode) return;
+    const onVisibility = () => {
+      const hidden = document.visibilityState === 'hidden';
+      setPageHidden(hidden);
+      if (hidden) stopSpeech();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [streamMode, stopSpeech]);
+
+  // 卸载：还在路上的对话请求一并掐掉（流式时服务端随之中止上游模型）
+  useEffect(() => {
+    const aborts = replyAbortRef;
+    return () => aborts.current?.abort();
+  }, []);
 
   function updateAccess(next: PhilAccess | null) {
     accessRef.current = next;
@@ -790,12 +984,29 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     return request;
   }
 
+  /**
+   * 统一打断：停掉正在念的、中止还在路上的 /speak（服务端随之中止上游 SSE）。
+   * 开录、换嗓、关朗读、卸载这几处在两个朗读 hook 里本来就会停；这里补的是「新对话」和页面隐藏。
+   * 旧链路（没配百炼）在这些新加的点上不动它，保持原样。
+   */
+  function interruptAll() {
+    if (!voiceOut.streaming) return;
+    voiceOut.stop();
+  }
+
   function reset() {
     genRef.current += 1;
     sendingRef.current = false;
+    // 上一段的回复还在流的话掐掉：结果本来也会因 gen 对不上被丢弃，掐掉是为了不让上游白写、白计费
+    replyAbortRef.current?.abort();
+    replyAbortRef.current = null;
+    replyStreamRef.current = null;
+    setStreamingText('');
+    interruptAll();
     setPendingRetry(false);
     setShowGate(false);
     liveVoice.cancel();
+    realtime.cancel();
     voiceIn.cancel();
     setSession(null);
     setSelectedPathId(null);
@@ -846,18 +1057,46 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     voiceContext: VoiceAnalysis | null,
     gen: number,
   ): Promise<'ok' | 'gate' | 'stale'> {
-    const res = await fetch('/api/phil-coach', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const controller = new AbortController();
+    replyAbortRef.current = controller;
+    try {
+      return await requestReply(thread, pathId, voiceContext, gen, controller.signal);
+    } finally {
+      if (replyAbortRef.current === controller) replyAbortRef.current = null;
+    }
+  }
+
+  /**
+   * 流式模式下请求头多一个 Accept 协商；回来的按 content-type 分两路：
+   * NDJSON 事件流 → 气泡逐字长出来、句子边到边念；JSON（闸门 403、模型没配、连不上模型，
+   * 以及没开流式时的一切）→ 和改造前一模一样的处理。
+   */
+  async function requestReply(
+    thread: ThreadItem[],
+    pathId: string,
+    voiceContext: VoiceAnalysis | null,
+    gen: number,
+    signal: AbortSignal,
+  ): Promise<'ok' | 'gate' | 'stale'> {
+    const request = buildReplyRequest(
+      streamMode,
+      {
         pathId,
         messages: thread.map(item => ({
           role: item.kind === 'coach' ? 'assistant' : 'user',
           content: item.text,
         })),
         ...(voiceContext ? { voiceContext } : {}),
-      }),
+      },
+      voiceOut.enabled,
+    );
+    const res = await fetch('/api/phil-coach', {
+      method: 'POST',
+      headers: request.headers,
+      body: request.body,
+      signal,
     });
+    if (streamMode && isReplyStream(res)) return readReplyStream(res, pathId, gen);
     const json = await res.json().catch(() => ({}));
     if (gen !== genRef.current) return 'stale';
     if (res.status === 403 && json.error === 'trial-ended') {
@@ -883,6 +1122,77 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     );
     // 对话有了新内容，「留住」重新可用
     setKeepState(prev => (prev === 'saved' ? 'idle' : prev));
+    return 'ok';
+  }
+
+  /** 此刻能不能开口念：开着朗读、没在录音、页面在前台 */
+  function canSpeakNow() {
+    return speechEnabledRef.current && !voiceCaptureRef.current && document.visibilityState !== 'hidden';
+  }
+
+  /**
+   * 读 NDJSON 回复：delta 拼进「正在长出来」的气泡；sentence 边到边交给朗读（开着的话），
+   * 也都记下来——没开朗读时，之后打开开关能按这些签名段补念。
+   * done 时以它的整段为准写进 thread；开口念过的话把 spokenRef 设成它，朗读 effect 就不会再念一遍。
+   *
+   * 流半路断了（error 事件、网络断开）：已经长出来的字照样写进 thread，并提示一句——
+   * 模型下一轮看到的，就是用户实际读到、听到的。一个字都没出来就当发送失败，走原来的报错。
+   */
+  async function readReplyStream(res: Response, pathId: string, gen: number): Promise<'ok' | 'stale'> {
+    const token = Symbol('reply');
+    replyStreamRef.current = token;
+    const sentences: SignedSentence[] = [];
+    const speech: { current: ReplySpeech | null } = { current: null };
+    let text = '';
+    let reply: string | null = null;
+    try {
+      for await (const event of readNdjson<PhilStreamEvent>(res.body as ReadableStream<Uint8Array>)) {
+        if (gen !== genRef.current) return 'stale';
+        if (event.type === 'delta') {
+          text += event.text;
+          // 开头的空行不显示（写进 thread 时整段会 trim，免得那一下往上跳）
+          setStreamingText(text.trimStart());
+        } else if (event.type === 'sentence') {
+          const sentence: SignedSentence = {
+            index: event.index,
+            text: event.text,
+            exp: event.exp,
+            sig: event.sig,
+            tone: event.tone,
+          };
+          sentences.push(sentence);
+          if (speech.current) {
+            speech.current.enqueue(sentence);
+          } else if (canSpeakNow()) {
+            // 第一段到了才开口（开朗读开关晚了一步也能从头念）
+            speech.current = voiceOut.startReply();
+            for (const s of sentences) speech.current?.enqueue(s);
+          }
+        } else if (event.type === 'done') {
+          reply = event.reply.trim();
+        } else if (event.type === 'error') {
+          break;
+        }
+      }
+    } catch {
+      // 网络断了，或者被「新对话」中止：下面按 gen 和「出没出字」分别处理
+    } finally {
+      speech.current?.end();
+      if (replyStreamRef.current === token) replyStreamRef.current = null;
+    }
+    if (gen !== genRef.current) return 'stale';
+    setStreamingText('');
+    const finalText = reply ?? text.trim();
+    if (!finalText) throw new Error('reply-failed');
+    voiceOut.remember(finalText, sentences);
+    if (speech.current) spokenRef.current = finalText;
+    setSession(current =>
+      current && current.pathId === pathId
+        ? { ...current, thread: [...current.thread, { kind: 'coach', text: finalText }] }
+        : current,
+    );
+    setKeepState(prev => (prev === 'saved' ? 'idle' : prev));
+    if (reply === null) setError(t.error.interrupted);
     return 'ok';
   }
 
@@ -975,6 +1285,8 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
     ) return;
     const answer = draft.trim();
     if (!answer) return;
+    // 点发送（或 ⌘/Ctrl+Enter）这一下是用户手势：回复几秒后才到，趁现在解锁播放
+    if (voiceOut.enabled) voiceOut.prime();
     const voiceContext = pendingVoiceContextRef.current;
     pendingVoiceContextRef.current = null;
     await deliverMessage(answer, voiceContext);
@@ -1514,7 +1826,21 @@ export default function PhilCoachExperience({ locale }: { locale: Locale }) {
             <span className="min-w-0">{liveCaption || t.transcribing}</span>
           </div>
         )}
-        {loading && (
+        {/*
+          流式回复：字逐段长出来，写完才进对话记录（样式和对话里的回复一样，接过去时不跳）。
+          对读屏隐藏：它在 role=log 里，每个 delta 都改它的文字，读屏会一段段念碎片，
+          写进对话记录时又从头念一遍。藏起来以后只在写进记录那一刻念一次，和旧链路一样。
+        */}
+        {streamingText && (
+          <div
+            aria-hidden="true"
+            className="max-w-[92%] self-start whitespace-pre-line text-[16.5px] leading-[1.95] text-pc-ink [overflow-wrap:anywhere]"
+          >
+            <span className="sr-only">phil-coach：</span>
+            {streamingText}
+          </div>
+        )}
+        {loading && !streamingText && (
           <div className="flex items-center gap-2 self-start text-[15px] leading-[1.9] text-pc-ink-2">
             <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-pc-plum motion-safe:animate-pulse" />
             {t.thinking}

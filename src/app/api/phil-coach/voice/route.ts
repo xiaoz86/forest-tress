@@ -1,11 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { parseVoiceAnalysisJson, type VoiceAnalysis } from '@/lib/philCoachVoice';
+import { DashscopeError, getDashscopeConfig, toDashscopeError, type DashscopeConfig } from '@/lib/dashscope';
+import { asrCircuit, transcribePcmRealtime } from '@/lib/dashscopeAsr';
+import { asrLanguageForLocale } from '@/lib/asrEvents';
+import { getLocale } from '@/lib/locale';
+import {
+  asrEmotionToVoiceAnalysis,
+  parseVoiceAnalysisJson,
+  type VoiceAnalysis,
+} from '@/lib/philCoachVoice';
+import { resolveVoiceStack } from '@/lib/voiceStack';
 import { chooseCompleteTranscript, normalizeAsrTranscript } from '@/lib/voiceTranscript';
+import { findWavPcmData, wavToPcm16kMono } from '@/lib/wavPcm';
 
 export const runtime = 'nodejs';
+// 百炼定稿最坏约 12 秒，失败再落回 SiliconFlow 最坏约 8 秒，加起来要在这之内
+export const maxDuration = 30;
 
 // 服务端语音观察：Qwen3-Omni 同时做转写与谨慎的语气观察；
 // 不支持当前音频格式或调用失败时，退回 SenseVoiceSmall 保住基础转写。
+//
+// 配了百炼（见 lib/voiceStack）时，定稿先走百炼实时识别：由这里向
+// qwen3-asr-flash-realtime 发起出站 WebSocket，一段录音一个会话，一口气推完拿结果
+// （15 秒录音推完约 1.5 秒出结果），情绪标签顺带转成 voiceContext。
+// 失败（超时、握手被拒、Key、额度、限流）就在同一个请求里
+// 落回下面原来的 SiliconFlow 流程，返回格式不变，只有 source 不同。
+// 浏览器直连百炼（/api/phil-coach/voice/token）失败时，前端也是把整段录音交到这里。
 
 const MAX_BYTES = 2_000_000; // 控制 Qwen 音频时长与成本，并留在 Vercel 请求体上限以内
 const WINDOW_MS = 5 * 60 * 1000;
@@ -64,44 +83,9 @@ async function isQwenCompatibleWav(file: File): Promise<boolean> {
     return false;
   }
   if (file.size < 44) return false;
-  // 头部多读一些：fmt 和 data 之间可能还夹着别的块
+  // 头部多读一些：fmt 和 data 之间可能还夹着别的块（块表的解析和为什么不能写死偏移，见 lib/wavPcm）
   const bytes = new Uint8Array(await file.slice(0, 4_096).arrayBuffer());
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const ascii = (offset: number, length: number) =>
-    String.fromCharCode(...bytes.slice(offset, offset + length));
-
-  if (ascii(0, 4) !== 'RIFF' || ascii(8, 4) !== 'WAVE') return false;
-
-  /*
-    别假设 data 一定在第 36 字节。
-    WAV 允许在 fmt 和 data 之间插 LIST、fact 这类块（ffmpeg 就会写 LIST），
-    写死偏移量的话，这种文件明明是合规的 16k 单声道 PCM 也会被判成不兼容——
-    于是静默跳过 Qwen，退回快速模型。而「整段 Qwen 校准」正是
-    「蜘蛛」不被听成「之初」的那道保险，它失效的时候没有任何迹象。
-    所以按块表往下走。
-  */
-  let offset = 12;
-  let sawFmt = false;
-  while (offset + 8 <= bytes.length) {
-    const id = ascii(offset, 4);
-    const size = view.getUint32(offset + 4, true);
-    if (id === 'fmt ') {
-      if (size < 16 || offset + 8 + 16 > bytes.length) return false;
-      const format = view.getUint16(offset + 8, true);
-      const channels = view.getUint16(offset + 10, true);
-      const sampleRate = view.getUint32(offset + 12, true);
-      const bitsPerSample = view.getUint16(offset + 22, true);
-      if (format !== 1 || channels !== 1 || sampleRate !== 16_000 || bitsPerSample !== 16) {
-        return false;
-      }
-      sawFmt = true;
-    } else if (id === 'data') {
-      return sawFmt;
-    }
-    // 块长度是奇数时后面补一个填充字节
-    offset += 8 + size + (size % 2);
-  }
-  return false;
+  return findWavPcmData(bytes) !== null;
 }
 
 async function analyzeWithQwen(
@@ -208,9 +192,51 @@ async function transcribeWithSenseVoice(
   return normalized.text ? { kind: 'ok', ...normalized } : { kind: 'empty' };
 }
 
+type BailianResult =
+  | { kind: 'ok'; text: string; emotion: string | null }
+  | { kind: 'empty' }
+  | { kind: 'failed' };
+
+/**
+ * 百炼实时识别（服务端出站 WebSocket）。任何失败都只返回 failed，由调用方落回 SiliconFlow；
+ * 连续失败三次熔断 60 秒（lib/dashscopeAsr 的 asrCircuit），省得每个人都替上游的故障多等一个超时。
+ * 前端主动断开（被打断）不算上游失败。
+ */
+async function transcribeWithBailian(
+  file: File,
+  config: DashscopeConfig,
+  signal: AbortSignal,
+  timeoutMs?: number,
+): Promise<BailianResult> {
+  // 语种跟着界面走：中文界面 zh，英文界面不传、让模型自己判断（传 en 会把中文直接翻成英文，见 asrEvents）
+  const language = asrLanguageForLocale(await getLocale());
+  if (asrCircuit.isOpen()) return { kind: 'failed' };
+  const pcm = wavToPcm16kMono(new Uint8Array(await file.arrayBuffer()));
+  // 不是 16k 单声道 PCM 的 WAV（比如老客户端传的 webm）交给 SiliconFlow；不到 0.1 秒的不值一次会话
+  if (!pcm || pcm.length < 3_200) return { kind: 'failed' };
+
+  const startedAt = Date.now();
+  try {
+    const result = await transcribePcmRealtime(pcm, { config, language, signal, timeoutMs });
+    asrCircuit.success();
+    const normalized = normalizeAsrTranscript(result.transcript);
+    if (!normalized.text) return { kind: 'empty' };
+    if (normalized.suspiciousLanguage) return { kind: 'failed' };
+    return { kind: 'ok', text: normalized.text, emotion: result.emotion };
+  } catch (err) {
+    const e = err instanceof DashscopeError ? err : toDashscopeError(err, signal);
+    if (e.kind !== 'aborted') asrCircuit.failure();
+    // 只记类别、错误码和耗时；转写文字和音频不进日志
+    console.warn('[phil-voice] bailian failed', e.kind, e.status ?? '', e.code ?? '', `${Date.now() - startedAt}ms`);
+    return { kind: 'failed' };
+  }
+}
+
 export async function POST(request: NextRequest) {
   const key = process.env.SILICONFLOW_API_KEY;
-  if (!key) {
+  // 百炼只在开关选了它时才参与；两家都没配才是「没配语音」
+  const bailian = resolveVoiceStack(process.env).asr === 'bailian' ? getDashscopeConfig() : null;
+  if (!key && !bailian) {
     return NextResponse.json({ error: 'voice-not-configured' }, { status: 503 });
   }
 
@@ -241,6 +267,19 @@ export async function POST(request: NextRequest) {
   // 实时字幕通常只走快速 ASR；仅当它明显漂成日韩语/孤立英文时，才用 Qwen
   // 复核这一小段。录到一半的半句话不做情绪分析。
   if (partial) {
+    // 分段字幕照旧走 SiliconFlow（省百炼的识别额度：分段有重叠，再加定稿整段一遍，同一段话要计费两次多）。
+    // 只有没配 SiliconFlow 时才用百炼顶上，不然字幕就整个没了。
+    if (!key) {
+      if (!bailian) return NextResponse.json({ error: 'voice-not-configured' }, { status: 503 });
+      const r = await transcribeWithBailian(file, bailian, request.signal, 6_000);
+      if (r.kind === 'ok') {
+        return NextResponse.json({ text: r.text, voiceContext: null, source: 'partial-bailian-realtime' });
+      }
+      return NextResponse.json(
+        { error: r.kind === 'empty' ? 'partial-empty' : 'transcribe-failed' },
+        { status: r.kind === 'empty' ? 422 : 502 },
+      );
+    }
     try {
       const r = await transcribeWithSenseVoice(file, key, 6_000);
       if (r.kind === 'ok') {
@@ -269,6 +308,28 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json({ error: 'transcribe-failed' }, { status: 502 });
     }
+  }
+
+  if (bailian) {
+    const r = await transcribeWithBailian(file, bailian, request.signal);
+    if (r.kind === 'ok') {
+      return NextResponse.json({
+        text: r.text,
+        // 情绪只给教练模型当低置信线索，不显示给用户；neutral 不生成观察
+        voiceContext: analysisRequested ? asrEmotionToVoiceAnalysis(r.text, r.emotion) : null,
+        source: 'bailian-realtime',
+      });
+    }
+    // 空结果也交给 SiliconFlow 再听一遍：声音很轻时两家的耳朵不一样
+    if (!key) {
+      return NextResponse.json(
+        { error: r.kind === 'empty' ? 'empty-result' : 'transcribe-failed' },
+        { status: r.kind === 'empty' ? 422 : 502 },
+      );
+    }
+  }
+  if (!key) {
+    return NextResponse.json({ error: 'voice-not-configured' }, { status: 503 });
   }
 
   try {

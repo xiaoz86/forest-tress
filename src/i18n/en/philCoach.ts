@@ -198,6 +198,7 @@ export const philCoach: typeof zhPhilCoach = {
     error: {
       send: 'That didn’t go through. Try again in a moment, or keep it for yourself for now.',
       resend: 'That didn’t go through. Try again in a moment.',
+      interrupted: 'The reply got cut off partway. What came through is kept—you can carry on, or try again in a moment.',
     },
 
     voice: {
@@ -238,6 +239,8 @@ export const philCoach: typeof zhPhilCoach = {
       readStateOn: 'Voice reply · on',
       readStateOff: 'Voice reply · off',
       switchVoice: 'Tap to switch voice',
+      speechUnavailable: 'The voice isn’t ready right now. Try again in a moment.',
+      speechPlayFailed: 'This part couldn’t be played. Try again in a moment.',
     },
 
     gate: {

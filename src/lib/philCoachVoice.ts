@@ -80,6 +80,44 @@ export function normalizeVoiceAnalysis(input: unknown): VoiceAnalysis | null {
   };
 }
 
+/**
+ * 百炼实时识别（qwen3-asr-flash-realtime）在 completed 事件里顺带给一个情绪标签，
+ * 只有七类、没有置信度。这里把它翻成教练模型读得懂的 voiceContext。
+ *
+ * - neutral（和认不出的标签）不生成观察：平静是默认状态，写进去只会多花 token，
+ *   还可能让模型对「平静」过度解读；
+ * - 词选得轻一点（sad→低落，不是「悲伤」；angry→恼火，不是「愤怒」）：
+ *   这是从七八秒声音里猜的一个字，模型看到重词容易接得太重；
+ * - emotionConfidence 固定 0.5：上游不给置信度，0.5 正好表达「可能是，也可能不是」；
+ * - 不猜隐含需要——这个模型不提供，编一个比空着更糟；
+ * - transcript 必须带上，否则 normalizeVoiceAnalysis 会把整个观察丢掉。
+ * 最后再过一遍 normalizeVoiceAnalysis，和 Qwen3-Omni 的结果走同一道收窄。
+ */
+const ASR_EMOTION_LABELS: Record<string, string> = {
+  surprised: '惊讶',
+  happy: '轻快',
+  sad: '低落',
+  angry: '恼火',
+  fearful: '不安',
+  disgusted: '反感',
+};
+
+export function asrEmotionToVoiceAnalysis(
+  transcript: string,
+  emotion: string | null | undefined,
+): VoiceAnalysis | null {
+  const label = typeof emotion === 'string' ? ASR_EMOTION_LABELS[emotion.trim().toLowerCase()] : undefined;
+  if (!label) return null;
+  return normalizeVoiceAnalysis({
+    transcript,
+    emotion: label,
+    emotionConfidence: 0.5,
+    speechSignals: [],
+    implicitNeed: '',
+    implicitNeedConfidence: 0,
+  });
+}
+
 /** 兼容模型偶尔包裹的 ```json 代码块，同时拒绝缺少有效转写的输出。 */
 export function parseVoiceAnalysisJson(content: string): VoiceAnalysis | null {
   const trimmed = content

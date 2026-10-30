@@ -18,6 +18,32 @@ export type VoiceInputResult = {
   needsReview?: boolean;
 };
 
+/**
+ * 采音层的裸 PCM 订阅口：每个 ScriptProcessor 回调交一份拷贝，采样率是录音那个 AudioContext 的
+ * （常见 48k / 44.1k，不是 16k）。订阅方不要改这份数组——同一份也进了整段录音。
+ */
+export type PcmListener = (samples: Float32Array, sampleRate: number) => void;
+
+/** 别的识别路径已经拿到的定稿（比如浏览器直连百炼）。voiceContext 的 transcript 会被换成最终选定的原文。 */
+export type QuickFinalResult = { text: string; voiceContext: VoiceAnalysis | null };
+
+export type ServerSpeechStartOptions = {
+  partials?: boolean;
+  analysis?: boolean;
+  /** 不传就和以前完全一样 */
+  onPcm?: PcmListener;
+  /**
+   * 收口时先问一句：有现成的定稿就直接用，不再整段上传；返回 null（或抛错）就照旧上传 /voice。
+   * 等它的时间由提供方自己设上限（浏览器直连那边是 3 秒）。不传就和以前完全一样。
+   */
+  quickFinal?: () => Promise<QuickFinalResult | null>;
+  /**
+   * 别处（浏览器直连百炼）此刻显示着的字幕。收口时停止那一下没带兜底文字（录满自动停），
+   * 就拿它当兜底：整段上传也失败时，屏幕上已经出过的字不丢。不传就和以前完全一样。
+   */
+  liveText?: () => string;
+};
+
 const MAX_RECORDING_MS = 55_000;
 const VOICE_SAMPLE_RATE = 16_000;
 const MAX_WAV_BYTES = 1_950_000;
@@ -537,6 +563,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     stream: MediaStream,
     withPartials: boolean,
     generation: number,
+    onPcm?: PcmListener,
   ): Promise<boolean> => {
     try {
       const ctx = audioCtxRef.current;
@@ -559,9 +586,19 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       // 早先电平表挂在 requestAnimationFrame 上，可页面一进后台、iOS 上键盘弹起
       // 或手指在滚动时，rAF 都会被节流甚至停掉——波形就直挺挺躺在那儿，
       // 让人以为没录上。音频回调走的是音频线程，只要有声音进来就会响。
+      const rate = ctx.sampleRate;
       tap.onaudioprocess = e => {
         const data = e.inputBuffer.getChannelData(0);
-        pcmRef.current.push(new Float32Array(data));
+        const copy = new Float32Array(data);
+        pcmRef.current.push(copy);
+        if (onPcm) {
+          // 订阅方（浏览器直连识别）出什么错都不能拖垮录音本身：整段 PCM 还要留着兜底
+          try {
+            onPcm(copy, rate);
+          } catch {
+            /* ignore */
+          }
+        }
         let sum = 0;
         for (let i = 0; i < data.length; i += 1) sum += data[i] * data[i];
         const rms = Math.sqrt(sum / data.length);
@@ -647,7 +684,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
 
   useEffect(() => cancel, [cancel]);
 
-  const start = useCallback(async (options?: { partials?: boolean; analysis?: boolean }) => {
+  const start = useCallback(async (options?: ServerSpeechStartOptions) => {
     if (busyRef.current) return false;
     busyRef.current = true;
     stoppingRef.current = false;
@@ -707,7 +744,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       setRequesting(false);
       streamRef.current = stream;
       dictationRef.current = options?.analysis === false;
-      const meterStarted = await startMeter(stream, options?.partials !== false, generation);
+      const meterStarted = await startMeter(stream, options?.partials !== false, generation, options?.onPcm);
       if (!meterStarted) {
         const error = new Error('audio-context-not-running') as Error & { name: string };
         error.name = 'AudioContextError';
@@ -731,13 +768,47 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           : new Float32Array(0);
         const enoughAudio = uploadFlat.length > pcmRate / 4;
         const pcmBlob = enoughAudio ? encodePcmWav(uploadFlat, pcmRate) : null;
-        const liveTextAtStop = chooseCompleteTranscript(
-          committedRef.current.text,
-          stopFallbackRef.current,
-        );
+        // 录满自动停（requestStop(0)）不带兜底文字；直连时分段字幕也没开，committedRef 是空的——
+        // 这时用直连那边的字幕，不然 55 秒的话在整段上传失败时会整个丢掉
+        let stopFallback = stopFallbackRef.current;
+        if (!stopFallback && options?.liveText) {
+          try {
+            stopFallback = options.liveText().trim();
+          } catch {
+            stopFallback = '';
+          }
+        }
+        const liveTextAtStop = chooseCompleteTranscript(committedRef.current.text, stopFallback);
         // 完整录音已经覆盖全部内容，停止并丢弃迟到切片，防止它们在收口后“幽灵回填”。
         cleanup();
         if (generationRef.current !== generation) return;
+
+        // 别的识别路径（浏览器直连百炼）已经边说边听完了：它的定稿能用就不再整段上传。
+        // 用不了（没连上、出错、超时、空结果、漂成日韩语）就当它不存在，往下照旧走 /voice——
+        // 整段 PCM 上面已经编好了，用户感觉不到换了路。
+        if (options?.quickFinal) {
+          let quick: QuickFinalResult | null = null;
+          try {
+            quick = await options.quickFinal();
+          } catch {
+            quick = null;
+          }
+          if (generationRef.current !== generation) return;
+          const reviewed = quick ? normalizeAsrTranscript(quick.text) : null;
+          if (quick && reviewed?.text && !reviewed.suspiciousLanguage) {
+            const raw = chooseCompleteTranscript(reviewed.text, liveTextAtStop);
+            const text = dictation ? await polishFinalText(raw, generation) : raw;
+            if (generationRef.current !== generation) return;
+            setPartial('');
+            onResultRef.current({
+              text,
+              voiceContext: quick.voiceContext ? { ...quick.voiceContext, transcript: raw } : null,
+            });
+            busyRef.current = false;
+            setTranscribing(false);
+            return;
+          }
+        }
 
         let finalPromise: Promise<Response> | null = null;
         let finalController: AbortController | null = null;

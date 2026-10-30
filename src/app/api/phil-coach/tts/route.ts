@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { siliconflowTtsSpeed } from '@/lib/siliconflowTts';
 
 export const runtime = 'nodejs';
 
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
         input: text,
         voice: VOICES[voiceKey],
         response_format: 'mp3',
-        speed: 0.9,          // 稍慢，贴陪伴的语速
+        speed: siliconflowTtsSpeed(), // 稍慢，贴陪伴的语速：默认 0.9，可用 PHIL_COACH_TTS_SPEED 调（和 /speak 同一个值）
       }),
       signal: AbortSignal.timeout(60000),
     });
