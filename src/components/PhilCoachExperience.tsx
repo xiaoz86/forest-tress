@@ -11,6 +11,7 @@ import {
 } from '@/lib/voiceServer';
 import {
   buildReplyRequest,
+  isAppleMobile,
   isReplyStream,
   readNdjson,
   useStreamingSpeech,
@@ -21,6 +22,8 @@ import {
 } from '@/lib/voiceStream';
 import { realtimeVoiceResult, useRealtimeAsr, type RealtimeAsrSession } from '@/lib/voiceRealtime';
 import { asrLanguageForLocale } from '@/lib/asrEvents';
+import { vdebug } from '@/lib/voiceDebugLog';
+import VoiceDebugPanel from '@/components/VoiceDebugPanel';
 import type { VoiceAnalysis } from '@/lib/philCoachVoice';
 import type { PhilAccess } from '@/lib/philCoachAccess';
 // 只拿类型：voiceStack.ts 会顺带引进服务端模块（node:https），不能进前端包
@@ -457,6 +460,18 @@ export default function PhilCoachExperience({
     [t],
   );
   const voiceOut = usePhilSpeech(streamMode, speechMessages);
+  // ?voiceDebug=1：开页先记一条环境快照——真机截图时第一眼就知道是哪台、走哪条线
+  useEffect(() => {
+    const ua = navigator.userAgent;
+    const os = /iPhone OS ([\d_]+)/.exec(ua)?.[1]?.replace(/_/g, '.') ?? (/Android [\d.]+/.exec(ua)?.[0] ?? '');
+    const session = (navigator as unknown as { audioSession?: { type?: string } }).audioSession;
+    vdebug(
+      'env',
+      `${isAppleMobile() ? 'apple-mobile' : 'other'} ${os} ${/MicroMessenger/i.test(ua) ? 'wechat' : /CriOS|Chrome/i.test(ua) ? 'chrome' : /Safari/i.test(ua) ? 'safari' : 'browser'}`
+        + ` audioSession=${session ? session.type ?? '?' : 'none'}`
+        + ` stack asr=${stack.asr} direct=${stack.asrDirect} tts=${stack.tts} stream=${stack.streamReply}`,
+    );
+  }, [stack]);
   const spokenRef = useRef<string>('');
   const importPromiseRef = useRef<Promise<void> | null>(null);
   /** 流式回复：正在长出来的那条（还没写进 thread） */
@@ -536,7 +551,9 @@ export default function PhilCoachExperience({
     // 只解锁、不留着：解锁完播放用的 AudioContext 就挂起，录音期间不和录音那个同时跑
     // （iOS 上两个同时 running 容易让外放变小、走听筒）。回复到了再恢复——解锁过的上下文不在手势里也能恢复。
     // 听写不用：录完还要再点一次发送，那一下会解锁。
-    if (voiceOut.enabled && mode === 'direct') voiceOut.prime({ unlockOnly: true });
+    // iPhone / iPad 例外：那边播放走 <audio>，在开麦克风的同一下放静音解锁会和录音抢音频会话，
+    // 改到「说完、再点一次」那一下解锁（见 finishVoice）。
+    if (voiceOut.enabled && mode === 'direct' && !isAppleMobile()) voiceOut.prime({ unlockOnly: true });
     voiceModeRef.current = mode;
     setVoiceMode(mode);
     setCaption('');
@@ -642,6 +659,9 @@ export default function PhilCoachExperience({
     micLiveRef.current = false;
     // 完整录音仍是定稿；浏览器字幕只在音频链路失败时兜底，用户说过的话不丢。
     voiceIn.stop(liveCaption);
+    // iPhone / iPad：直接发的回复要在录完之后才到，那时已不在手势里。「说完、再点一次」这一下是手势，
+    // 录音也已经收口——趁现在给 <audio> 解锁，不和录音抢（开麦克风那一下在这类设备上不解锁）。
+    if (voiceOut.enabled && voiceModeRef.current === 'direct' && isAppleMobile()) voiceOut.prime();
   };
   const cancelVoice = () => {
     if (captionWatchdogRef.current) {
@@ -1766,6 +1786,7 @@ export default function PhilCoachExperience({
   return (
     <div className="relative">
       {gateOverlay}
+      <VoiceDebugPanel />
 
       {/* 开口之后：这是哪一种对话、不会被保存；右边随时可以重新开始 */}
       {session && (

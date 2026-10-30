@@ -24,6 +24,7 @@
  * 打断（stop）：停掉所有已排上的声音节点、中止所有还在路上的 /speak（服务端随之中止上游 SSE）。
  */
 
+import { vdebug } from './voiceDebugLog.ts';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPcmAligner, pcm16ToWav } from './wavPcm.ts';
 import type { SpeechTone } from './philCoachSpeechSign.ts';
@@ -658,7 +659,7 @@ function audioContextCtor(): AudioContextCtor | null {
   );
 }
 
-function isAppleMobile(): boolean {
+export function isAppleMobile(): boolean {
   if (typeof navigator === 'undefined') return false;
   return /iPad|iPhone|iPod/i.test(navigator.userAgent)
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -930,6 +931,7 @@ export function createElementSink(el: AudioElementLike, events: SinkEvents) {
           blocked = false;
           events.blocked(false);
         }
+        vdebug('sink', '<audio> play ok');
         if (!sounded) {
           sounded = true;
           events.sound();
@@ -937,6 +939,7 @@ export function createElementSink(el: AudioElementLike, events: SinkEvents) {
       },
       (err: unknown) => {
         if (gen !== generation) return;
+        vdebug('sink', `<audio> play rejected ${(err as { name?: string } | null)?.name ?? 'error'}`);
         if ((err as { name?: string } | null)?.name === 'NotAllowedError') {
           // 自动播放被拦：留着这段，等用户点「点一下就能听」
           blocked = true;
@@ -984,6 +987,7 @@ export function createElementSink(el: AudioElementLike, events: SinkEvents) {
   };
   el.onerror = () => {
     if (!playing) return;
+    vdebug('sink', '<audio> error event');
     skipBroken();
   };
 
@@ -1098,8 +1102,19 @@ function createAudioOutput(events: SinkEvents, { isBusy }: { isBusy: () => boole
     return element;
   };
 
-  /** 老 iOS（没有 audioSession）上 Web Audio 受静音拨片管，宁可一开始就走 <audio> */
-  const preferElement = () => isAppleMobile() && !audioSession();
+  /**
+   * iPhone / iPad 一律走 <audio>，不建播放用的 AudioContext、也不碰 audioSession。
+   *
+   * 原来只在「没有 audioSession」的老 iOS 上这样做，有 audioSession 就走 Web Audio、
+   * 把会话设成 playback 来绕开静音拨片。真机（iOS 微信）上两件事都不成立：
+   *   - 微信 App 自己管着系统的音频会话，网页设 playback 不生效——静音拨片一开，Web Audio 一点声都没有，
+   *     而且不报错，「点一下就能听」也不出来；
+   *   - 直接发模式在点麦克风那一下解锁播放，等于和录音那个 AudioContext 同时起了第二个，
+   *     麦克风时不时被饿死（「全程没有听到声音」）。
+   * <audio> 不受静音拨片管、不抢录音（改造前线上一直这么放）。代价是每段要收齐才放（不再边收边放），
+   * 百炼合成一句约一秒，首声晚一点，换来的是一定有声音。
+   */
+  const preferElement = () => isAppleMobile();
 
   const noteRunning = (c: AudioContext) => {
     if (c === ctx && c.state === 'running') unlocked = true;
@@ -1111,9 +1126,11 @@ function createAudioOutput(events: SinkEvents, { isBusy }: { isBusy: () => boole
   };
 
   /** 没在念：挂起上下文、把会话还给系统。正在念（引擎有活、播放端没放完）就什么都不动 */
-  const park = () => {
+  const park = (force = false) => {
     cancelPark();
-    if (isBusy() || (web && !web.idle()) || (element && !element.idle())) return;
+    // 念完之后的「空闲挂起」要看忙不忙；明确要放手的时候（force）不看——
+    // 播放端刚被 stop 过，idle() 未必立刻为真，跳过的话音频会话会停在 playback，麦克风收进来的全是静音
+    if (!force && (isBusy() || (web && !web.idle()) || (element && !element.idle()))) return;
     const c = ctx;
     if (c && c.state === 'running' && typeof c.suspend === 'function') {
       void c.suspend().catch(() => undefined);
@@ -1133,6 +1150,7 @@ function createAudioOutput(events: SinkEvents, { isBusy }: { isBusy: () => boole
      */
     prime({ unlockOnly = false }: { unlockOnly?: boolean } = {}) {
       cancelPark();
+      vdebug('sink', `prime unlockOnly=${unlockOnly} path=${preferElement() ? 'element' : 'webaudio'}`);
       if (preferElement()) {
         // 这类设备上 <audio> 就是主路径：在手势里放一下静音给它解锁，之后回复到了才能直接出声。
         // 其余设备不碰它——点麦克风的那一下紧接着就要开录，不去多占一次音频会话。
@@ -1151,23 +1169,25 @@ function createAudioOutput(events: SinkEvents, { isBusy }: { isBusy: () => boole
     },
     async pickSink(): Promise<SpeechSink> {
       cancelPark();
-      setPlaybackSession(true);
-      const fallback = () => {
+      const fallback = (why: string) => {
         const sink = ensureElement();
+        vdebug('sink', `use <audio> (${why})${sink ? '' : ' — no Audio()'}`);
         if (!sink) throw new Error('no-audio-output');
         return sink;
       };
-      if (preferElement()) return fallback();
+      if (preferElement()) return fallback('apple mobile');
+      setPlaybackSession(true);
       const c = ensureContext();
-      if (!c) return fallback();
+      if (!c) return fallback('no AudioContext');
       if (c.state !== 'running') {
         await Promise.race([
           c.resume().catch(() => undefined),
           new Promise(resolve => setTimeout(resolve, unlocked ? RESUME_WAIT_UNLOCKED_MS : RESUME_WAIT_MS)),
         ]);
       }
-      if (c.state !== 'running') return fallback();
+      if (c.state !== 'running') return fallback(`ctx ${c.state}`);
       noteRunning(c);
+      vdebug('sink', `use webaudio ctx=${c.state} rate=${c.sampleRate}`);
       web ??= createWebAudioSink(c, events);
       return web;
     },
@@ -1188,7 +1208,8 @@ function createAudioOutput(events: SinkEvents, { isBusy }: { isBusy: () => boole
     },
     /** 开录前、关朗读、换嗓、被打断：马上挂起，把会话类型还给系统 */
     releaseSession() {
-      park();
+      vdebug('sink', 'release session (force)');
+      park(true);
     },
     close() {
       cancelPark();
@@ -1303,9 +1324,7 @@ export function useStreamingSpeech({ messages }: { messages?: StreamingSpeechMes
   /** 第一次用到时才建（不在渲染里碰浏览器音频） */
   const getEngine = useCallback((): { engine: SpeechEngine; output: ReturnType<typeof createAudioOutput> } => {
     if (engineRef.current && outputRef.current) return { engine: engineRef.current, output: outputRef.current };
-    const debug = voiceDebugEnabled()
-      ? (label: string) => console.info('[phil-voice] speak', label)
-      : undefined;
+    const debug = voiceDebugEnabled() ? (label: string) => vdebug('speak', label) : undefined;
     // 播放端的回报先经过这一层：engine 建好之前不会有任何声音，所以这里拿到的一定是它
     const events: SinkEvents = {
       sound: () => engineRef.current?.events.sound(),

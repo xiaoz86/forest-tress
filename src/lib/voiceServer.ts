@@ -3,6 +3,7 @@
 // 服务端语音：录音上传转写（微信也能用）+ 神经网络朗读（不再是播报腔）。
 // 与 voice.ts 里的浏览器原生方案互补：这里音质与兼容性更好，代价是要走一次网络。
 
+import { vdebug } from './voiceDebugLog.ts';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { normalizeVoiceAnalysis, type VoiceAnalysis } from '@/lib/philCoachVoice';
 import {
@@ -328,6 +329,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   /** 整段录音的最高电平都没过底噪：麦克风一路都是静的。 */
   const silentMic = useCallback(() => peakLevelRef.current < SILENT_MIC_RMS, []);
   const micHint = useCallback(() => {
+    vdebug('mic', `silent mic hint (peak=${peakLevelRef.current.toFixed(3)})`);
     void listInputDevices();
     const label = micLabelRef.current;
     return label
@@ -397,6 +399,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
   const polishFinalText = useCallback(
     async (text: string, generation: number): Promise<string> => {
       if (text.length < FINAL_POLISH_MIN_CHARS) return text;
+      const polishStartedAt = Date.now();
       const controller = new AbortController();
       polishRequestRef.current = controller;
       const timeout = setTimeout(() => controller.abort(), FINAL_POLISH_TIMEOUT_MS);
@@ -408,6 +411,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           signal: controller.signal,
         });
         const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        vdebug('mic', `polish ${res.status} changed=${Boolean(json.changed)} ${Date.now() - polishStartedAt}ms`);
         if (generationRef.current !== generation) return text;
         if (!res.ok || typeof json.text !== 'string' || !json.changed) return text;
         /*
@@ -419,6 +423,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         if (!reviewed.text || reviewed.suspiciousLanguage) return text;
         return reviewed.text;
       } catch {
+        vdebug('mic', `polish failed/timeout ${Date.now() - polishStartedAt}ms`);
         return text;
       } finally {
         clearTimeout(timeout);
@@ -569,8 +574,12 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       const ctx = audioCtxRef.current;
       if (!ctx) return false;
       // iOS 上就算在手势里建好，拿到麦克风这一等也可能把它挂起；再推一次
+      vdebug('mic', `record ctx ${ctx.state} rate=${ctx.sampleRate}`);
       if (ctx.state === 'suspended') await ctx.resume();
-      if (ctx.state !== 'running') return false;
+      if (ctx.state !== 'running') {
+        vdebug('mic', `record ctx still ${ctx.state} — give up`);
+        return false;
+      }
       const source = ctx.createMediaStreamSource(stream);
       sourceRef.current = source;
       startedAtRef.current = Date.now();
@@ -587,6 +596,8 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       // 或手指在滚动时，rAF 都会被节流甚至停掉——波形就直挺挺躺在那儿，
       // 让人以为没录上。音频回调走的是音频线程，只要有声音进来就会响。
       const rate = ctx.sampleRate;
+      let debugSecond = 0;
+      let debugPeak = 0;
       tap.onaudioprocess = e => {
         const data = e.inputBuffer.getChannelData(0);
         const copy = new Float32Array(data);
@@ -603,6 +614,14 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         for (let i = 0; i < data.length; i += 1) sum += data[i] * data[i];
         const rms = Math.sqrt(sum / data.length);
         if (rms > peakLevelRef.current) peakLevelRef.current = rms;
+        // 调试：前 5 秒每秒报一次这一秒的最大音量（全是 0.000 就是麦克风被饿死了）
+        if (rms > debugPeak) debugPeak = rms;
+        const second = Math.floor((Date.now() - startedAtRef.current) / 1000);
+        if (second !== debugSecond && debugSecond < 5) {
+          vdebug('mic', `level s${debugSecond} peak=${debugPeak.toFixed(3)}`);
+          debugSecond = second;
+          debugPeak = 0;
+        }
         // 放大到易感知的范围，并留一点底噪门限
         setLevel(Math.min(1, Math.max(0, (rms - 0.01) * 6)));
         setElapsed(Math.floor((Date.now() - startedAtRef.current) / 1000));
@@ -743,6 +762,11 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
       }
       setRequesting(false);
       streamRef.current = stream;
+      {
+        const track = stream.getAudioTracks()[0];
+        const st = (track?.getSettings?.() ?? {}) as MediaTrackSettings;
+        vdebug('mic', `got stream "${track?.label || '?'}" muted=${track?.muted} state=${track?.readyState} rate=${st.sampleRate ?? '?'} ec=${st.echoCancellation ?? '?'}`);
+      }
       dictationRef.current = options?.analysis === false;
       const meterStarted = await startMeter(stream, options?.partials !== false, generation, options?.onPcm);
       if (!meterStarted) {
@@ -779,6 +803,8 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
           }
         }
         const liveTextAtStop = chooseCompleteTranscript(committedRef.current.text, stopFallback);
+        const finalStartedAt = Date.now();
+        vdebug('mic', `stop: audio=${pcmBlob ? (pcmBlob.size / 32000).toFixed(1) : 0}s peak=${peakLevelRef.current.toFixed(3)} caption=${liveTextAtStop.length}字`);
         // 完整录音已经覆盖全部内容，停止并丢弃迟到切片，防止它们在收口后“幽灵回填”。
         cleanup();
         if (generationRef.current !== generation) return;
@@ -851,6 +877,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
         try {
           const res = await finalPromise;
           const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+          vdebug('mic', `final /voice ${res.status} source=${String(json.source ?? json.error ?? '?')} ${Date.now() - finalStartedAt}ms`);
           if (generationRef.current !== generation) return;
           if (!res.ok || typeof json.text !== 'string') {
             if (liveTextAtStop) {
