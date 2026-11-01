@@ -115,6 +115,7 @@ test('streamTtsPcm：请求体和请求头对，跨块 SSE 还原成偶数长度
   let seen: { url: string; headers: Headers; body: Record<string, unknown> } | null = null;
   const encoder = new TextEncoder();
   let done: { audioBytes: number } | null = null;
+  const responseTimes: number[] = [];
   const result = await withFetch(
     async (input, init) => {
       seen = {
@@ -138,6 +139,7 @@ test('streamTtsPcm：请求体和请求头对，跨块 SSE 还原成偶数长度
         voice: 'vf',
         instruction: '慢一点',
         config: CONFIG,
+        onHeaders: elapsedMs => responseTimes.push(elapsedMs),
         onDone: info => {
           done = info;
         },
@@ -148,6 +150,8 @@ test('streamTtsPcm：请求体和请求头对，跨块 SSE 还原成偶数长度
   );
 
   assert.ok(seen);
+  assert.equal(responseTimes.length, 1);
+  assert.ok(responseTimes[0] >= 0);
   const request = seen as { url: string; headers: Headers; body: Record<string, unknown> };
   assert.equal(request.url, 'https://ws-test.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer');
   assert.equal(request.headers.get('X-DashScope-SSE'), 'enable');

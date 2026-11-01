@@ -112,6 +112,8 @@ export async function POST(request: Request) {
   const bailianVoice = resolveBailianVoice(voiceKey);
   if (bailian && bailianVoice && body.provider !== 'siliconflow' && !ttsCircuit.isOpen()) {
     const startedAt = Date.now();
+    let headersMs: number | null = null;
+    const region = process.env.VERCEL_REGION || 'local';
     try {
       const { stream, firstAudioMs } = await streamTtsPcm({
         text,
@@ -120,9 +122,11 @@ export async function POST(request: Request) {
         gainDb: bailianTtsGainDb(voiceKey),
         config: bailian,
         signal: request.signal,
+        onHeaders: elapsedMs => { headersMs = elapsedMs; },
         onDone: ({ audioBytes, usage, cancelled }) => {
           console.info(
             cancelled ? '[phil-speak] bailian cancelled' : '[phil-speak] bailian ok',
+            `voice=${voiceKey} region=${region} headers=${headersMs ?? '-'}ms`,
             `first=${firstAudioMs}ms`,
             `total=${Date.now() - startedAt}ms`,
             `audio=${(audioBytes / 2 / 24_000).toFixed(1)}s`,
@@ -151,7 +155,8 @@ export async function POST(request: Request) {
       // 400 是这一句或这份配置的问题（比如某个复刻音色被删了），不是百炼挂了——
       // 不算进熔断，不然连错三次会把另一把好好的嗓音也一起切到 SiliconFlow
       if (e.status !== 400) ttsCircuit.failure();
-      console.warn('[phil-speak] bailian failed', e.kind, e.status ?? '', e.code ?? '', `${Date.now() - startedAt}ms`);
+      console.warn('[phil-speak] bailian failed', e.kind, e.status ?? '', e.code ?? '', `${Date.now() - startedAt}ms`,
+        `voice=${voiceKey} region=${region} headers=${headersMs ?? '-'}ms`);
       if (!siliconKey) return jsonError('tts-failed', 502);
     }
   }

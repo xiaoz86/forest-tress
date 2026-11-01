@@ -202,6 +202,7 @@ export async function streamTtsPcm({
   firstAudioTimeoutMs = 8_000,
   totalTimeoutMs = 45_000,
   gainDb = 0,
+  onHeaders,
   onDone,
 }: {
   text: string;
@@ -213,6 +214,8 @@ export async function streamTtsPcm({
   totalTimeoutMs?: number;
   /** 响度提升（dB），0 就是不处理；见 bailianTtsGainDb */
   gainDb?: number;
+  /** 仅记录上游响应头耗时，区分连接等待与合成等待。 */
+  onHeaders?: (elapsedMs: number) => void;
   onDone?: (info: TtsStreamDone) => void;
 }): Promise<TtsPcmStream> {
   const cfg = config === undefined ? getDashscopeConfig() : config;
@@ -254,6 +257,7 @@ export async function streamTtsPcm({
     stopTimers();
     throw toDashscopeError(err, combined);
   }
+  onHeaders?.(Date.now() - startedAt);
 
   if (!res.ok || !res.body) {
     stopTimers();
