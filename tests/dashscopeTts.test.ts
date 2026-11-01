@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import dns from 'node:dns';
+import { createServer } from 'node:http';
+import { syncBuiltinESMExports } from 'node:module';
+import type { AddressInfo, LookupFunction } from 'node:net';
 import test from 'node:test';
 import { DashscopeError, getDashscopeConfig } from '../src/lib/dashscope.ts';
 import {
@@ -111,6 +115,43 @@ async function readAll(stream: ReadableStream<Uint8Array>): Promise<Uint8Array[]
   }
 }
 
+test('TTS 连接：首个 IPv4 地址不可达时，使用下一地址取得音频', async () => {
+  const server = createServer((request, response) => {
+    request.resume();
+    request.on('end', () => response.end(SAMPLE_SSE));
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const originalLookup = dns.lookup;
+  const nativeFetch = globalThis.fetch;
+  const testHost = 'tts-address-test.invalid';
+  const originalNoProxy = process.env.NO_PROXY;
+  process.env.NO_PROXY = testHost;
+  const lookupWithFailure: LookupFunction = (hostname, options, callback) => {
+    if (hostname !== testHost) return originalLookup(hostname, options, callback);
+    const addresses = [{ address: '127.0.0.2', family: 4 }, { address: '127.0.0.1', family: 4 }];
+    callback(null, options.all ? addresses : addresses[0].address, 4);
+  };
+  dns.lookup = lookupWithFailure as typeof dns.lookup;
+  syncBuiltinESMExports();
+  try {
+    const pcm = await withFetch(
+      (_input, init) => nativeFetch(`http://${testHost}:${(server.address() as AddressInfo).port}/tts`, init),
+      async () => {
+        const result = await streamTtsPcm({ text: '好。', voice: 'vf', config: CONFIG, firstAudioTimeoutMs: 1500 });
+        return readAll(result.stream);
+      },
+    );
+    assert.deepEqual(pcm.flatMap(chunk => [...chunk]), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  } finally {
+    dns.lookup = originalLookup;
+    syncBuiltinESMExports();
+    if (originalNoProxy === undefined) delete process.env.NO_PROXY;
+    else process.env.NO_PROXY = originalNoProxy;
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});
+
 test('streamTtsPcm：请求体和请求头对，跨块 SSE 还原成偶数长度的 PCM 块', async () => {
   let seen: { url: string; headers: Headers; body: Record<string, unknown> } | null = null;
   const encoder = new TextEncoder();
@@ -185,6 +226,40 @@ test('streamTtsPcm：第一块音频之前出错 → 直接抛，调用方还能
       (err: unknown) => err instanceof DashscopeError && err.kind === kind,
       kind,
     );
+  }
+});
+
+test('连接超时后重新建连，同一段文字成功合成且不重置整体等待预算', async () => {
+  let calls = 0;
+  const bodies: unknown[] = [];
+  const signals: unknown[] = [];
+  const pcm = await withFetch(async (_url, init) => {
+    bodies.push(init?.body);
+    signals.push(init?.signal);
+    if (++calls < 3) throw new TypeError('fetch failed', { cause: { code: 'UND_ERR_CONNECT_TIMEOUT' } });
+    return new Response(SAMPLE_SSE);
+  }, async () => readAll((await streamTtsPcm({ text: '好。', voice: 'vf', config: CONFIG })).stream));
+  assert.equal(calls, 3);
+  assert.ok(bodies.every(body => body === bodies[0]));
+  assert.ok(signals.every(signal => signal === signals[0]));
+  assert.equal(pcm.flatMap(chunk => [...chunk]).length, 12);
+});
+
+test('连接重试最多三次；其他网络错误和用户取消不重试', async () => {
+  for (const [code, abort, expected] of [
+    ['UND_ERR_CONNECT_TIMEOUT', false, 3],
+    ['ECONNRESET', false, 1],
+    ['UND_ERR_CONNECT_TIMEOUT', true, 1],
+  ] as const) {
+    let calls = 0;
+    const ctrl = new AbortController();
+    await assert.rejects(withFetch(async () => {
+      calls++;
+      if (abort) ctrl.abort();
+      throw new TypeError('fetch failed', { cause: { code } });
+    }, () => streamTtsPcm({ text: '好。', voice: 'vf', config: CONFIG, signal: ctrl.signal })),
+    (err: unknown) => err instanceof DashscopeError && err.kind === (abort ? 'aborted' : 'upstream'));
+    assert.equal(calls, expected);
   }
 });
 

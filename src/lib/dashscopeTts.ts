@@ -38,6 +38,7 @@ const ttsDispatcher = new EnvHttpProxyAgent({
   autoSelectFamily: true,
   autoSelectFamilyAttemptTimeout: 250,
   connect: {
+    timeout: 1500,
     lookup(hostname, options, callback) {
       lookup(hostname, { ...options, family: 4 }, callback);
     },
@@ -270,7 +271,18 @@ export async function streamTtsPcm({
       signal: combined,
       dispatcher: ttsDispatcher,
     };
-    res = await fetch(ttsEndpoint(cfg), init);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        res = await fetch(ttsEndpoint(cfg), init);
+        break;
+      } catch (err) {
+        const error = err as { code?: string; cause?: { code?: string } };
+        // 只重试 TCP/TLS 尚未建立的请求：正文还没发送，不会重复合成。
+        // 已发出请求后的错误、用户取消和整体首音超时都不重试。
+        const code = error?.cause?.code ?? error?.code;
+        if (code !== 'UND_ERR_CONNECT_TIMEOUT' || attempt >= 2 || combined.aborted) throw err;
+      }
+    }
   } catch (err) {
     stopTimers();
     throw toDashscopeError(err, combined);
