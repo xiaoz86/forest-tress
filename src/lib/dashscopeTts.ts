@@ -14,6 +14,7 @@
  *
  * 日志纪律：这里不打日志；调用方只记错误类别、状态码和耗时。
  */
+import { lookup } from 'node:dns';
 import { EnvHttpProxyAgent } from 'undici';
 import {
   anySignal,
@@ -30,8 +31,18 @@ import { createPcmAligner, createPcmLeveler, createPcmSilenceTrimmer } from './w
 
 type Env = Record<string, string | undefined>;
 
-// 仅语音请求使用独立 IPv4 连接，避免双栈连接卡住；本地仍遵循现有代理配置。
-const ttsDispatcher = new EnvHttpProxyAgent({ connect: { family: 4 }, pipelining: 0 });
+// 返回全部 IPv4 地址，让 Node 在某个地址连不通时及时尝试下一个，而非等完首音预算。
+// 不在 socket 上设 family: 4（会关闭自动地址尝试）；本地仍遵循现有代理配置。
+const ttsDispatcher = new EnvHttpProxyAgent({
+  pipelining: 0,
+  autoSelectFamily: true,
+  autoSelectFamilyAttemptTimeout: 250,
+  connect: {
+    lookup(hostname, options, callback) {
+      lookup(hostname, { ...options, family: 4 }, callback);
+    },
+  },
+});
 
 export const TTS_SAMPLE_RATE = 24_000;
 /** /speak 响应头 X-Audio-Format 的值，前端播放器按它分派 */
