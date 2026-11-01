@@ -14,6 +14,7 @@
  *
  * 日志纪律：这里不打日志；调用方只记错误类别、状态码和耗时。
  */
+import { EnvHttpProxyAgent } from 'undici';
 import {
   anySignal,
   classifyDashscopeError,
@@ -28,6 +29,9 @@ import type { SpeechTone } from './philCoachSpeechSign.ts';
 import { createPcmAligner, createPcmLeveler, createPcmSilenceTrimmer } from './wavPcm.ts';
 
 type Env = Record<string, string | undefined>;
+
+// 仅语音请求使用独立 IPv4 连接，避免双栈连接卡住；本地仍遵循现有代理配置。
+const ttsDispatcher = new EnvHttpProxyAgent({ connect: { family: 4 }, pipelining: 0 });
 
 export const TTS_SAMPLE_RATE = 24_000;
 /** /speak 响应头 X-Audio-Format 的值，前端播放器按它分派 */
@@ -233,7 +237,7 @@ export async function streamTtsPcm({
 
   let res: Response;
   try {
-    res = await fetch(ttsEndpoint(cfg), {
+    const init: RequestInit & { dispatcher: EnvHttpProxyAgent } = {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${cfg.apiKey}`,
@@ -253,7 +257,9 @@ export async function streamTtsPcm({
         },
       }),
       signal: combined,
-    });
+      dispatcher: ttsDispatcher,
+    };
+    res = await fetch(ttsEndpoint(cfg), init);
   } catch (err) {
     stopTimers();
     throw toDashscopeError(err, combined);
