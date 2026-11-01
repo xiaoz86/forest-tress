@@ -16,6 +16,7 @@ import {
   synthesizeSiliconflowMp3,
 } from '@/lib/siliconflowTts';
 import { resolveVoiceStack } from '@/lib/voiceStack';
+import { traceTtsRequest, type TtsRequestTrace } from '@/lib/ttsRequestTrace';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -113,9 +114,10 @@ export async function POST(request: Request) {
   if (bailian && bailianVoice && body.provider !== 'siliconflow' && !ttsCircuit.isOpen()) {
     const startedAt = Date.now();
     let headersMs: number | null = null;
+    let connectionTrace: TtsRequestTrace = {};
     const region = process.env.VERCEL_REGION || 'local';
     try {
-      const { stream, firstAudioMs } = await streamTtsPcm({
+      const { stream, firstAudioMs } = await traceTtsRequest(() => streamTtsPcm({
         text,
         voice: bailianVoice,
         instruction: bailianTtsInstruction(tone),
@@ -127,13 +129,14 @@ export async function POST(request: Request) {
           console.info(
             cancelled ? '[phil-speak] bailian cancelled' : '[phil-speak] bailian ok',
             `voice=${voiceKey} region=${region} headers=${headersMs ?? '-'}ms`,
+            `connection=${JSON.stringify(connectionTrace)}`,
             `first=${firstAudioMs}ms`,
             `total=${Date.now() - startedAt}ms`,
             `audio=${(audioBytes / 2 / 24_000).toFixed(1)}s`,
             usage ? `tokens=${usage.output_tokens ?? '?'}/${usage.input_tokens ?? '?'}` : '',
           );
         },
-      });
+      }), trace => { connectionTrace = trace; });
       ttsCircuit.success();
       return new Response(stream, {
         headers: {
@@ -156,7 +159,7 @@ export async function POST(request: Request) {
       // 不算进熔断，不然连错三次会把另一把好好的嗓音也一起切到 SiliconFlow
       if (e.status !== 400) ttsCircuit.failure();
       console.warn('[phil-speak] bailian failed', e.kind, e.status ?? '', e.code ?? '', `${Date.now() - startedAt}ms`,
-        `voice=${voiceKey} region=${region} headers=${headersMs ?? '-'}ms`);
+        `voice=${voiceKey} region=${region} headers=${headersMs ?? '-'}ms`, `connection=${JSON.stringify(connectionTrace)}`);
       if (!siliconKey) return jsonError('tts-failed', 502);
     }
   }
