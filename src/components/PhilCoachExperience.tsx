@@ -660,7 +660,7 @@ export default function PhilCoachExperience({
     // 完整录音仍是定稿；浏览器字幕只在音频链路失败时兜底，用户说过的话不丢。
     voiceIn.stop(liveCaption);
     // iPhone / iPad：直接发的回复要在录完之后才到，那时已不在手势里。「说完、再点一次」这一下是手势，
-    // 录音也已经收口——趁现在给 <audio> 解锁，不和录音抢（开麦克风那一下在这类设备上不解锁）。
+    // 仍有短暂的尾音采集——这里只在手势里解锁，不切播放模式；等回复实际播放时再切换。
     if (voiceOut.enabled && voiceModeRef.current === 'direct' && isAppleMobile()) voiceOut.prime();
   };
   const cancelVoice = () => {
@@ -1098,6 +1098,8 @@ export default function PhilCoachExperience({
     gen: number,
     signal: AbortSignal,
   ): Promise<'ok' | 'gate' | 'stale'> {
+    const requestedAt = Date.now();
+    vdebug('reply', 'request started');
     const request = buildReplyRequest(
       streamMode,
       {
@@ -1116,7 +1118,8 @@ export default function PhilCoachExperience({
       body: request.body,
       signal,
     });
-    if (streamMode && isReplyStream(res)) return readReplyStream(res, pathId, gen);
+    vdebug('reply', `headers status=${res.status} ${Date.now() - requestedAt}ms`);
+    if (streamMode && isReplyStream(res)) return readReplyStream(res, pathId, gen, requestedAt);
     const json = await res.json().catch(() => ({}));
     if (gen !== genRef.current) return 'stale';
     if (res.status === 403 && json.error === 'trial-ended') {
@@ -1158,7 +1161,7 @@ export default function PhilCoachExperience({
    * 流半路断了（error 事件、网络断开）：已经长出来的字照样写进 thread，并提示一句——
    * 模型下一轮看到的，就是用户实际读到、听到的。一个字都没出来就当发送失败，走原来的报错。
    */
-  async function readReplyStream(res: Response, pathId: string, gen: number): Promise<'ok' | 'stale'> {
+  async function readReplyStream(res: Response, pathId: string, gen: number, requestedAt: number): Promise<'ok' | 'stale'> {
     const token = Symbol('reply');
     replyStreamRef.current = token;
     const sentences: SignedSentence[] = [];
@@ -1169,10 +1172,12 @@ export default function PhilCoachExperience({
       for await (const event of readNdjson<PhilStreamEvent>(res.body as ReadableStream<Uint8Array>)) {
         if (gen !== genRef.current) return 'stale';
         if (event.type === 'delta') {
+          if (!text && event.text) vdebug('reply', `first text ${Date.now() - requestedAt}ms`);
           text += event.text;
           // 开头的空行不显示（写进 thread 时整段会 trim，免得那一下往上跳）
           setStreamingText(text.trimStart());
         } else if (event.type === 'sentence') {
+          if (!sentences.length) vdebug('reply', `first sentence ${Date.now() - requestedAt}ms chars=${event.text.length}`);
           const sentence: SignedSentence = {
             index: event.index,
             text: event.text,

@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   buildReplyRequest,
   concatBytes,
+  createAudioOutput,
   createElementSink,
   createPlaybackClock,
   createSpeechEngine,
@@ -620,4 +621,66 @@ test('引擎 + <audio>：第一段放不出来，后面的照放，放完这条�
   assert.equal(engine.active, false);
   assert.deepEqual(states.at(-1), { loading: false, speaking: false });
   assert.deepEqual(errors, ['playback']);
+});
+
+test('iPhone：尾音期间仅解锁，回复实际播放才请求 playback，再次开录前归还 auto', async t => {
+  const originals = new Map(['navigator', 'Audio', 'window'].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  t.after(() => {
+    for (const [key, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  });
+  const session = { type: 'auto' };
+  let contexts = 0;
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'iPhone', audioSession: session } });
+  Object.defineProperty(globalThis, 'Audio', { configurable: true, value: FakeAudio });
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { AudioContext: class { constructor() { contexts += 1; } } } });
+  const events: SinkEvents = { sound() {}, advanced() {}, drained() {}, blocked() {}, playError() {} };
+  const output = createAudioOutput(events, { isBusy: () => false });
+  t.after(() => output.close());
+  output.prime();
+  await tick();
+  assert.equal(session.type, 'auto', '完成录音手势中的静音不抢尾音采集');
+  const sink = await output.pickSink();
+  sink.stop();
+  assert.equal(session.type, 'auto', '选择播放器还没有播放');
+  sink.pushPcm(new Uint8Array(4800), 24000);
+  sink.endSegment();
+  await tick();
+  assert.equal(session.type, 'playback', '录音已释放，实际播放明确请求媒体模式');
+  output.stopAll();
+  output.releaseSession();
+  assert.equal(session.type, 'auto', '再录一轮不保留 playback');
+  assert.equal(contexts, 0, 'iOS 仍不创建第二个 AudioContext');
+
+  Object.defineProperty(session, 'type', { get: () => 'auto', set: () => { throw new Error('unsupported'); } });
+  assert.doesNotThrow(() => {
+    sink.pushPcm(new Uint8Array(4800), 24000);
+    sink.endSegment();
+    output.releaseSession();
+  }, '不支持切换的宿主仍可调用原来的播放器');
+  await tick();
+});
+
+test('<audio>：上一段迟到的 play 拒绝不会把下一段误判为播放被拦', async () => {
+  const { el, log, sink, addSegment } = elementSetup();
+  let rejectFirst!: (err: Error) => void;
+  const normalPlay = el.play.bind(el);
+  let first = true;
+  el.play = () => {
+    if (!first) return normalPlay();
+    first = false;
+    return new Promise<void>((_resolve, reject) => { rejectFirst = reject; });
+  };
+  addSegment(1);
+  addSegment(2);
+  el.error();
+  await tick();
+  rejectFirst(Object.assign(new Error('late rejection'), { name: 'NotAllowedError' }));
+  await tick();
+  assert.ok(!log.includes('blocked:true'));
+  assert.equal(sink.pendingSegments(), 1);
+  el.end();
+  assert.equal(sink.idle(), true);
 });

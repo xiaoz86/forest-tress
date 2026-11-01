@@ -7,7 +7,7 @@
  *
  * 断句的取舍（为什么不是一句一段）：
  * - 第一段要快：遇到句末标点、够 4 个字就发——「停止说话 → 听见声音」的等待主要卡在这一段；
- *   28 个字还没等到句号，就在最后一个逗号处切，别让一个长句把开口拖住。
+ *   或在首个至少 12 字的自然停顿处先发，避免 iPhone 等整句合成才出声。
  * - 之后各段要攒：攒到 40 字以上、遇到句末再发，单段不超过 120 字。
  *   第一段在念的时候后面有的是时间；段数少一些，TTS 请求就少（百炼 RPM 只有 180，账号共用），
  *   语调也更连贯——一句一段念出来，每句都像重新起头。
@@ -18,7 +18,7 @@ export type SpeechChunk = { index: number; text: string };
 export type SpeechChunkerOptions = {
   /** 第一段最少几个字（太短的「嗯。」单独合成不值一个请求，也念不出语气） */
   firstMin?: number;
-  /** 第一段等句号最多等到几个字，之后就在逗号处切 */
+  /** 第一段在逗号等自然停顿处可提前发出的最少字数 */
   firstSoftMax?: number;
   /** 之后各段攒到几个字再发 */
   minLength?: number;
@@ -32,6 +32,7 @@ const TRAILERS = new Set(['。', '！', '？', '!', '?', '…', '；', ';', '.',
 const SOFT_BREAK = new Set(['，', ',', '、', '：', ':']);
 const OPEN_PAREN = new Set(['（', '(']);
 const CLOSE_PAREN = new Set(['）', ')']);
+const QUOTE_END: Record<string, string> = { '“': '”', '「': '」', '『': '』', '"': '"' };
 
 /**
  * 看起来像舞台提示的括号内容：提示词第 8 条明令禁止，但模型偶尔还是会写。
@@ -107,8 +108,11 @@ type Cut = { end: number; strong: boolean };
 function scanCuts(buf: string, final: boolean): Cut[] {
   const cuts: Cut[] = [];
   let depth = 0;
+  let quote: string | null = null;
   for (let i = 0; i < buf.length; i += 1) {
     const ch = buf[i];
+    if (quote === ch) quote = null;
+    else if (!quote && QUOTE_END[ch]) quote = QUOTE_END[ch];
     if (OPEN_PAREN.has(ch)) {
       depth += 1;
       continue;
@@ -118,6 +122,9 @@ function scanCuts(buf: string, final: boolean): Cut[] {
       continue;
     }
     if (depth > 0) continue;
+    // 裸网址交给 cleanForSpeech 整段移除；不能先把协议或查询参数切碎后念出来。
+    const prefix = buf.slice(0, i + 1);
+    if (/https?:$/i.test(prefix) || /https?:\/\/[^\s)）\]】]*$/i.test(prefix)) continue;
 
     if (ch === '\n') {
       cuts.push({ end: i + 1, strong: true });
@@ -144,17 +151,22 @@ function scanCuts(buf: string, final: boolean): Cut[] {
       while (j < buf.length && TRAILERS.has(buf[j])) j += 1;
       if (j >= buf.length && !final) break;
       cuts.push({ end: j, strong: true });
+      if (quote && buf.slice(i + 1, j).includes(quote)) quote = null;
       i = j - 1;
       continue;
     }
-    if (SOFT_BREAK.has(ch)) cuts.push({ end: i + 1, strong: false });
+    if (SOFT_BREAK.has(ch) && !quote) {
+      // 时间、千位数不是停顿；数字后的标点落在 token 尾部时，等下一字再判断。
+      if (/\d/.test(buf[i - 1] || '') && (/\d/.test(buf[i + 1] || '') || (!final && i + 1 === buf.length))) continue;
+      cuts.push({ end: i + 1, strong: false });
+    }
   }
   return cuts;
 }
 
 export function createSpeechChunker(options: SpeechChunkerOptions = {}) {
   const firstMin = options.firstMin ?? 4;
-  const firstSoftMax = options.firstSoftMax ?? 28;
+  const firstSoftMax = options.firstSoftMax ?? 12;
   const minLength = options.minLength ?? 40;
   const maxLength = options.maxLength ?? 120;
 
@@ -177,14 +189,12 @@ export function createSpeechChunker(options: SpeechChunkerOptions = {}) {
     const cuts = scanCuts(buf, final);
 
     if (index === 0) {
-      const sentence = cuts.find(c => c.strong && spoken(c.end) >= firstMin);
-      if (sentence && spoken(sentence.end) <= maxLength) return sentence.end;
-      if (spoken(buf.length) >= firstSoftMax) {
-        for (let k = cuts.length - 1; k >= 0; k -= 1) {
-          const len = spoken(cuts[k].end);
-          if (len >= firstMin && len <= maxLength) return cuts[k].end;
-        }
-      }
+      // 顺序找第一个可念的停顿，不因一次 delta 恰好带了整句就跳过前面的短分句。
+      const ready = cuts.find(c => {
+        const len = spoken(c.end);
+        return len >= (c.strong ? firstMin : Math.max(firstMin, firstSoftMax)) && len <= maxLength;
+      });
+      if (ready) return ready.end;
     } else {
       const ready = cuts.find(c => c.strong && spoken(c.end) >= minLength);
       if (ready && spoken(ready.end) <= maxLength) return ready.end;

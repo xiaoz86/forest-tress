@@ -110,6 +110,21 @@ test('回复流：没有签名密钥时照样流文字，只是不发 sentence',
   assert.equal((events[0] as { speak: boolean }).speak, false);
 });
 
+test('长首句仍在生成时，已签名的第一分句就能开始合成，气泡原文保持完整', async () => {
+  const prefix = '这几天你一直独自撑着很多事，';
+  const tail = '没有人可以商量，也没有人替你的班。我们可以慢慢说。';
+  const events = await collect<PhilStreamEvent>(createReplyEventStream({
+    requestId: 'early-clause', chunks: fromArray([prefix, tail]), cancel() {}, signer: createSpeechSigner(SECRET),
+  }));
+  const sentenceAt = events.findIndex(e => e.type === 'sentence');
+  const tailAt = events.findIndex(e => e.type === 'delta' && e.text === tail);
+  assert.ok(sentenceAt < tailAt, '第一分句不等长句后半段');
+  const first = events[sentenceAt] as Extract<PhilStreamEvent, { type: 'sentence' }>;
+  assert.equal(first.text, prefix.slice(0, -1));
+  assert.equal(verifySpeech(first, SECRET), 'ok');
+  assert.deepEqual(events.at(-1), { type: 'done', requestId: 'early-clause', reply: prefix + tail });
+});
+
 test('回复流：模型中途断了 → 以 error 事件结束；一个字都没写也算失败', async () => {
   const broken = await collect<PhilStreamEvent>(
     createReplyEventStream({

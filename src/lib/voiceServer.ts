@@ -659,7 +659,9 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
     }
     stopMeter();
     try {
-      streamRef.current?.getTracks().forEach(t => t.stop());
+      const tracks = streamRef.current?.getTracks() ?? [];
+      tracks.forEach(t => t.stop());
+      if (tracks.length) vdebug('mic', `released tracks=${tracks.length} live=${tracks.filter(t => t.readyState === 'live').length}`);
     } catch {
       /* ignore */
     }
@@ -672,6 +674,7 @@ export function useServerSpeechInput(onResult: (result: VoiceInputResult) => voi
    */
   const requestStop = useCallback((tailMs = RECORDING_TAIL_MS, fallbackText = '') => {
     if (!finalizeRef.current || stoppingRef.current) return;
+    vdebug('mic', `finish requested tail=${tailMs}ms`);
     stoppingRef.current = true;
     stopFallbackRef.current = fallbackText.trim();
     if (maxTimerRef.current) {

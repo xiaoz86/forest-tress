@@ -52,15 +52,46 @@ test('第一段太短（「嗯。」）不单独发，和下一句一起', () =>
   assert.deepEqual(chunkForSpeech('嗯。我在这儿。').map(c => c.text), ['嗯。我在这儿。']);
 });
 
-test('第一段 28 个字还没有句号，就在最后一个逗号处切', () => {
-  const reply = '我想先慢慢听你说说，你在医院陪着家人的那几天，一个人撑着很多事，没人可以商量，也没人替你的班';
+test('第一段在首个够长的自然停顿立即交出，不等完整长句或 28 字', () => {
+  const reply = '这几天你一直独自撑着很多事，没有人可以商量，也没有人能替你照顾家人。我们可以先说说眼下最想解决的事情。';
   const out = streamThrough(reply, 2);
-  assert.ok(out.length >= 2);
-  assert.ok(out[0].text.length >= 4 && out[0].text.length <= 40, out[0].text);
+  assert.equal(out[0].text, '这几天你一直独自撑着很多事');
   assert.notEqual(out[0].at, 'flush');
-  // 切在逗号处（结尾的逗号念出来像没说完，清洗时去掉了）
-  assert.ok(reply.startsWith(out[0].text));
-  assert.equal(reply[out[0].text.length], '，');
+  assert.ok((out[0].at as number) < 28);
+  // 一次到齐与逐字到达，首段相同；只缩短首段，不把后续长句都打碎。
+  for (const step of [1, 3, 8, reply.length]) {
+    const chunks = streamThrough(reply, step);
+    assert.equal(chunks[0].text, out[0].text);
+    assert.equal(chunks.map(c => c.text).join(''), cleanForSpeech(reply).replace('，', ''));
+  }
+});
+
+test('首段提前切：保留英文单词、数字千位与时间中的逗号冒号', () => {
+  for (const reply of [
+    'You have been carrying a lot alone, and we can take this one step at a time.',
+    '我们先约定在明天的 10:30 见面，然后一起整理眼下最需要完成的事情。',
+    '你提到这次需要支付 12,500 元，我们可以先看看哪些支出能够延后。',
+  ]) {
+    const expected = chunkForSpeech(reply);
+    for (const step of [1, 2, 5, reply.length]) {
+      assert.deepEqual(streamThrough(reply, step).map(({ index, text }) => ({ index, text })), expected);
+    }
+    if (reply.includes('10:30')) assert.ok(expected[0].text.includes('10:30'));
+    if (reply.includes('12,500')) assert.ok(expected[0].text.includes('12,500'));
+  }
+});
+
+test('首段提前切不劈开网址协议与参数，朗读不泄出 URL 残片', () => {
+  for (const reply of [
+    'Please check https://example.com/help, then tell me which step feels most useful.',
+    '我们可以先参考这个练习地址 https://example.com/a,b?step=1 然后谈谈哪个步骤最有帮助。',
+  ]) {
+    for (const step of [1, 2, 5, reply.length]) {
+      const out = streamThrough(reply, step);
+      const spoken = out.map(c => c.text).join(' ');
+      assert.ok(!/https|example|\/\/|step=1/.test(spoken), spoken);
+    }
+  }
 });
 
 test('之后各段攒到 40 字以上再发，单段不超过 120 字', () => {

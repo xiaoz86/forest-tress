@@ -9,9 +9,8 @@
  *   - SiliconFlow：整句 mp3，decodeAudioData 之后放进同一条队列。
  * 两种按响应头 X-Audio-Format 分派，播放严格按段的 index 顺序，最多两段同时在路上（预取）。
  *
- * 播放用 Web Audio：Int16 → Float32，按 nextStartTime 无缝排队；断流时先攒约 150ms 再开播，
- * 免得网络一抖就一顿一顿。iOS 上 Web Audio 起不来（没在手势里解锁、被打断、或者老系统
- * 没有 navigator.audioSession、静音拨片会让 Web Audio 没声）时，退回一个复用的 <audio>：
+ * 非 iOS 播放用 Web Audio：Int16 → Float32，按 nextStartTime 无缝排队；断流时先攒约 150ms 再开播，
+ * 免得网络一抖就一顿一顿。iOS 固定使用复用的 <audio>，其他设备 Web Audio 起不来时也退到它：
  * 每段收齐后拼成 WAV（mp3 原样），按段接着放。
  *
  * 失败：
@@ -514,6 +513,7 @@ export function createSpeechEngine({
         const usable = format.kind === 'pcm' ? bytes.subarray(0, bytes.length - (bytes.length % 2)) : bytes;
         seg.parts.push(usable);
         seg.status = 'ready';
+        debug?.(`segment ready ${Date.now() - startedAt}ms bytes=${usable.length}`);
         pump(job);
         return;
       }
@@ -535,6 +535,7 @@ export function createSpeechEngine({
       aligner.flush();
       if (!seg.parts.length) throw new Error('empty-audio');
       seg.status = 'ready';
+      debug?.(`segment ready ${Date.now() - startedAt}ms bytes=${seg.parts.reduce((sum, part) => sum + part.length, 0)}`);
       pump(job);
     } catch {
       if (alive()) segmentFailed(job, seg);
@@ -665,16 +666,16 @@ export function isAppleMobile(): boolean {
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-type AudioSessionLike = { type: string };
+type AudioSessionLike = { type: string; state?: string };
 function audioSession(): AudioSessionLike | null {
   if (typeof navigator === 'undefined') return null;
   return (navigator as unknown as { audioSession?: AudioSessionLike }).audioSession ?? null;
 }
 
 /**
- * iOS 的 Web Audio 默认归在「环境音」里：静音拨片一拨就没声，录过音之后还可能从听筒出来。
- * 放之前把会话类型设成 playback（和 <audio> 一样不受拨片影响、走扬声器）；
- * 开录前（stop）再设回 auto，让系统按「录音」重新选——两件事不会同时发生（录音时不念）。
+ * 录音后显式请求媒体播放模式，包括 <audio> 路径。系统/微信是否采纳仍需真机验证，
+ * 不能靠增大 PCM 增益纠正听筒路由。开录前（stop）再设回 auto。
+ * https://www.w3.org/TR/audio-session/
  */
 function setPlaybackSession(on: boolean) {
   const session = audioSession();
@@ -682,8 +683,9 @@ function setPlaybackSession(on: boolean) {
   try {
     const next = on ? 'playback' : 'auto';
     if (session.type !== next) session.type = next;
+    vdebug('sink', `session=${session.type} state=${session.state ?? '?'} requested=${next}`);
   } catch {
-    /* 不支持就算了 */
+    vdebug('sink', 'session hint unavailable');
   }
 }
 
@@ -924,9 +926,12 @@ export function createElementSink(el: AudioElementLike, events: SinkEvents) {
 
   const tryPlay = () => {
     const gen = generation;
+    const url = playing;
+    // 在真正的回复音频播放前切换，而非用户点「完成」解锁静音时：那时还在采集尾音。
+    setPlaybackSession(true);
     void el.play().then(
       () => {
-        if (gen !== generation) return;
+        if (gen !== generation || playing !== url) return;
         if (blocked) {
           blocked = false;
           events.blocked(false);
@@ -938,7 +943,7 @@ export function createElementSink(el: AudioElementLike, events: SinkEvents) {
         }
       },
       (err: unknown) => {
-        if (gen !== generation) return;
+        if (gen !== generation || playing !== url) return;
         vdebug('sink', `<audio> play rejected ${(err as { name?: string } | null)?.name ?? 'error'}`);
         if ((err as { name?: string } | null)?.name === 'NotAllowedError') {
           // 自动播放被拦：留着这段，等用户点「点一下就能听」
@@ -1044,10 +1049,12 @@ export function createElementSink(el: AudioElementLike, events: SinkEvents) {
       if (playing || queue.length) return;
       try {
         silentUrl ??= silentWavUrl();
+        const gen = generation;
+        const url = silentUrl;
         el.src = silentUrl;
         void el.play().then(
           () => {
-            if (!playing) el.pause();
+            if (gen === generation && !playing && el.src === url) el.pause();
           },
           () => undefined,
         );
@@ -1070,7 +1077,7 @@ export function createElementSink(el: AudioElementLike, events: SinkEvents) {
  * 挂起不会把解锁丢掉：在手势里跑起来过的上下文，之后不在手势里也能恢复（WebKit 在第一次手势启动时
  * 就摘掉了「需要手势」的限制；Chrome 看的是页面有没有过用户激活）。
  */
-function createAudioOutput(events: SinkEvents, { isBusy }: { isBusy: () => boolean }) {
+export function createAudioOutput(events: SinkEvents, { isBusy }: { isBusy: () => boolean }) {
   let ctx: AudioContext | null = null;
   let web: SpeechSink | null = null;
   let el: HTMLAudioElement | null = null;
@@ -1103,7 +1110,8 @@ function createAudioOutput(events: SinkEvents, { isBusy }: { isBusy: () => boole
   };
 
   /**
-   * iPhone / iPad 一律走 <audio>，不建播放用的 AudioContext、也不碰 audioSession。
+   * iPhone / iPad 一律走 <audio>，不建播放用的 AudioContext。
+   * 静音解锁不切换 audioSession；实际回复播放时才请求 playback，录音前归还 auto。
    *
    * 原来只在「没有 audioSession」的老 iOS 上这样做，有 audioSession 就走 Web Audio、
    * 把会话设成 playback 来绕开静音拨片。真机（iOS 微信）上两件事都不成立：
@@ -1112,7 +1120,7 @@ function createAudioOutput(events: SinkEvents, { isBusy }: { isBusy: () => boole
    *   - 直接发模式在点麦克风那一下解锁播放，等于和录音那个 AudioContext 同时起了第二个，
    *     麦克风时不时被饿死（「全程没有听到声音」）。
    * <audio> 不受静音拨片管、不抢录音（改造前线上一直这么放）。代价是每段要收齐才放（不再边收边放），
-   * 百炼合成一句约一秒，首声晚一点，换来的是一定有声音。
+   * 首声必须等该段收齐；能否出声及系统路由仍需在目标设备验证。
    */
   const preferElement = () => isAppleMobile();
 
