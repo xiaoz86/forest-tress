@@ -54,15 +54,15 @@ export function bailianTtsInstruction(tone: SpeechTone, env: Env = process.env):
  * 认不出的键名回落到 female；任意字符串不会被透传给上游。没配返回 null。
  */
 /**
- * 每把嗓音的响度提升（dB），见 createPcmLeveler。复刻的女声天生比男声轻约 2 dB、
- * 两者都只有约 −18~−20 dBFS，手机外放听不清；默认女声 +7、男声 +4，处理后两把嗓音都在约 −13~−14 dBFS。
+ * 每把嗓音的响度提升（dB），见 createPcmLeveler。默认女声、男声均 +7；
+ * 男声由 +4 调至 +7，以缩小手机试听及同文样本中的响度差。实际响度仍随合成内容变化。
  * 可以用 DASHSCOPE_TTS_GAIN_DB_FEMALE / DASHSCOPE_TTS_GAIN_DB_MALE 调，范围 0–12，0 就是不处理。
  */
 export function bailianTtsGainDb(voiceKey: unknown, env: Env = process.env): number {
   const male = voiceKey === 'male';
   const raw = (male ? env.DASHSCOPE_TTS_GAIN_DB_MALE : env.DASHSCOPE_TTS_GAIN_DB_FEMALE)?.trim();
   const parsed = raw ? Number(raw) : NaN;
-  const value = Number.isFinite(parsed) ? parsed : male ? 4 : 7;
+  const value = Number.isFinite(parsed) ? parsed : 7;
   return Math.max(0, Math.min(12, value));
 }
 

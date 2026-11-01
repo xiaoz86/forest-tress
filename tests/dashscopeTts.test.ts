@@ -334,12 +334,13 @@ test('响度均衡：按任意块大小处理，结果和一次处理完全一�
   }
 });
 
-test('响度提升：默认女声 +7、男声 +4；可以用环境变量调，限制在 0–12，写错了用默认', () => {
+test('响度提升：默认女声、男声均 +7；可以用环境变量调，限制在 0–12，写错了用默认', () => {
   assert.equal(bailianTtsGainDb('female', {}), 7);
-  assert.equal(bailianTtsGainDb('male', {}), 4);
+  assert.equal(bailianTtsGainDb('male', {}), 7);
   assert.equal(bailianTtsGainDb('anything', {}), 7);
   assert.equal(bailianTtsGainDb('female', { DASHSCOPE_TTS_GAIN_DB_FEMALE: '8' }), 8);
   assert.equal(bailianTtsGainDb('male', { DASHSCOPE_TTS_GAIN_DB_MALE: '20' }), 12);
   assert.equal(bailianTtsGainDb('male', { DASHSCOPE_TTS_GAIN_DB_MALE: '-3' }), 0);
   assert.equal(bailianTtsGainDb('female', { DASHSCOPE_TTS_GAIN_DB_FEMALE: 'abc' }), 7);
+  assert.equal(bailianTtsGainDb('male', { DASHSCOPE_TTS_GAIN_DB_MALE: 'abc' }), 7);
 });
