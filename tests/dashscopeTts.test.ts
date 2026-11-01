@@ -155,6 +155,7 @@ test('streamTtsPcm：请求体和请求头对，跨块 SSE 还原成偶数长度
   const request = seen as { url: string; headers: Headers; body: Record<string, unknown> };
   assert.equal(request.url, 'https://ws-test.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer');
   assert.equal(request.headers.get('X-DashScope-SSE'), 'enable');
+  assert.equal(request.headers.get('Connection'), 'close');
   assert.equal(request.headers.get('Authorization'), 'Bearer sk-test');
   assert.deepEqual(request.body, {
     model: 'qwen-audio-3.1-tts-flash',

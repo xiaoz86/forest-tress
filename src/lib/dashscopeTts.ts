@@ -240,6 +240,7 @@ export async function streamTtsPcm({
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
         'X-DashScope-SSE': 'enable',
+        Connection: 'close',
       },
       body: JSON.stringify({
         model: cfg.ttsModel,
