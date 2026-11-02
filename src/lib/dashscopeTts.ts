@@ -39,6 +39,7 @@ const ttsDispatcher = new EnvHttpProxyAgent({
   autoSelectFamilyAttemptTimeout: 250,
   connect: {
     timeout: 1500,
+    // 网关的会话复用曾在暖实例上持续连接超时；每次做完整 TLS 握手。
     maxCachedSessions: 0,
     lookup(hostname, options, callback) {
       lookup(hostname, { ...options, family: 4 }, callback);
