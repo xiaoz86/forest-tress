@@ -39,6 +39,7 @@ const ttsDispatcher = new EnvHttpProxyAgent({
   autoSelectFamilyAttemptTimeout: 250,
   connect: {
     timeout: 1500,
+    maxCachedSessions: 0,
     lookup(hostname, options, callback) {
       lookup(hostname, { ...options, family: 4 }, callback);
     },
