@@ -735,3 +735,21 @@ body { margin: 0; }
   font: inherit; color: var(--sp-accent-text); text-decoration: underline; text-underline-offset: 0.25em;
 }
 
+/* 支持优先：简短封面之后直接进入支持，章名比编号更醒目。 */
+.sp[data-layout='support'] .sp-cover {
+  min-height: 0;
+  grid-template-rows: clamp(180px, 34svh, 320px) auto;
+}
+.sp[data-layout='support'] .sp-sheet { padding-bottom: 28px; }
+.sp[data-layout='support'] .sp-ch { padding: clamp(36px, calc(var(--sp-gap) * 0.7), 72px) 0; }
+.sp[data-layout='support'] .sp-mark-t {
+  font-family: var(--sp-head); font-size: clamp(21px, 2.4vw, 28px);
+  letter-spacing: 0.02em; color: var(--sp-ink);
+}
+.sp[data-layout='support'] .sp-num { font-size: 22px; }
+.sp-life-title { margin: 0; font: 500 20px/1.5 var(--sp-head); color: var(--sp-ink); }
+@media (min-width: 1024px) {
+  .sp[data-layout='support'] .sp-cover { min-height: clamp(420px, 64svh, 680px); }
+  .sp[data-layout='support'] .sp-sheet { padding-bottom: 48px; }
+}
+

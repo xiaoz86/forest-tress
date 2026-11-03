@@ -9,7 +9,7 @@ import TunePanel from '@/components/space/tune/TunePanel';
 import Unavailable from '@/components/space/Unavailable';
 import { fetchMember } from '@/lib/space/access';
 import { draftInBackground } from '@/lib/space/autoDraft';
-import { chapterOrder, effectiveDraft } from '@/lib/space/edits';
+import { chapterOrder, effectiveDraft, type ChapterKey } from '@/lib/space/edits';
 import { listPublicEvents } from '@/lib/space/events';
 import { coverPhotoMode } from '@/lib/space/photoMeta';
 import { richness } from '@/lib/space/portrait';
@@ -87,14 +87,17 @@ export default async function SpacePage({ memberId: rawId, searchParams: sp, via
   const viewer = as ? simulate(real, as) : real;
   const preview = host && !as;
   const result = rec.result ?? null;
+  const layoutRequested = one(sp.layout) === 'support';
   // 还没有 AI 起稿的（注册时没赶上）：本人打开自己的空间时在后台补上，下一次打开就有了
-  if (!rec.result && host) after(() => draftInBackground(node));
+  if (!rec.result && host && !layoutRequested) after(() => draftInBackground(node));
   // 调风格（?tune=1）和编辑（?edit=1）：本人在自己的网站上直接改。两者不同时开；假装成访客时都不能用
   const tuning = preview && one(sp.tune) === '1';
   const editing = preview && !tuning && one(sp.edit) === '1';
+  // 只读结构预览复用真实内容与权限；进入编辑后仍以本人保存的顺序为准，不写共享资料。
+  const supportPreview = layoutRequested && !editing && !tuning;
   const eff = rec.result || rec.edits ? effectiveDraft(result?.draft ?? null, rec.edits) : null;
   const extras = {
-    order: chapterOrder(rec.edits),
+    order: supportPreview ? ['offer', 'knowing', 'path'] as ChapterKey[] : chapterOrder(rec.edits),
     cover: rec.edits?.cover ?? null,
     learning: rec.edits?.learning ?? [],
     story: rec.edits?.story ?? '',
@@ -164,6 +167,7 @@ export default async function SpacePage({ memberId: rawId, searchParams: sp, via
     if (as) u.set('as', as);
     if (editing) u.set('edit', '1');
     if (tuning) u.set('tune', '1');
+    if (supportPreview && extra.edit !== '1' && extra.tune !== '1') u.set('layout', 'support');
     for (const [k, v] of Object.entries(extra)) {
       if (v) u.set(k, v);
       else u.delete(k);
@@ -199,6 +203,7 @@ export default async function SpacePage({ memberId: rawId, searchParams: sp, via
                 ? settings.published ? '当前没有对外展示，你和管理员可以预览。' : '尚未公开；你和管理员可以预览，发布由本人决定。'
                 : '已发布 · 保存内容或风格后会更新公开网站。'}
               {preview && pending > 0 && ` ${pending} 处 AI 起稿待你确认。`}
+              {supportPreview && ' 当前是支持优先的结构预览，未改变已保存的顺序。'}
             </p>
             <details className="sp-preview-options">
               <summary>访客视角与更多</summary>
