@@ -31,39 +31,37 @@ export const home: typeof zhHome = {
     taglineTop: 'Here, we discover what’s possible within ourselves — and be truly seen.',
     taglineBottom:
       'Through meaningful encounters, we create, grow, and bring new possibilities to life together.',
-    lede: 'Walk your own path. Be seen. Find your people. Create together.',
     // 术语表定的是 看见 = notice，这里跟着定：六个词都是动词，读下来是一串动作
     chips: ['Breathe', 'Notice', 'Resonate', 'Meet', 'Create', 'Grow'],
     cta: 'Walk into the forest',
   },
 
   value: {
-    headingTop: 'Not more people to meet.',
-    headingBottom: 'The ones who actually matter to you.',
+    heading: 'Here, we meet in a different, distinctive way.',
     items: [
       {
         index: '01 · BE SEEN',
         symbol: '见',
-        title: 'Be seen',
-        body: 'Let people see more than your title: the work you are putting yourself into, the skill you have built, and what you actually need.',
+        title: 'See each other',
+        body: 'What we do, and what we truly need, shape how we express ourselves to the world.',
       },
       {
         index: '02 · MEET NEARBY',
         symbol: '遇',
-        title: 'Find your people',
-        body: 'Start from what you both care about, and find people who understand you, or who bring what you do not have.',
+        title: 'Move toward each other',
+        body: 'Through matching, exchange, and connection, we build lasting relationships for creating together.',
       },
       {
         index: '03 · GROW TOGETHER',
         symbol: '生',
-        title: 'Grow together',
-        body: 'One conversation, one small group, one thing made together: any of them can move a seed a real step forward.',
+        title: 'Grow and create together',
+        body: 'With people we enjoy, we nurture extraordinary possibilities and create something beautiful together.',
       },
     ],
   },
 
   entrances: {
-    heading: 'Come in by the path that suits you.',
+    sectionLabel: 'Four ways in',
     items: [
       {
         icon: '息',
@@ -93,9 +91,7 @@ export const home: typeof zhHome = {
   },
 
   creators: {
-    headingTop: 'People here are already',
-    headingBottom: 'doing these things.',
-    lede: 'Every node is a real person. You can see what they are making, what they can offer, and who they hope to meet right now.',
+    heading: 'You can see what they are making, what they can offer, and who they hope to meet right now.',
     link: 'Meet the creators',
     showcase: {
       growing: 'Growing in the forest',
@@ -111,8 +107,7 @@ export const home: typeof zhHome = {
   },
 
   paths: {
-    headingTop: 'Connection does not need forcing.',
-    headingBottom: 'Let it grow at the speed that suits you.',
+    heading: 'Grow at the pace that suits you.',
     steps: [
       {
         n: '01',
@@ -140,8 +135,7 @@ export const home: typeof zhHome = {
   },
 
   stories: {
-    heading: 'Some connections have already begun.',
-    lede: 'Not every meeting has to turn into a collaboration. Being heard properly, and finding someone you can talk to, is already the nearby coming back.',
+    sectionLabel: 'Stories in the forest',
     items: [
       {
         type: 'AI MATCH · CO-CREATORS',

@@ -4,17 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { tokensToStyle, type DimensionKey, type StyleVector, type ThemeTokens } from '@/lib/space/themes';
 import {
-  ACCENTS, KNOBS, KNOB_ORDER, MAX_ROUNDS, NOTME_BLOCKS, NOTME_TOPICS, PAPERS, QUICK,
-  accentName, applyTune, contrastReport, nearestAccent, nextRound, nudge, optionLabel, ownDiff, remix, sameAsTheme,
+  ACCENTS, KNOBS, KNOB_ORDER, NOTME_BLOCKS, NOTME_TOPICS, PAPERS, QUICK,
+  accentName, applyTune, contrastReport, nearestAccent, nudge, optionLabel, ownDiff, remix, sameAsTheme,
   themeExact, themeKnobs, usableAccent,
-  type Change, type KnobKey, type KnobValue, type Knobs, type NotMeAnswer, type Round, type RoundResult,
+  type Change, type KnobKey, type KnobValue, type Knobs, type NotMeAnswer,
 } from '@/lib/space/tune';
 import './tune.css';
 
 /**
  * 调风格面板：在本人自己的网站上，实时拨旋钮。
  *
- * 四种方式拨同一组旋钮——说一句（AI 或常用说法）、二选一（一轮只改一处，像验光）、细调（自己拨、锁住喜欢的、再来一版）、
+ * 手动调整和用一句话描述（AI 或常用说法）拨同一组旋钮，
  * 以及页面上每一块的「这不像我」（只问一个具体问题）。改动直接写到 .sp 的 CSS 变量上，所见即所得；
  * 点「保存」才存下，访客才看到。本人说过的偏好（更安静、更暖……）随保存一起写回画像。
  *
@@ -23,13 +23,13 @@ import './tune.css';
 
 type Note = { block: string; said: string; dim: DimensionKey; dir: 1 | -1 };
 type Swatch = { hex: string; name: string; from: string };
-type Tab = 'say' | 'pick' | 'fine';
+type Tab = 'say' | 'fine';
 /** 撤销以「一步」为单位：一步之前的旋钮和说过的偏好一起存，撤销就整步退回去 */
 type Step = { knobs: Knobs; notes: Note[] };
 type NotMeState = {
   block: string; topic: string | null; result: string | null;
   before: Knobs | null; keys: KnobKey[]; notes: Note[];
-  /** 想改的旋钮被锁住了：给「去细调解锁」，不给「好多了」 */
+  /** 想改的旋钮被锁住了：给「去手动调整解锁」，不给「好多了」 */
   blocked?: boolean;
   /** 这一步是第几步（history 长度）：撤销这一下时判断之后有没有再动过 */
   step?: number;
@@ -51,6 +51,8 @@ export type TunePanelProps = {
   willPin: boolean;
   /** 访客现在看到的是不是这一套（不是的话，本人是在预览另一套） */
   isLive: boolean;
+  /** 网站当前是否对外展示，与当前预览的主题无关 */
+  published: boolean;
   /** 访客现在看到的那一套的名字 */
   liveName: string;
   /** 这个人的审美位置（画像 + 测试 + 说过的偏好）：挑候选用 */
@@ -61,9 +63,8 @@ export type TunePanelProps = {
 };
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'say', label: '说一句' },
-  { id: 'pick', label: '二选一' },
-  { id: 'fine', label: '细调' },
+  { id: 'fine', label: '手动调整' },
+  { id: 'say', label: '用一句话描述' },
 ];
 
 /** 页面上每一块对应的元素：「这不像我」打开时，手机上先把这一块滚到抽屉上方 */
@@ -72,19 +73,10 @@ const BLOCK_EL: Record<string, string> = {
 };
 
 const narrow = () => typeof window !== 'undefined' && window.matchMedia('(max-width: 760px)').matches;
+const HELP_KEY = 'sp_tune_help_dismissed';
 
 function Dot({ hex, big }: { hex: string; big?: boolean }) {
   return <span className={`tn-dot ${big ? 'is-big' : ''}`} style={{ background: hex }} aria-hidden />;
-}
-
-/** 一个档位给人看的样子：颜色类带色块 */
-function ValueView({ k, v }: { k: KnobKey; v: KnobValue }) {
-  if (k === 'accent') return <><Dot hex={String(v)} />{optionLabel(k, v)}</>;
-  if (k === 'paper') {
-    const p = PAPERS.find(x => x.id === v);
-    return <>{p && <Dot hex={p.bg} />}{optionLabel(k, v)}</>;
-  }
-  return <>{optionLabel(k, v)}</>;
 }
 
 export default function TunePanel(p: TunePanelProps) {
@@ -104,18 +96,22 @@ export default function TunePanel(p: TunePanelProps) {
   const [savedState, setSavedState] = useState(() => JSON.stringify({ k: initial, l: p.saved?.locks ?? [] }));
   const [history, setHistory] = useState<Step[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
-  const [tab, setTab] = useState<Tab>('say');
+  const [tab, setTab] = useState<Tab>('fine');
   const [open, setOpen] = useState(true);
+  const [showHelp, setShowHelp] = useState(true);
+  useEffect(() => {
+    try {
+      // 浏览器偏好在挂载后读取，保持服务端和首次渲染一致。
+      if (window.localStorage.getItem(HELP_KEY)) setShowHelp(false);
+    } catch { /* 隐私模式不影响风格编辑。 */ }
+  }, []);
   const [msg, setMsg] = useState('');
   const [saving, setSaving] = useState(false);
   /** 收起时那一条上显示的：刚改了什么、怎么接着来 */
   const [status, setStatus] = useState('');
 
   const eff = useMemo(() => ({ ...base0, ...knobs }) as Required<Knobs>, [base0, knobs]);
-  // 异步里（等照片取色时）读最新的旋钮和锁：闭包里的是点「开始」那一刻的旧值
-  const live = useRef({ knobs, locks });
-  live.current = { knobs, locks };
-  // 没有照片时，「照片」当作锁住：说一句、再来一版、二选一都不去拨它
+  // 没有照片时，自动调整也不改变照片参数。
   const lockSet: KnobKey[] = p.hasPhoto ? locks : [...new Set<KnobKey>([...locks, 'photo'])];
   const dirty = JSON.stringify({ k: knobs, l: locks }) !== savedState || notes.length > 0;
   const changed = Object.keys(knobs).length;
@@ -154,28 +150,10 @@ export default function TunePanel(p: TunePanelProps) {
   }
   const photoHexes = (palette ?? []).map(s => s.hex);
 
-  // ── 二选一 ──
-  const [rounds, setRounds] = useState<RoundResult[]>([]);
-  const [round, setRound] = useState<Round | null>(null);
-  const [side, setSide] = useState<'a' | 'b'>('b');
-  const [calState, setCalState] = useState<'idle' | 'loading' | 'on' | 'done'>('idle');
-  const roundLine = (r: Round, n: number) => `第 ${n} 轮 · ${KNOBS[r.key].label}`;
-
   // ── 改动、撤销 ──
-  /** 二选一进行到一半，正在比的那个旋钮被别处改了、或者被锁住了：A「现在的」不对了，重出这一轮（页面先看 A） */
-  function syncRound(nextKnobs: Knobs, nextLocks: KnobKey[] = lockSet) {
-    if (calState !== 'on' || !round) return;
-    const e = { ...base0, ...nextKnobs } as Required<Knobs>;
-    if (e[round.key] === round.a && !nextLocks.includes(round.key)) return;
-    const r = nextRound(e, nextLocks, p.vector, rounds, photoHexes);
-    setRound(r);
-    setSide('a');
-    if (!r) setCalState('done');
-  }
-
   const lastPush = useRef(0);
-  /** 所有改动都走这里：记一步（旋钮 + 说过的偏好），换上新的，二选一跟着对齐 */
-  function commit(nextKnobs: Knobs, nextNotes: Note[] = notes, opts: { coalesce?: boolean; fromRound?: boolean } = {}) {
+  /** 所有改动都走这里：记一步（旋钮 + 说过的偏好），换上新的 */
+  function commit(nextKnobs: Knobs, nextNotes: Note[] = notes, opts: { coalesce?: boolean } = {}) {
     // 点了已经选中的那一档：什么都没变，不记一步（不然要多按几下撤销才回得去）
     if (JSON.stringify(tidy(nextKnobs)) === JSON.stringify(knobs) && nextNotes.length === notes.length
       && nextNotes.every((n, i) => n === notes[i])) return;
@@ -188,9 +166,8 @@ export default function TunePanel(p: TunePanelProps) {
     setNotes(nextNotes.slice(-12));
     setMsg('');
     setStatus('');
-    if (!opts.fromRound) syncRound(k);
   }
-  const change = (patch: Knobs, opts: { coalesce?: boolean; fromRound?: boolean } = {}) => commit({ ...knobs, ...patch }, notes, opts);
+  const change = (patch: Knobs, opts: { coalesce?: boolean } = {}) => commit({ ...knobs, ...patch }, notes, opts);
   /** 撤销一整步：旋钮、这一步说过的偏好一起退回；这一步留下的结果框、提示都收掉，免得说的和页面对不上 */
   function undo() {
     const last = history[history.length - 1];
@@ -203,7 +180,6 @@ export default function TunePanel(p: TunePanelProps) {
     setSayOut(null);
     setNotMe(null);
     setRemixMsg('');
-    syncRound(last.knobs);
   }
   const patchOf = (cs: Change[]) => Object.fromEntries(cs.map(c => [c.key, c.value])) as Knobs;
   /**
@@ -222,46 +198,6 @@ export default function TunePanel(p: TunePanelProps) {
     commit(next, notes.filter(n => !stepNotes.includes(n)));
   }
 
-  /** 开始校准时的样子：完成页按「问过的旋钮现在和那时比」来数改了几处，撤销、别处改过也对得上 */
-  const [calStart, setCalStart] = useState<Required<Knobs> | null>(null);
-  async function startCal() {
-    setCalState('loading');
-    const pal = await loadPalette();
-    // 取色要等一会儿：这期间可能撤销了、锁了一个旋钮——按此刻最新的来出题
-    const { knobs: k1, locks: l1 } = live.current;
-    const e1 = { ...base0, ...k1 } as Required<Knobs>;
-    const lk1: KnobKey[] = p.hasPhoto ? l1 : [...new Set<KnobKey>([...l1, 'photo'])];
-    const r = nextRound(e1, lk1, p.vector, [], pal.map(s => s.hex));
-    setCalStart(e1);
-    setRounds([]);
-    setRound(r);
-    setSide('b');
-    setCalState(r ? 'on' : 'done');
-    if (r) peekAfter('');
-  }
-  function answer(pick: 'a' | 'b' | 'same') {
-    if (!round) return;
-    // 这一轮出题之后才锁上的旋钮：不改它（按「差不多」算）
-    const choice = pick === 'b' && lockSet.includes(round.key) ? 'same' : pick;
-    const done = [...rounds, { key: round.key, a: round.a, b: round.b, pick: choice }];
-    let next = knobs;
-    if (choice === 'b') {
-      next = tidy({ ...knobs, [round.key]: round.b });
-      change({ [round.key]: round.b }, { fromRound: true });
-    }
-    const r = nextRound({ ...base0, ...next } as Required<Knobs>, lockSet, p.vector, done, photoHexes);
-    setRounds(done);
-    setRound(r);
-    setSide('b');
-    if (!r) setCalState('done');
-    else peekAfter('');
-  }
-  const calChanges = useMemo(() => {
-    if (!calStart) return [];
-    const asked = [...new Set(rounds.map(r => r.key))];
-    return asked.filter(k => eff[k] !== calStart[k]).map(k => [k, { from: calStart[k], to: eff[k] }] as const);
-  }, [rounds, calStart, eff]);
-
   // ── 这不像我 ──
   const [notMe, setNotMe] = useState<NotMeState | null>(null);
   const panelRef = useRef<HTMLElement>(null);
@@ -270,8 +206,6 @@ export default function TunePanel(p: TunePanelProps) {
       const block = (e as CustomEvent<{ block?: string }>).detail?.block;
       if (!block || !NOTME_BLOCKS[block]) return;
       setNotMe({ block, topic: null, result: null, before: null, keys: [], notes: [] });
-      // 二选一进行中：页面先回到「现在的」，这不像我改了什么才看得见，回答完也不会被 B 盖回去
-      setSide('a');
       setOpen(true);
       // 手机上抽屉挡住下半屏：把这一块滚到上面露出来的地方
       if (narrow()) document.querySelector(BLOCK_EL[block])?.scrollIntoView({ block: 'start' });
@@ -289,7 +223,7 @@ export default function TunePanel(p: TunePanelProps) {
       const entries = Object.entries(a.set) as [KnobKey, KnobValue][];
       const blocked = entries.filter(([k]) => locks.includes(k)).map(([k]) => KNOBS[k].label);
       if (blocked.length) {
-        setNotMe({ ...notMe, result: `你锁住了「${blocked.join('、')}」。想改的话，先在「细调」里解锁。`, before: null, keys: [], notes: [], blocked: true });
+        setNotMe({ ...notMe, result: `你锁住了「${blocked.join('、')}」。想改的话，先在「手动调整」里解锁。`, before: null, keys: [], notes: [], blocked: true });
         return;
       }
       const fresh = entries.filter(([k, v]) => eff[k] !== v);
@@ -301,7 +235,7 @@ export default function TunePanel(p: TunePanelProps) {
       lines = cs.map(c => c.what);
       if (!cs.length && a.only?.some(k => locks.includes(k))) {
         const names = a.only.filter(k => locks.includes(k)).map(k => KNOBS[k].label);
-        setNotMe({ ...notMe, result: `你锁住了「${names.join('、')}」。想改的话，先在「细调」里解锁。`, before: null, keys: [], notes: [], blocked: true });
+        setNotMe({ ...notMe, result: `你锁住了「${names.join('、')}」。想改的话，先在「手动调整」里解锁。`, before: null, keys: [], notes: [], blocked: true });
         return;
       }
     }
@@ -327,11 +261,8 @@ export default function TunePanel(p: TunePanelProps) {
     setStatus('');
   }
 
-  // ── 页面上现在显示的：二选一时可以临时看 B（「这不像我」打开时不看，免得它的改动被 B 盖住） ──
-  const peek = tab === 'pick' && !notMe && calState === 'on' && round && side === 'b'
-    ? tidy({ ...knobs, [round.key]: round.b }) : null;
-  const shown = peek ?? knobs;
-  const applied = useMemo(() => applyTune(p.base.tokens, shown), [p.base.tokens, shown]);
+  // ── 实时预览当前修改 ──
+  const applied = useMemo(() => applyTune(p.base.tokens, knobs), [p.base.tokens, knobs]);
   useEffect(() => {
     const el = document.querySelector<HTMLElement>('.sp');
     if (!el) return;
@@ -403,13 +334,11 @@ export default function TunePanel(p: TunePanelProps) {
     setSayOut(null);
   }
 
-  // ── 细调 ──
+  // ── 手动调整 ──
   const [remixMsg, setRemixMsg] = useState('');
   function toggleLock(k: KnobKey) {
     const next = locks.includes(k) ? locks.filter(x => x !== k) : [...locks, k];
     setLocks(next);
-    // 正在二选一比的就是这个旋钮，刚被锁上：换一轮，不再拿它来比
-    syncRound(knobs, p.hasPhoto ? next : [...new Set<KnobKey>([...next, 'photo'])]);
   }
   function doRemix() {
     const patch = remix(eff, lockSet, p.vector, photoHexes);
@@ -426,11 +355,6 @@ export default function TunePanel(p: TunePanelProps) {
     setNotes([]);
     setRemixMsg('');
     setStatus('');
-    if (calState !== 'idle') {
-      setCalState('idle');
-      setRound(null);
-      setRounds([]);
-    }
   }
 
   // ── 保存 ──
@@ -438,7 +362,7 @@ export default function TunePanel(p: TunePanelProps) {
     // 什么都没改、只是把网站固定成这一套：这一下改的是访客看到的整站，先问一句
     if (pinOnly && !window.confirm(p.isLive
       ? `网站会固定用「${p.base.name}」，不再跟着推荐变。确定吗？`
-      : `访客看到的网站会从「${p.liveName}」换成「${p.base.name}」。确定吗？`)) return;
+      : `网站会从「${p.liveName}」换成「${p.base.name}」${p.published ? '，保存后公开更新' : '，仍不对外展示'}。确定吗？`)) return;
     setSaving(true);
     setMsg('');
     try {
@@ -455,9 +379,9 @@ export default function TunePanel(p: TunePanelProps) {
       setSavedState(JSON.stringify({ k: knobs, l: locks }));
       setNotes([]);
       setStatus('');
-      setMsg(j.pinned
-        ? `存好了。网站从现在起用「${p.base.name}」${changed ? '，加上你的微调' : ''}。`
-        : '存好了，访客现在看到的就是这一版。');
+      setMsg(p.published
+        ? `存好了，访客现在看到的是「${p.base.name}」${changed ? '，加上你的微调' : ''}。`
+        : '已保存，当前未对外展示；你和管理员可以预览。');
       router.refresh();
     } catch {
       setMsg('网络不太好，没存上。');
@@ -491,10 +415,7 @@ export default function TunePanel(p: TunePanelProps) {
     dirty ? '未保存' : '',
     p.isLive ? '' : `预览中，网站现在是「${p.liveName}」`,
   ].filter(Boolean).join(' · ');
-  const roundOn = tab === 'pick' && !notMe && calState === 'on' && round;
-  const collapsedLine = roundOn
-    ? <>{roundLine(round, rounds.length + 1)} · <span className="tn-nw">点这里作答</span></>
-    : status || sub;
+  const collapsedLine = status || sub;
   const saveLabel = saving ? '正在存…' : dirty ? '保存' : pinOnly ? (p.isLive ? '固定用这一套' : '换成这一套') : '已保存';
   const pinHint = p.willPin && (dirty || pinOnly)
     ? (p.isLive ? `保存后，网站固定用「${p.base.name}」，不再跟着推荐变。` : `保存后，网站从「${p.liveName}」换成「${p.base.name}」。`)
@@ -519,6 +440,23 @@ export default function TunePanel(p: TunePanelProps) {
     );
   };
 
+  const knobControl = (k: KnobKey) => (
+    <div className="tn-knob" key={k}>
+      <div className="tn-knob-h">
+        <span>{KNOBS[k].label}</span>
+        {lockBtn(k)}
+      </div>
+      <div className="tn-seg" role="radiogroup" aria-label={KNOBS[k].label}>
+        {KNOBS[k].options.map(o => (
+          <button key={String(o.value)} type="button" role="radio" aria-checked={isSel(k, o.value)}
+            className={isSel(k, o.value) ? 'is-on' : ''} onClick={() => change({ [k]: o.value } as Knobs)}>
+            {o.label}{origMark(k, o.value)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <aside className={`tn ${open ? 'is-open' : ''}`} aria-label="调风格" ref={panelRef} tabIndex={-1}>
       {/* 点标题这一条的空白处（手机上的把手也在这里）同样收起、展开；键盘用户用里面的按钮 */}
@@ -527,17 +465,6 @@ export default function TunePanel(p: TunePanelProps) {
           <b>调风格<i className="tn-chev" aria-hidden>{open ? '收起' : '展开'}</i></b>
           <span>{open ? sub : collapsedLine}</span>
         </button>
-        {/* 收起来看整页时，二选一还能直接切 A / B */}
-        {!open && roundOn && (
-          <span className="tn-mini-ab" role="radiogroup" aria-label="页面上显示哪一个">
-            {(['a', 'b'] as const).map(s => (
-              <button key={s} type="button" role="radio" aria-checked={side === s}
-                className={side === s ? 'is-on' : ''} onClick={() => setSide(s)}>
-                {s.toUpperCase()}
-              </button>
-            ))}
-          </span>
-        )}
         <a className="tn-close" href={p.closeHref} aria-label="关闭调风格"
           onClick={e => { if (dirty && !window.confirm('还没保存，确定不要这些改动吗？')) e.preventDefault(); }}>
           完成
@@ -546,6 +473,15 @@ export default function TunePanel(p: TunePanelProps) {
 
       {open && (
         <div className="tn-body">
+          {showHelp && (
+            <div className="tn-help">
+              <p>颜色、字体、留白都可以改。先试一处，页面会立即预览；满意后再保存。</p>
+              <button type="button" className="tn-link" onClick={() => {
+                setShowHelp(false);
+                try { window.localStorage.setItem(HELP_KEY, '1'); } catch { /* 本次仍可收起。 */ }
+              }}>知道了</button>
+            </div>
+          )}
           {p.otherBase && !p.saved && (
             <p className="tn-note">你之前在「{p.otherBase}」上调过。在这一套上保存，会换掉那一份。</p>
           )}
@@ -581,7 +517,7 @@ export default function TunePanel(p: TunePanelProps) {
                   <div className="tn-row-acts">
                     {notMe.blocked ? (
                       <>
-                        <button type="button" className="tn-btn is-main" onClick={() => { setNotMe(null); setTab('fine'); }}>去细调解锁</button>
+                        <button type="button" className="tn-btn is-main" onClick={() => { setNotMe(null); setTab('fine'); }}>去手动调整解锁</button>
                         <button type="button" className="tn-btn" onClick={() => setNotMe({ ...notMe, topic: null, result: null, blocked: false })}>
                           换一个
                         </button>
@@ -611,9 +547,9 @@ export default function TunePanel(p: TunePanelProps) {
             </section>
           ) : (
             <>
-              <nav className="tn-tabs" role="tablist" aria-label="调风格的方式">
+              <nav className="tn-tabs" aria-label="调风格的方式">
                 {TABS.map(t => (
-                  <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
+                  <button key={t.id} type="button" aria-pressed={tab === t.id}
                     className={tab === t.id ? 'is-on' : ''} onClick={() => { setTab(t.id); setStatus(''); }}>
                     {t.label}
                   </button>
@@ -649,68 +585,12 @@ export default function TunePanel(p: TunePanelProps) {
                       )}
                     </div>
                   )}
-                  <p className="tn-hint">说的话只拨下面「细调」里的那些旋钮，不会做出看不清的页面。你说过的偏好，保存时会记进你的审美画像。</p>
-                </section>
-              )}
-
-              {tab === 'pick' && (
-                <section className="tn-sec">
-                  {calState === 'idle' && (
-                    <>
-                      <p className="tn-lead">每一轮只改一处，其余不动。你在页面上看看 A 和 B，选更像你的那个。最多 {MAX_ROUNDS} 轮。</p>
-                      <button type="button" className="tn-btn is-main" onClick={startCal}>开始</button>
-                    </>
-                  )}
-                  {calState === 'loading' && <p className="tn-lead">先从你的照片里取几种颜色…</p>}
-                  {calState === 'on' && round && (
-                    <div className="tn-round">
-                      <p className="tn-step">{roundLine(round, rounds.length + 1)}</p>
-                      <p className="tn-q">{round.question}</p>
-                      <div className="tn-ab" role="radiogroup" aria-label="页面上显示哪一个">
-                        {(['a', 'b'] as const).map(s => (
-                          <button key={s} type="button" role="radio" aria-checked={side === s}
-                            className={side === s ? 'is-on' : ''} onClick={() => setSide(s)}>
-                            <b>{s.toUpperCase()}</b>
-                            <span><ValueView k={round.key} v={s === 'a' ? round.a : round.b} /></span>
-                            <small>{s === 'a' ? '现在的' : '换一换'}</small>
-                          </button>
-                        ))}
-                      </div>
-                      <p className="tn-hint">点 A、B 切换，页面跟着变；上下滚动看看整体。</p>
-                      <div className="tn-row-acts">
-                        <button type="button" className="tn-btn" onClick={() => answer('a')}>A 更像我</button>
-                        <button type="button" className="tn-btn" onClick={() => answer('b')}>B 更像我</button>
-                        <button type="button" className="tn-link" onClick={() => answer('same')}>差不多</button>
-                      </div>
-                    </div>
-                  )}
-                  {calState === 'done' && (
-                    <>
-                      <p className="tn-lead">
-                        {rounds.length ? `校准完了：这次比了 ${rounds.length} 轮，最后改了 ${calChanges.length} 处。` : '没有可以校准的了（可能都锁住了）。'}
-                      </p>
-                      {calChanges.length > 0 && (
-                        <ul className="tn-changes">
-                          {calChanges.map(([k, v]) => (
-                            <li key={k}>{KNOBS[k].label}：{optionLabel(k, v.from)} → {optionLabel(k, v.to)}</li>
-                          ))}
-                        </ul>
-                      )}
-                      <div className="tn-row-acts">
-                        <button type="button" className="tn-btn" onClick={startCal}>再校准一次</button>
-                      </div>
-                    </>
-                  )}
+                  <p className="tn-hint">说的话只拨下面「手动调整」里的那些旋钮，不会做出看不清的页面。你说过的偏好，保存时会记进你的审美画像。</p>
                 </section>
               )}
 
               {tab === 'fine' && (
                 <section className="tn-sec">
-                  <div className="tn-row-acts tn-remix">
-                    <button type="button" className="tn-btn is-main" onClick={doRemix}>再来一版</button>
-                    <span className="tn-hint" role="status">{remixMsg || '只换没锁住的；越像你的越容易被挑中。'}</span>
-                  </div>
-
                   <div className="tn-knob">
                     <div className="tn-knob-h">
                       <span>{KNOBS.accent.label}<em>{optionLabel('accent', eff.accent)}</em></span>
@@ -732,7 +612,7 @@ export default function TunePanel(p: TunePanelProps) {
                         </div>
                       </div>
                     )}
-                    {!palette && (
+                    {p.hasPhoto && !palette && (
                       <button type="button" className="tn-link" onClick={loadPalette} disabled={palBusy}>
                         {palBusy ? '正在取色…' : '从我的照片里取色 →'}
                       </button>
@@ -756,22 +636,15 @@ export default function TunePanel(p: TunePanelProps) {
                     </div>
                   </div>
 
-                  {segKeys.map(k => (
-                    <div className="tn-knob" key={k}>
-                      <div className="tn-knob-h">
-                        <span>{KNOBS[k].label}</span>
-                        {lockBtn(k)}
-                      </div>
-                      <div className="tn-seg" role="radiogroup" aria-label={KNOBS[k].label}>
-                        {KNOBS[k].options.map(o => (
-                          <button key={String(o.value)} type="button" role="radio" aria-checked={isSel(k, o.value)}
-                            className={isSel(k, o.value) ? 'is-on' : ''} onClick={() => change({ [k]: o.value } as Knobs)}>
-                            {o.label}{origMark(k, o.value)}
-                          </button>
-                        ))}
-                      </div>
+                  {(['type', 'space'] as KnobKey[]).map(knobControl)}
+                  <details className="tn-details">
+                    <summary>更多细节 · 字重、圆角、照片与版式</summary>
+                    {segKeys.filter(k => k !== 'type' && k !== 'space').map(knobControl)}
+                    <div className="tn-row-acts tn-remix">
+                      <button type="button" className="tn-btn" onClick={doRemix}>再来一版</button>
+                      <span className="tn-hint" role="status">{remixMsg || '只换没锁住的部分。'}</span>
                     </div>
-                  ))}
+                  </details>
                 </section>
               )}
             </>
@@ -779,6 +652,7 @@ export default function TunePanel(p: TunePanelProps) {
 
           {/* 常驻底部：保存、撤销、对比度——在面板里滚到哪都看得到 */}
           <footer className="tn-foot">
+            <p className="tn-hint">{p.published ? '保存后会更新已发布的网站。' : '保存后仍不对外展示，只有你和管理员可以预览。'}</p>
             <div className="tn-row-acts">
               <button type="button" className="tn-btn is-main" onClick={save} disabled={saving || (!dirty && !pinOnly)}>
                 {saveLabel}

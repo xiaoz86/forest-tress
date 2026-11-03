@@ -23,9 +23,7 @@ export default function PathSection({ t }: { t: Dictionary['home']['paths'] }) {
             className="text-[clamp(2rem,4.2vw,3.2rem)] font-normal leading-[1.25] tracking-[-0.03em] text-white"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
-            {t.headingTop}
-            <br />
-            {t.headingBottom}
+            {t.heading}
           </h2>
         </div>
 

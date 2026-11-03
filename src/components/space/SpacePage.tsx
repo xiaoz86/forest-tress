@@ -175,40 +175,54 @@ export default async function SpacePage({ memberId: rawId, searchParams: sp, via
   return (
     <>
       {host && (
-        <div className="sp-bar">
-          <span className="sp-bar-tag">{as ? `假装是${AS_ROLES.find(r => r.value === as)!.label}` : editing ? '编辑中' : '预览'}</span>
-          {preview && (
-            <a className={`sp-bar-edit ${editing ? 'is-on' : ''}`} href={keep({ edit: editing ? '' : '1', tune: '' })}>
-              {editing ? '完成编辑' : pending ? `编辑（${pending} 处待确认）` : '编辑'}
-            </a>
-          )}
-          {preview && (
-            <a className={`sp-bar-edit ${tuning ? 'is-on' : ''}`} href={keep({ tune: tuning ? '' : '1', edit: '' })}>
-              {tuning ? '完成调风格' : '调风格'}
-            </a>
-          )}
-          {mode === 'none' && (
-            <span className="sp-bar-warn">{settings.published ? '你不在森林里，只有你能看到' : '未发布 · 只有你和管理员能看到，确认好就发布'}</span>
-          )}
-          <span className="sp-bar-title">{node.name} 的个人空间 · {theme.name}（{source}）</span>
-          <span className="sp-swatches" aria-label="切换风格">
-            {THEMES.map(t => (
-              <a key={t.id} href={keep({ theme: t.id })} title={t.name} aria-label={t.name}
-                className={`sp-swatch ${t.id === theme.id ? 'is-on' : ''}`}
-                style={{ background: `linear-gradient(135deg, ${t.tokens.bg} 50%, ${t.tokens.accent} 50%)` }} />
-            ))}
-          </span>
-          {preview && <span className="sp-bar-legend">┈ AI 起稿，待你确认</span>}
-          <span className="sp-bar-sp" />
-          <span className="sp-bar-as" aria-label="用别人的身份看">
-            {AS_ROLES.map(r => (
-              <a key={r.value} href={keep({ as: as === r.value ? '' : r.value })} className={as === r.value ? 'is-on' : ''}>
-                {r.label}
+        <div className="sp-owner">
+          <nav className="sp-bar" aria-label="我的空间工具">
+            {preview ? <>
+              <a className={`sp-bar-edit ${editing ? 'is-on' : ''}`} href={keep({ edit: editing ? '' : '1', tune: '' })}>
+                {editing ? '完成编辑' : '改内容'}
               </a>
-            ))}
-          </span>
-          <a href={`/space/${memberId}/manage`}>管理</a>
-          <a className="sp-bar-back" href={`/space/${memberId}/studio`}>工作室</a>
+              <a className={`sp-bar-edit ${tuning ? 'is-on' : ''}`} href={keep({ tune: tuning ? '' : '1', edit: '' })} title="颜色、字体、留白都可以改">
+                {tuning ? '完成调风格' : '调风格'}
+              </a>
+              <a href={`${keep({ edit: '1', tune: '' })}#space-order`}>调整顺序</a>
+            </> : <>
+              <span className="sp-bar-tag">{AS_ROLES.find(r => r.value === as)?.label}视角</span>
+              <a href={keep({ as: '' })}>返回我的预览</a>
+            </>}
+            <a href={`/space/${memberId}/manage?tab=share`}>预览与分享</a>
+            <span className="sp-bar-sp" />
+            <span className="sp-bar-title">{node.name} · {theme.name}（{source}）</span>
+          </nav>
+          <div className="sp-owner-info">
+            <p className="sp-owner-notice">
+              {mode === 'none'
+                ? settings.published ? '当前没有对外展示，你和管理员可以预览。' : '尚未公开；你和管理员可以预览，发布由本人决定。'
+                : '已发布 · 保存内容或风格后会更新公开网站。'}
+              {preview && pending > 0 && ` ${pending} 处 AI 起稿待你确认。`}
+            </p>
+            <details className="sp-preview-options">
+              <summary>访客视角与更多</summary>
+              <div className="sp-owner-options">
+                <span className="sp-bar-as" aria-label="用别人的身份看">
+                  {AS_ROLES.map(r => (
+                    <a key={r.value} href={keep({ as: as === r.value ? '' : r.value })} aria-current={as === r.value ? 'page' : undefined}>
+                      {r.label}
+                    </a>
+                  ))}
+                </span>
+                <span className="sp-swatches" aria-label="试试其他主题">
+                  {THEMES.map(t => (
+                    <a key={t.id} href={keep({ theme: t.id })} title={t.name} aria-label={t.name}
+                      className={`sp-swatch ${t.id === theme.id ? 'is-on' : ''}`}
+                      style={{ background: `linear-gradient(135deg, ${t.tokens.bg} 50%, ${t.tokens.accent} 50%)` }} />
+                  ))}
+                </span>
+                <a href={`/space/${memberId}/manage?tab=inbox`}>收件箱</a>
+                <a href={`/space/${memberId}/manage?tab=visibility`}>谁能看到</a>
+                <a href={`/space/${memberId}/studio`}>风格工作室</a>
+              </div>
+            </details>
+          </div>
         </div>
       )}
       {tuning && (
@@ -220,6 +234,7 @@ export default async function SpacePage({ memberId: rawId, searchParams: sp, via
             ? getTheme(rec.tune.base)?.name ?? null : null}
           willPin={rec.style?.chosen !== baseTheme.id}
           isLive={baseTheme.id === liveId}
+          published={mode !== 'none'}
           liveName={getTheme(liveId)?.name ?? baseTheme.name}
           vector={(input && effectiveVector(input)?.v) || ZERO}
           hasPhoto={photo !== 'none'}
@@ -242,9 +257,9 @@ export default async function SpacePage({ memberId: rawId, searchParams: sp, via
           greet: settings.greetingsOpen
             ? <GreetForm memberId={memberId} hostName={node.name} open preview={preview} viewerName={viewerName} />
             : undefined,
-          bookFor: (title: string) => (
-            <BookButton memberId={memberId} serviceTitle={title} open={settings.bookingsOpen} preview={preview} viewerName={viewerName} />
-          ),
+          bookFor: settings.bookingsOpen ? (title: string) => (
+            <BookButton memberId={memberId} serviceTitle={title} open preview={preview} viewerName={viewerName} />
+          ) : undefined,
         }}
       />
     </>

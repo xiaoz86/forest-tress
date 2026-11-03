@@ -26,23 +26,16 @@
 .tn-chev::after { content: ' ▾'; }
 .tn:not(.is-open) .tn-chev::after { content: ' ▴'; }
 .tn-toggle span {
-  /* 最多两行：「第 2 轮 · 纸色 · 点这里作答」「改了 2 处 · 未保存 · 预览中……」在窄屏上也不被截掉要紧的那半句 */
+  /* 最多两行：「改了 2 处 · 未保存 · 预览中……」在窄屏上也不被截掉要紧的那半句 */
   max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
   font-size: 12.5px; line-height: 1.45; color: var(--tn-soft);
 }
-.tn-nw { white-space: nowrap; }
 .tn-close {
   /* 和左边的标题按钮隔开一点：手机上点标题栏空白处收起抽屉时，不会被吸到「完成」上退出调风格 */
   margin-left: 6px;
   display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 99px;
   border: 1px solid var(--tn-line); color: var(--tn-ink); text-decoration: none; font-size: 13px; background: #fff;
 }
-.tn-mini-ab { display: inline-flex; gap: 4px; }
-.tn-mini-ab button {
-  width: 40px; min-height: 36px; border: 1.5px solid var(--tn-line); border-radius: 99px; background: #fff;
-  color: var(--tn-soft); font: 600 13px/1 'Manrope', sans-serif; cursor: pointer;
-}
-.tn-mini-ab button.is-on { border-color: var(--tn-main); background: var(--tn-main); color: #fff; }
 .tn-body { overflow-y: auto; overscroll-behavior: contain; padding: 12px 16px 0; }
 
 .tn-tabs { display: flex; gap: 4px; padding: 3px; margin-bottom: 14px; border-radius: 99px; background: #f1ece0; }
@@ -53,12 +46,15 @@
 .tn-tabs button.is-on { background: #fff; color: var(--tn-ink); font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / 0.1); }
 
 .tn-sec { display: grid; gap: 12px; }
+.tn-help { display: flex; align-items: start; gap: 8px; margin-bottom: 12px; padding: 10px; border-radius: 10px; background: #eaf0e4; font-size: 13px; }
+.tn-help .tn-link { flex: none; }
+.tn-details summary { min-height: 44px; cursor: pointer; color: var(--tn-main); }
+.tn-details .tn-remix { margin-top: 16px; }
 .tn-sec > *, .tn-notme > * { min-width: 0; }
 .tn-lead { color: var(--tn-ink); }
 .tn-hint { font-size: 12.5px; line-height: 1.6; color: var(--tn-soft); }
 .tn-note { margin-bottom: 12px; padding: 8px 10px; border-radius: 10px; background: #fbf1dc; color: #6d5424; font-size: 13px; }
 .tn-q { font-weight: 600; font-size: 15px; }
-.tn-step { font-size: 12px; letter-spacing: 0.08em; color: var(--tn-mark); }
 .tn-result { color: var(--tn-ink); }
 .tn-changes { padding-left: 1.1em; font-size: 13px; color: var(--tn-soft); display: grid; gap: 2px; }
 
@@ -92,18 +88,6 @@
 
 .tn-notme { display: grid; gap: 12px; padding-bottom: 6px; }
 .tn-cancel { margin-top: -4px; }
-
-/* 二选一 */
-.tn-round { display: grid; gap: 10px; }
-.tn-ab { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.tn-ab button {
-  display: grid; justify-items: start; gap: 2px; padding: 10px 12px; min-height: 76px; cursor: pointer; text-align: left;
-  border: 1.5px solid var(--tn-line); border-radius: 12px; background: #fff; color: var(--tn-ink); font: inherit;
-}
-.tn-ab button.is-on { border-color: var(--tn-main); box-shadow: 0 0 0 3px rgb(47 81 61 / 0.12); }
-.tn-ab b { font-size: 13px; color: var(--tn-mark); }
-.tn-ab span { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
-.tn-ab small { font-size: 12px; color: var(--tn-soft); }
 
 /* 细调 */
 .tn-remix { padding-bottom: 4px; }
@@ -165,6 +149,8 @@
 .tn-msg { font-size: 13px; color: var(--tn-main); }
 
 @media (max-width: 760px) {
+  .tn-btn, .tn-tabs button, .tn-seg button, .tn-paper, .tn-link { min-height: 44px; }
+  .tn-say input { font-size: 16px; }
   .tn {
     top: auto; left: 8px; right: 8px; bottom: max(8px, env(safe-area-inset-bottom)); width: auto;
     max-height: 62vh; border-radius: 16px;

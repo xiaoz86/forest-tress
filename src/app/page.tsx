@@ -146,10 +146,6 @@ export default async function Home() {
             {t.hero.taglineBottom}
           </p>
 
-          <p className="mx-auto mb-16 max-w-[580px] animate-fade-in-delay-2 text-[16.5px] leading-[1.9] text-white/75 [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]">
-            {t.hero.lede}
-          </p>
-
           <div className="mb-14 flex animate-fade-in-delay-3 flex-wrap justify-center gap-x-8 gap-y-4">
             {t.hero.chips.map((c, i) => (
               <span

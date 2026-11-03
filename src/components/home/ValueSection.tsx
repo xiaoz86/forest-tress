@@ -18,9 +18,7 @@ export default function ValueSection({ t }: { t: Dictionary['home']['value'] }) 
             className="mx-auto max-w-[680px] text-[clamp(2rem,4.2vw,3.2rem)] font-normal leading-[1.2] tracking-[-0.03em] text-ink"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
-            {t.headingTop}
-            <br />
-            {t.headingBottom}
+            {t.heading}
           </h2>
         </div>
 

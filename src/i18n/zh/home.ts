@@ -1,4 +1,4 @@
-// 首页文案。原样从各个 section 里搬出来的，一个字都没改。
+// 首页文案。
 //
 // 不要加 as const：那会把每个值锁成字面量类型，英文字典就一个字都赋不进去。
 //
@@ -19,38 +19,36 @@ export const home = {
     titleTail: '的超级创造者',
     taglineTop: '我们既发现自己的无限可能，也被看见',
     taglineBottom: '在相遇中共同创造与成长',
-    lede: '让正在独立做事的人，找到真正同行的伙伴。',
     chips: ['呼吸', '看见', '同频', '相遇', '共创', '生长'],
     cta: '走进这片森林',
   },
 
   value: {
-    headingTop: '不是再认识更多人，',
-    headingBottom: '而是遇见真正与你有关的人。',
+    heading: '我们在这换另外一种独特的方式相遇。',
     items: [
       {
         index: '01 · BE SEEN',
         symbol: '见',
-        title: '被看见',
-        body: '让别人看见的不只是你的身份，而是你正在投入的事情、积累的能力与真实的需要。',
+        title: '彼此看见',
+        body: '我们所做的事，与真实的需要，构成了我们向世界传递的表达方式。',
       },
       {
         index: '02 · MEET NEARBY',
         symbol: '遇',
-        title: '遇见同频',
-        body: '从共同关心的议题出发，找到能够理解你，也可能与你形成互补的人。',
+        title: '走向对方',
+        body: '在匹配、交换、连接中构建起我们可持续的共创关系网。',
       },
       {
         index: '03 · GROW TOGETHER',
         symbol: '生',
-        title: '共同生长',
-        body: '一次对话、一个小组或一场共创，都可以让一颗种子真正向前生长一步。',
+        title: '成长共创',
+        body: '和喜欢的人一起，孕育非凡可能，共创美好。',
       },
     ],
   },
 
   entrances: {
-    heading: '从适合你的那条小径进入。',
+    sectionLabel: '四个入口',
     items: [
       {
         icon: '息',
@@ -80,9 +78,7 @@ export const home = {
   },
 
   creators: {
-    headingTop: '森林里，已经有人',
-    headingBottom: '在做这些事。',
-    lede: '每一个节点都来自一个真实的人。你可以看见他们正在创造什么、能够提供什么，以及此刻希望遇见怎样的伙伴。',
+    heading: '你可以看见他们正在创造什么、能够提供什么，以及此刻希望遇见怎样的伙伴。',
     link: '进入创造者平台',
     showcase: {
       growing: '森林里正在生长',
@@ -100,8 +96,7 @@ export const home = {
   },
 
   paths: {
-    headingTop: '连接不必用力，',
-    headingBottom: '让关系沿着适合自己的速度生长。',
+    heading: '沿着适合自己的速度生长。',
     steps: [
       {
         n: '01',
@@ -129,8 +124,7 @@ export const home = {
   },
 
   stories: {
-    heading: '有些连接，已经开始发生。',
-    lede: '不是每次相遇都要变成合作。被认真听见、找到可以交流的人，本身也是附近重新出现的方式。',
+    sectionLabel: '森林故事',
     items: [
       {
         type: 'AI MATCH · 共创伙伴',

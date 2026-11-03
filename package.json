@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:voice": "node --experimental-strip-types --test tests/voiceTranscript.test.ts",
+    "test:space": "node --experimental-strip-types --test tests/spacePresentation.test.ts",
     "test:phil-voice": "node --experimental-strip-types --test tests/philCoachSpeech.test.ts tests/philCoachSpeechSign.test.ts tests/philCoachStream.test.ts tests/dashscopeAsr.test.ts tests/dashscopeTts.test.ts tests/ttsRequestTrace.test.ts tests/outboundWebSocket.test.ts tests/voiceStack.test.ts tests/voiceStream.test.ts tests/voiceRealtime.test.ts tests/philCoachVoiceTicket.test.ts",
     "test:xiaoya": "node --experimental-strip-types --test tests/xiaoya*.test.ts"
   },

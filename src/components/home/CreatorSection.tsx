@@ -16,29 +16,24 @@ export default function CreatorSection({ nodes, t }: Props) {
   return (
     <section id="forest" className="bg-[#eef1e8] px-8 py-24 max-md:px-7 max-md:py-16">
       <div className="mx-auto max-w-[1180px]">
-        <div className="mb-12 grid grid-cols-[1fr_0.85fr] items-end gap-10 max-md:grid-cols-1 max-md:gap-5">
+        <div className="mb-10 flex items-end justify-between gap-10 max-md:flex-col max-md:items-start max-md:gap-5">
           <div>
             <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
               Creator Platform
             </p>
             <h2
-              className="text-[clamp(2rem,4.2vw,3.2rem)] font-normal leading-[1.2] tracking-[-0.03em] text-ink"
+              className="max-w-[800px] text-[clamp(1.25rem,2.4vw,1.75rem)] font-normal leading-[1.65] text-ink"
               style={{ fontFamily: 'var(--font-serif)' }}
             >
-              {t.headingTop}
-              <br />
-              {t.headingBottom}
+              {t.heading}
             </h2>
           </div>
-          <div>
-            <p className="text-[14px] leading-[1.95] text-ink-soft">{t.lede}</p>
-            <Link
-              href="/creators"
-              className="mt-5 inline-block text-[13.5px] font-medium text-forest-mid underline-offset-4 transition-colors hover:text-forest-deep hover:underline"
-            >
-              {t.link} →
-            </Link>
-          </div>
+          <Link
+            href="/creators"
+            className="inline-block shrink-0 text-[13.5px] font-medium text-forest-mid underline-offset-4 transition-colors hover:text-forest-deep hover:underline"
+          >
+            {t.link} →
+          </Link>
         </div>
 
         <CreatorShowcase nodes={nodes} t={t.showcase} />

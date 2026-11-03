@@ -15,22 +15,12 @@ export default function StorySection({ t, children }: Props) {
   const [lead, ...rest] = t.items;
 
   return (
-    <section id="stories" className="px-8 py-24 max-md:px-7 max-md:py-16">
+    <section id="stories" aria-labelledby="stories-heading" className="px-8 py-24 max-md:px-7 max-md:py-16">
       <div className="mx-auto max-w-[1080px]">
-        <div className="mb-12 grid grid-cols-[1fr_0.85fr] items-end gap-10 max-md:grid-cols-1 max-md:gap-5">
-          <div>
-            <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
-              Stories in the Forest
-            </p>
-            <h2
-              className="text-[clamp(2rem,4.2vw,3.2rem)] font-normal leading-[1.2] tracking-[-0.03em] text-ink"
-              style={{ fontFamily: 'var(--font-serif)' }}
-            >
-              {t.heading}
-            </h2>
-          </div>
-          <p className="text-[14px] leading-[1.95] text-ink-soft">{t.lede}</p>
-        </div>
+        <h2 id="stories-heading" className="sr-only">{t.sectionLabel}</h2>
+        <p aria-hidden="true" className="mb-6 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
+          Stories in the Forest
+        </p>
 
         <div className="grid grid-cols-[1.05fr_0.95fr] gap-5 max-lg:grid-cols-1">
           <article className="flex flex-col justify-between rounded-[30px] bg-white p-10 shadow-[0_14px_44px_rgba(42,59,47,0.06)] max-md:p-7">

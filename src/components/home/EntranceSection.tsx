@@ -11,19 +11,12 @@ const HREFS = ['/meditations', '/phil-coach', '/creators', '/shares'];
 
 export default function EntranceSection({ t }: { t: Dictionary['home']['entrances'] }) {
   return (
-    <section id="entrances" className="bg-paper-soft/60 px-8 py-24 max-md:px-7 max-md:py-16">
+    <section id="entrances" aria-labelledby="entrances-heading" className="bg-paper-soft/60 px-8 py-24 max-md:px-7 max-md:py-16">
       <div className="mx-auto max-w-[1080px]">
-        <div className="mb-12 max-w-[860px]">
-          <p className="mb-4 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
-            Four Ways In
-          </p>
-          <h2
-            className="text-[clamp(2rem,4.2vw,3.2rem)] font-normal leading-[1.2] tracking-[-0.03em] text-ink"
-            style={{ fontFamily: 'var(--font-serif)' }}
-          >
-            {t.heading}
-          </h2>
-        </div>
+        <h2 id="entrances-heading" className="sr-only">{t.sectionLabel}</h2>
+        <p aria-hidden="true" className="mb-6 text-[12px] font-bold uppercase tracking-[0.2em] text-forest">
+          Four Ways In
+        </p>
 
         <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1 max-md:gap-4">
           {t.items.map((e, i) => (

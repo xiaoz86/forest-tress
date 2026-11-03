@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useId, useState, type ReactNode } from 'react';
 import {
-  CHAPTER_LABEL, LEARNING_KIND_LABEL, LIMITS_EDIT,
+  LEARNING_KIND_LABEL, LIMITS_EDIT,
   type BlockMark, type ChapterKey, type DraftBlock, type LearningItem, type LearningKind, type ServiceFormat,
   type ServiceItem, type ValueEntry,
 } from '@/lib/space/edits';
@@ -123,7 +123,7 @@ function Candidates({ list, onPick }: { list: { text: string; quote: string | nu
 
 // ─────────────── 一句话介绍 ───────────────
 
-export function TaglineEditor({ memberId, mark, value }: { memberId: string; mark: BlockMark; value: string }) {
+export function TaglineEditor({ memberId, mark, value, beautyText }: { memberId: string; mark: BlockMark; value: string; beautyText?: string }) {
   const s = useSaver(memberId);
   const uid = useId();
   const [editing, setEditing] = useState(false);
@@ -147,11 +147,20 @@ export function TaglineEditor({ memberId, mark, value }: { memberId: string; mar
       onHide={() => s.run({ op: 'hide', block: 'tagline' })}
       onReset={() => s.run({ op: 'reset', block: 'tagline' })}>
       <div className="ek-form">
-        <label htmlFor={`${uid}-t`}>写一句你自己的话（{LIMITS_EDIT.tagline} 字以内）</label>
-        <input id={`${uid}-t`} value={text} maxLength={LIMITS_EDIT.tagline} onChange={e => setText(e.target.value)} />
+        <label htmlFor={`${uid}-t`}>一句介绍、喜欢的话，或你所认为的美（{LIMITS_EDIT.tagline} 字以内）</label>
+        <textarea id={`${uid}-t`} rows={2} value={text} onChange={e => setText(e.target.value)} />
+        {text.length > LIMITS_EDIT.tagline && <p className="ek-hint" role="status">这段话有 {text.length} 字，请选出最想放在首屏的一句，缩短到 {LIMITS_EDIT.tagline} 字以内。</p>}
+        {beautyText?.trim() && (
+          <details className="ek-beauty">
+            <summary>从我写过的“美”里选一句</summary>
+            <p>{beautyText}</p>
+            <button type="button" className="ek-btn" disabled={s.busy} onClick={() => setText(beautyText.trim())}>放入编辑框，继续修改</button>
+            <p className="ek-hint">确认并存好后才会成为首屏介绍，不会改动原来的“美”。</p>
+          </details>
+        )}
         <Candidates list={cands} onPick={c => { setText(c.text); setCands([]); }} />
         <div className="ek-row">
-          <button type="button" className="ek-btn is-main" disabled={s.busy || !text.trim()}
+          <button type="button" className="ek-btn is-main" disabled={s.busy || !text.trim() || text.length > LIMITS_EDIT.tagline}
             onClick={() => s.run({ op: 'set', block: 'tagline', value: text }, () => setEditing(false))}>存好</button>
           <button type="button" className="ek-btn" disabled={asking} onClick={more}>{asking ? 'AI 在想…' : '再给我两个版本'}</button>
           <button type="button" className="ek-btn is-quiet" onClick={() => setEditing(false)}>算了</button>
@@ -176,7 +185,7 @@ export function RolesEditor({ memberId, mark, value }: { memberId: string; mark:
       onHide={() => s.run({ op: 'hide', block: 'roles' })}
       onReset={() => s.run({ op: 'reset', block: 'roles' })}>
       <div className="ek-form">
-        <p className="ek-hint">首屏上用「 / 」连成一行，最多显示 4 个。每个 {LIMITS_EDIT.role} 字以内。</p>
+        <p className="ek-hint">前 2 个身份展示在首屏，其余放在经历中。每个 {LIMITS_EDIT.role} 字以内。</p>
         {items.map((r, i) => (
           <div className="ek-row" key={i}>
             <input aria-label={`身份 ${i + 1}`} id={`${uid}-${i}`} value={r} maxLength={LIMITS_EDIT.role}
@@ -294,8 +303,10 @@ export function ServicesEditor({ memberId, mark, value }: { memberId: string; ma
             <legend>第 {i + 1} 项</legend>
             <label htmlFor={`${uid}-${i}-t`}>名字</label>
             <input id={`${uid}-${i}-t`} value={it.title} maxLength={LIMITS_EDIT.serviceTitle} onChange={e => setField(i, 'title', e.target.value)} />
-            <label htmlFor={`${uid}-${i}-d`}>介绍（给谁的、做什么）</label>
-            <textarea id={`${uid}-${i}-d`} rows={2} value={it.desc} maxLength={LIMITS_EDIT.serviceDesc} onChange={e => setField(i, 'desc', e.target.value)} />
+            <label htmlFor={`${uid}-${i}-d`}>给谁、回应什么需要、可以一起做什么</label>
+            <textarea id={`${uid}-${i}-d`} rows={3} value={it.desc} maxLength={LIMITS_EDIT.serviceDesc}
+              placeholder="例如：给正考虑工作变化的人，一起梳理当下困惑，找到愿意尝试的一小步。"
+              onChange={e => setField(i, 'desc', e.target.value)} />
             {cands?.i === i && <Candidates list={cands.list} onPick={c => { setField(i, 'desc', c.text); setCands(null); }} />}
             <div className="ek-grid">
               <label>形式
@@ -420,6 +431,12 @@ export function CoverFocus({ memberId, src, focus }: { memberId: string; src: st
 
 // ─────────────── 章节顺序 ───────────────
 
+const ORDER_STARTS: { label: string; hint: string; order: ChapterKey[] }[] = [
+  { label: '提供支持', hint: '先看支持与服务，再了解我', order: ['offer', 'knowing', 'path'] },
+  { label: '展示作品', hint: '先看作品与经历，再了解我', order: ['path', 'knowing', 'offer'] },
+  { label: '认识与探索', hint: '先了解我在意与探索的事', order: ['knowing', 'path', 'offer'] },
+];
+
 export function OrderEditor({ memberId, order }: { memberId: string; order: ChapterKey[] }) {
   const s = useSaver(memberId);
   const [v, setV] = useState(order);
@@ -431,27 +448,38 @@ export function OrderEditor({ memberId, order }: { memberId: string; order: Chap
     return out;
   });
   const changed = v.join() !== order.join();
+  const label = (k: ChapterKey) => k === 'knowing' ? '关于我'
+    : k === 'path' ? (v[0] === 'path' ? '作品与经历' : '走过的路')
+    : v[0] === 'offer' ? '我能提供的支持' : '一起做点什么';
   return (
-    <div className="ek ek-order">
+    <div className="ek ek-order" id="space-order">
       <div className="ek-bar">
         <span className="ek-label">章节顺序</span>
         <span className="ek-hint-inline">「心里的种子」和底部的打招呼永远在最后。想整章隐藏，去管理页「谁能看到」选「仅自己」。</span>
       </div>
+      <p className="ek-hint">选择你希望访客先了解的内容。首屏会保留名字与一句介绍。选好后还可以上下调整，存好才会生效。</p>
+      <div className="ek-order-starts" aria-label="内容顺序起点">
+        {ORDER_STARTS.map(start => (
+          <button key={start.label} type="button" className="ek-order-start" disabled={s.busy}
+            aria-pressed={v.join() === start.order.join()} onClick={() => setV([...start.order])}>
+            <strong>{start.label}</strong><span>{start.hint}</span>
+          </button>
+        ))}
+      </div>
       <ol className="ek-orderlist">
         {v.map((k, i) => (
           <li key={k}>
-            <span>{CHAPTER_LABEL[k]}</span>
-            <button type="button" className="ek-btn is-quiet" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`${CHAPTER_LABEL[k]} 上移`}>↑</button>
-            <button type="button" className="ek-btn is-quiet" disabled={i === v.length - 1} onClick={() => move(i, 1)} aria-label={`${CHAPTER_LABEL[k]} 下移`}>↓</button>
+            <span>{label(k)}</span>
+            <button type="button" className="ek-btn is-quiet" disabled={s.busy || i === 0} onClick={() => move(i, -1)} aria-label={`${label(k)} 上移`}>↑</button>
+            <button type="button" className="ek-btn is-quiet" disabled={s.busy || i === v.length - 1} onClick={() => move(i, 1)} aria-label={`${label(k)} 下移`}>↓</button>
           </li>
         ))}
       </ol>
-      {v[0] === 'offer' && <p className="ek-hint">提醒：调研里大家更想先认识这个人，服务放在中后部更自然（v2 §0.3）。</p>}
       {s.err && <p className="ek-err">{s.err}</p>}
       {changed && (
         <div className="ek-row">
           <button type="button" className="ek-btn is-main" disabled={s.busy} onClick={() => s.run({ op: 'order', value: v })}>存好</button>
-          <button type="button" className="ek-btn is-quiet" onClick={() => setV(order)}>算了</button>
+          <button type="button" className="ek-btn is-quiet" disabled={s.busy} onClick={() => setV(order)}>算了</button>
         </div>
       )}
     </div>
