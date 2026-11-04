@@ -55,7 +55,7 @@ export type LearningItem = { id: string; kind: LearningKind; title: string; note
 export type ValueEntry = { text: string; quote: string | null };
 
 export type ChapterKey = 'knowing' | 'path' | 'offer';
-export const DEFAULT_ORDER: ChapterKey[] = ['knowing', 'path', 'offer'];
+export const DEFAULT_ORDER: ChapterKey[] = ['offer', 'knowing', 'path'];
 export const CHAPTER_LABEL: Record<ChapterKey, string> = {
   knowing: '我这个人',
   path: '走过的路',
@@ -72,7 +72,11 @@ export type SpaceEdits = {
   order?: ChapterKey[];
   /** 首屏照片的焦点（0–100 的百分比），手机和桌面的裁切都跟着它 */
   cover?: { x: number; y: number };
+  /** 本人填写的首屏近况；关闭展示时仍保留私人草稿 */
+  coverRecent?: { text: string; visible: boolean };
   learning?: LearningItem[];
+  /** 支持区的开场文字，独立于 AI 起稿 */
+  offerIntro?: string;
   /** 一个对我很重要的生命故事（放在种子层，可见性跟「心里的种子」一样） */
   story?: string;
   updatedAt?: string;
@@ -80,6 +84,7 @@ export type SpaceEdits = {
 
 export const LIMITS_EDIT = {
   tagline: 40,
+  coverRecent: 40,
   role: 16,
   roles: 6,
   value: 30,
@@ -91,6 +96,7 @@ export const LIMITS_EDIT = {
   learningTitle: 40,
   learningNote: 60,
   learning: 8,
+  offerIntro: 120,
   story: 800,
 } as const;
 

@@ -38,7 +38,9 @@ export async function GET(request: NextRequest) {
  *   { op: 'set', block, value }                             —— 改成我写的
  *   { op: 'order', value: ChapterKey[] }                   —— 中间三章的顺序
  *   { op: 'cover', x, y }                                  —— 首屏照片焦点（0–100）
+ *   { op: 'coverRecent', value: { text, visible } }         —— 首屏近况与公开开关
  *   { op: 'learning', value: LearningItem[] }              —— 最近在读 / 在听 / 在看 / 在学
+ *   { op: 'offerIntro', value: string }                    —— 支持区的开场文字
  *   { op: 'story', value: string }                         —— 一个生命故事
  */
 export async function PATCH(request: NextRequest) {
@@ -142,6 +144,15 @@ export async function PATCH(request: NextRequest) {
       const y = Number(body.y);
       if (!Number.isFinite(x) || !Number.isFinite(y)) { problem = '位置不对，再点一下照片'; return {}; }
       edits.cover = { x: Math.round(Math.min(100, Math.max(0, x))), y: Math.round(Math.min(100, Math.max(0, y))) };
+    } else if (op === 'coverRecent') {
+      const v = body.value;
+      if (!v || typeof v !== 'object' || Array.isArray(v)) { problem = '近况格式不对，刷新一下再试'; return {}; }
+      const recent = v as Record<string, unknown>;
+      if (typeof recent.text !== 'string' || typeof recent.visible !== 'boolean') { problem = '近况格式不对，刷新一下再试'; return {}; }
+      const text = cleanLine(recent.text, LIMITS_EDIT.coverRecent + 1);
+      if ([...text].length > LIMITS_EDIT.coverRecent) { problem = `最近的一笔请控制在 ${LIMITS_EDIT.coverRecent} 字以内`; return {}; }
+      if (recent.visible && !text) { problem = '先写一条近况，再公开展示'; return {}; }
+      edits.coverRecent = { text, visible: recent.visible };
     } else if (op === 'learning') {
       const items: LearningItem[] = [];
       for (const x of Array.isArray(body.value) ? body.value : []) {
@@ -160,6 +171,11 @@ export async function PATCH(request: NextRequest) {
         });
       }
       edits.learning = items.slice(0, LIMITS_EDIT.learning);
+    } else if (op === 'offerIntro') {
+      const text = clean(body.value, LIMITS_EDIT.offerIntro + 1);
+      if (!text) { problem = '开场文字不能是空的'; return {}; }
+      if ([...text].length > LIMITS_EDIT.offerIntro) { problem = `开场文字请控制在 ${LIMITS_EDIT.offerIntro} 字以内`; return {}; }
+      edits.offerIntro = text;
     } else if (op === 'story') {
       const text = clean(body.value, LIMITS_EDIT.story);
       if (text) edits.story = text;

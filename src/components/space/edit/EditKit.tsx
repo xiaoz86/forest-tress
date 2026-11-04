@@ -341,8 +341,8 @@ export function ServicesEditor({ memberId, mark, value }: { memberId: string; ma
 // ─────────────── 作品分组 ───────────────
 
 const KIND_LABEL: Record<WorkKind, string> = {
-  work: '作品与项目（走过的路）',
-  content: '在别处的我（走过的路）',
+  work: '作品与项目（作品与生活）',
+  content: '在别处的我（作品与生活）',
   service: '长期在做的（一起做点什么）',
   activity: '活动（一起做点什么）',
 };
@@ -429,6 +429,44 @@ export function CoverFocus({ memberId, src, focus }: { memberId: string; src: st
   );
 }
 
+// ─────────────── 最近的一笔 ───────────────
+
+export function CoverRecentEditor({ memberId, value }: { memberId: string; value: { text: string; visible: boolean } }) {
+  const s = useSaver(memberId);
+  const uid = useId();
+  const [editing, setEditing] = useState(false);
+  const [recent, setRecent] = useState(value);
+  const length = [...recent.text.trim()].length;
+  return (
+    <div className="ek">
+      <div className="ek-bar">
+        <span className="ek-label">最近的一笔</span>
+        <span className="ek-acts">
+          {!editing && <button type="button" className="ek-btn" disabled={s.busy} onClick={() => { setRecent(value); setEditing(true); }}>改</button>}
+        </span>
+      </div>
+      {s.err && <p className="ek-err" role="alert">{s.err}</p>}
+      {editing && (
+        <div className="ek-form">
+          <label htmlFor={`${uid}-recent`}>最近的一笔（{LIMITS_EDIT.coverRecent} 字以内）</label>
+          <input id={`${uid}-recent`} value={recent.text} disabled={s.busy} onChange={e => setRecent(v => ({ ...v, text: e.target.value }))} />
+          {length > LIMITS_EDIT.coverRecent && <p className="ek-hint" role="status">这条近况有 {length} 字，请缩短到 {LIMITS_EDIT.coverRecent} 字以内。</p>}
+          <label className="ek-check">
+            <input type="checkbox" checked={recent.visible} disabled={s.busy} onChange={e => setRecent(v => ({ ...v, visible: e.target.checked }))} />
+            在首屏公开展示这条近况
+          </label>
+          <p className="ek-hint">关闭后只有你在编辑时可见</p>
+          <div className="ek-row">
+            <button type="button" className="ek-btn is-main" disabled={s.busy || length > LIMITS_EDIT.coverRecent || (recent.visible && !length)}
+              onClick={() => s.run({ op: 'coverRecent', value: recent }, () => setEditing(false))}>存好</button>
+            <button type="button" className="ek-btn is-quiet" disabled={s.busy} onClick={() => setEditing(false)}>取消</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─────────────── 章节顺序 ───────────────
 
 const ORDER_STARTS: { label: string; hint: string; order: ChapterKey[] }[] = [
@@ -449,13 +487,12 @@ export function OrderEditor({ memberId, order }: { memberId: string; order: Chap
   });
   const changed = v.join() !== order.join();
   const label = (k: ChapterKey) => k === 'knowing' ? '关于我'
-    : k === 'path' ? (v[0] === 'path' ? '作品与经历' : '走过的路')
-    : v[0] === 'offer' ? '我能提供的支持' : '一起做点什么';
+    : k === 'path' ? '作品与生活' : '如何支持到你';
   return (
     <div className="ek ek-order" id="space-order">
       <div className="ek-bar">
         <span className="ek-label">章节顺序</span>
-        <span className="ek-hint-inline">「心里的种子」和底部的打招呼永远在最后。想整章隐藏，去管理页「谁能看到」选「仅自己」。</span>
+        <span className="ek-hint-inline">「心里的种子」和底部的打招呼永远在最后。想隐藏某类内容，去管理页「谁能看到」按内容类别选择「仅自己」。</span>
       </div>
       <p className="ek-hint">选择你希望访客先了解的内容。首屏会保留名字与一句介绍。选好后还可以上下调整，存好才会生效。</p>
       <div className="ek-order-starts" aria-label="内容顺序起点">
@@ -554,6 +591,39 @@ export function StoryEditor({ memberId, value }: { memberId: string; value: stri
           <div className="ek-row">
             <button type="button" className="ek-btn is-main" disabled={s.busy} onClick={() => s.run({ op: 'story', value: text }, () => setEditing(false))}>存好</button>
             <button type="button" className="ek-btn is-quiet" onClick={() => setEditing(false)}>算了</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────── 支持区开场文字 ───────────────
+
+export function OfferIntroEditor({ memberId, value }: { memberId: string; value: string }) {
+  const s = useSaver(memberId);
+  const uid = useId();
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value);
+  const length = [...text.trim()].length;
+  return (
+    <div className="ek">
+      <div className="ek-bar">
+        <span className="ek-label">支持区开场文字</span>
+        <span className="ek-acts">
+          {!editing && <button type="button" className="ek-btn" disabled={s.busy} onClick={() => { setText(value); setEditing(true); }}>改</button>}
+        </span>
+      </div>
+      {s.err && <p className="ek-err" role="alert">{s.err}</p>}
+      {editing && (
+        <div className="ek-form">
+          <label htmlFor={`${uid}-intro`}>用一小段话介绍你希望怎样提供支持（{LIMITS_EDIT.offerIntro} 字以内）</label>
+          <textarea id={`${uid}-intro`} rows={3} value={text} onChange={e => setText(e.target.value)} />
+          {length > LIMITS_EDIT.offerIntro && <p className="ek-hint" role="status">这段话有 {length} 字，请缩短到 {LIMITS_EDIT.offerIntro} 字以内。</p>}
+          <div className="ek-row">
+            <button type="button" className="ek-btn is-main" disabled={s.busy || !length || length > LIMITS_EDIT.offerIntro}
+              onClick={() => s.run({ op: 'offerIntro', value: text }, () => setEditing(false))}>存好</button>
+            <button type="button" className="ek-btn is-quiet" disabled={s.busy} onClick={() => setEditing(false)}>算了</button>
           </div>
         </div>
       )}

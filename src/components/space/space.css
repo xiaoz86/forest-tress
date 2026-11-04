@@ -112,6 +112,10 @@ body { margin: 0; }
 .sp-stamp img { object-fit: cover; }
 
 .sp-sheet { position: relative; padding: 14px var(--m) max(18px, env(safe-area-inset-bottom)); }
+.sp-cover-main { width: 100%; min-width: 0; }
+.sp-cover-foot { width: 100%; margin-top: 24px; }
+.sp-cover-recent { margin: 0 0 14px; padding-top: 14px; border-top: 1px solid var(--sp-sheet-soft); font-size: 13px; line-height: 1.7; color: var(--sp-sheet-soft); overflow-wrap: anywhere; }
+.sp-cover-recent > span { display: block; margin-bottom: 4px; font-size: 12px; }
 /* 溶边：照片往下溶进纸里 */
 .sp-sheet::before {
   content: ''; position: absolute; left: 0; right: 0; bottom: 100%;
@@ -131,16 +135,17 @@ body { margin: 0; }
   font-family: var(--sp-head); font-weight: var(--sp-head-weight);
   font-size: max(28px, calc(48px * var(--ns)));
   line-height: 1.08; letter-spacing: var(--sp-name-track);
-  text-wrap: balance; word-break: keep-all; overflow-wrap: break-word; overflow-wrap: anywhere;
+  text-wrap: balance; word-break: normal; overflow-wrap: break-word; overflow-wrap: anywhere;
 }
 /* 相纸、硬边两种边缘没有溶边，名字不压到照片上 */
 .sp[data-edge='print'] .sp-name, .sp[data-edge='rule'] .sp-name { margin-top: 6px; }
 .sp-tagline {
-  margin: 10px 0 0; max-width: 14em;
+  margin: 14px 0 0; max-width: 18em;
   font-family: var(--sp-head); font-weight: 400;
   font-size: 20px; line-height: 1.45;
-  text-wrap: balance; word-break: keep-all; overflow-wrap: break-word; overflow-wrap: anywhere;
+  text-wrap: pretty; word-break: normal; line-break: strict; overflow-wrap: break-word; overflow-wrap: anywhere;
 }
+.sp-tagline-line { display: block; }
 .sp-tagline[data-long] { font-size: 18px; }
 .sp-placeholder { opacity: 0.55; font-size: 16px; }
 .sp-byline {
@@ -163,6 +168,7 @@ body { margin: 0; }
   font: 600 15px/1 var(--sp-body); text-decoration: none; white-space: nowrap;
 }
 .sp .sp-btn { color: var(--sp-accent-ink); }
+.sp .sp-cover-consult { margin-top: 24px; gap: 20px; background: var(--sp-sheet-ink); color: rgb(var(--sv)); }
 /* 按钮圆角来自 --sp-btn-radius（themes.ts tokensToStyle，跟着主题和「圆角」旋钮走） */
 .sp-btn[aria-disabled='true'] { cursor: default; }
 .sp-go {
@@ -203,7 +209,7 @@ body { margin: 0; }
   .sp-tagline { font-size: 24px; }
 }
 
-/* 桌面：字靠左贴底，照片从 36% 铺到右边缘、上下出血；左边垫一层同一张照片的模糊版 */
+/* 桌面：文字从首屏约三分之一处展开，可选近况留在底部；右侧保留人像焦点。 */
 @media (min-width: 1024px) {
   .sp-cover {
     display: block;
@@ -216,7 +222,7 @@ body { margin: 0; }
             mask-image: linear-gradient(to right, #000 55%, transparent 100%);
   }
   .sp-cover-amb img { object-fit: cover; filter: blur(40px) var(--sp-photo-filter); transform: scale(1.3); }
-  .sp-cover-photo { position: absolute; top: 0; right: 0; bottom: 0; left: 36%; }
+  .sp-cover-photo { position: absolute; top: 0; right: 0; bottom: 0; left: 40%; }
   .sp-cover-photo img { object-position: var(--fx, 50%) var(--fy, 45%); }
   .sp-glyph { font-size: clamp(280px, 34vw, 560px); }
   .sp-stamp { width: 168px; height: 168px; }
@@ -245,28 +251,31 @@ body { margin: 0; }
 
   .sp-sheet {
     position: relative; z-index: 1;
-    width: 38%; min-height: inherit;
-    display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;
-    padding: 48px 24px clamp(48px, 9vh, 104px) var(--m);
+    width: 44%; min-height: inherit;
+    display: flex; flex-direction: column; align-items: flex-start;
+    padding: clamp(112px, calc(var(--sp-vh) * 0.28), 320px) 28px 40px var(--m);
   }
-  .sp[data-edge='rule'] .sp-sheet { width: 40%; border-top: 0; }
+  .sp:is([data-edge='arch'], [data-edge='print'], [data-edge='rule']) .sp-sheet { width: 40%; }
+  .sp[data-edge='rule'] .sp-sheet { border-top: 0; }
+  .sp[data-editing] .sp-sheet { padding-top: clamp(48px, calc(var(--sp-vh) * 0.12), 128px); }
+  .sp-cover-foot { margin-top: auto; padding-top: 40px; }
   .sp[data-align='center'] .sp-sheet { align-items: center; }
   .sp-sheet::before { display: none; }
   .sp-cover-note { position: static; margin: 0 0 auto; }
-  /* 纸幅只有 38% 宽：字号不超过「纸幅宽 ÷ 名字的视觉长度」，五个字的中文名不会掉一个字到下一行 */
+  /* 姓名保持视觉重量；长名字自然换行，封面随内容增高。 */
   .sp-name, .sp[data-edge='print'] .sp-name, .sp[data-edge='rule'] .sp-name {
     margin-top: 0;
-    font-size: min(calc(clamp(56px, 6.2vw, 96px) * var(--ns)), calc((38vw - var(--m) - 24px) / (var(--nl) * 1.12)));
+    font-size: clamp(48px, calc(6.2vw * var(--ns)), 104px);
     line-height: 1.04;
   }
-  .sp-tagline { margin-top: 20px; font-size: clamp(22px, 2.1vw, 32px); }
-  .sp-tagline[data-long] { font-size: clamp(20px, 1.7vw, 26px); }
+  .sp-tagline { margin-top: 24px; font-size: clamp(22px, 2vw, 30px); line-height: 1.6; }
+  .sp-tagline[data-long] { font-size: clamp(22px, 1.9vw, 28px); }
   .sp-byline { margin-top: 20px; font-size: 14px; line-height: 1.7; }
   .sp-now { margin-top: 12px; font-size: clamp(15px, 1.1vw, 17px); line-height: 1.8; -webkit-line-clamp: 3; }
 }
 @media (min-width: 1024px) and (max-height: 720px) {
   .sp-name, .sp[data-edge='print'] .sp-name, .sp[data-edge='rule'] .sp-name {
-    font-size: min(calc(min(80px, 6.2vw) * var(--ns)), calc((38vw - var(--m) - 24px) / (var(--nl) * 1.12)));
+    font-size: clamp(48px, calc(6.2vw * var(--ns)), 80px);
   }
 }
 
@@ -286,15 +295,7 @@ body { margin: 0; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 38vw;
 }
 .sp-run-toc { display: none; gap: 24px; color: var(--sp-meta); }
-.sp-run-sp { flex: 1; }
 .sp-run-offer { color: var(--sp-meta); padding: 14px 0; white-space: nowrap; }
-.sp-run-hi {
-  display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: var(--sp-btn-radius, 999px);
-  background: var(--sp-accent-text); color: var(--sp-accent-ink) !important; font-weight: 600; white-space: nowrap;
-  position: relative;
-}
-/* 视觉 36px，点击区用伪元素撑到 44px（box-shadow 不参与点击命中） */
-.sp-run-hi::before { content: ''; position: absolute; top: -4px; bottom: -4px; left: 0; right: 0; }
 @media (min-width: 1024px) {
   .sp-run { height: 52px; }
   .sp-run-toc { display: flex; }
@@ -478,10 +479,9 @@ body { margin: 0; }
 .sp-offer-ch { background: var(--sp-surface); }
 .sp[data-theme='ink'] .sp-offer-ch { border-top: 1px solid var(--sp-line); border-bottom: 1px solid var(--sp-line); }
 .sp-offer { max-width: 1180px; margin: 0 auto; padding: 0 var(--m); }
-.sp-offer-side .sp-head { font-size: clamp(24px, 2.4vw, 34px); max-width: none; }
-/* 两句各占一行、句内不断：否则「？」会被挤到下一行开头 */
-.sp-head .sp-line { display: inline-block; white-space: nowrap; }
-.sp-dek { margin: 14px 0 20px; max-width: 22em; font-size: 15px; line-height: 1.8; color: var(--sp-ink-soft); }
+/* 保留本人输入的换行，长句在窄屏内自然折行。 */
+.sp-offer-side .sp-head { font-size: clamp(24px, 2.4vw, 34px); max-width: none; white-space: pre-line; }
+.sp-offer-side > .sp-btn { margin-top: clamp(24px, 2.5vw, 32px); }
 .sp-offer-main { margin-top: 8px; }
 @media (min-width: 1024px) and (min-height: 720px) {
   .sp-offer {
@@ -735,11 +735,12 @@ body { margin: 0; }
   font: inherit; color: var(--sp-accent-text); text-decoration: underline; text-underline-offset: 0.25em;
 }
 
-/* 支持优先：简短封面之后直接进入支持，章名比编号更醒目。 */
+/* 支持优先：封面独占一屏，导航与支持正文从下一屏开始。 */
 .sp[data-layout='support'] .sp-cover {
-  min-height: 0;
-  grid-template-rows: clamp(180px, 34svh, 320px) auto;
+  min-height: var(--sp-vh);
+  grid-template-rows: minmax(200px, 1fr) auto;
 }
+@supports (height: 100dvh) { .sp[data-layout='support'] { --sp-vh: 100dvh; } }
 .sp[data-layout='support'] .sp-sheet { padding-bottom: 28px; }
 .sp[data-layout='support'] .sp-ch { padding: clamp(36px, calc(var(--sp-gap) * 0.7), 72px) 0; }
 .sp[data-layout='support'] .sp-mark-t {
@@ -749,7 +750,6 @@ body { margin: 0; }
 .sp[data-layout='support'] .sp-num { font-size: 22px; }
 .sp-life-title { margin: 0; font: 500 20px/1.5 var(--sp-head); color: var(--sp-ink); }
 @media (min-width: 1024px) {
-  .sp[data-layout='support'] .sp-cover { min-height: clamp(420px, 64svh, 680px); }
   .sp[data-layout='support'] .sp-sheet { padding-bottom: 48px; }
 }
 

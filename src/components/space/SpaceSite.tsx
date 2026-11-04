@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Fragment } from 'react';
 import { splitBeauty } from '@/lib/beauty';
-import { mergeAboutChapters, sameIntroduction } from '@/lib/space/presentation';
+import { coverTaglineLines, sameIntroduction } from '@/lib/space/presentation';
 import { canOptimize } from '@/lib/space/image';
 import type { CoverPhoto } from '@/lib/space/photoMeta';
 import { stillQuoted, type PortraitResult, type WorkKind } from '@/lib/space/portrait';
@@ -12,7 +12,7 @@ import {
 } from '@/lib/space/story';
 import { tokensToStyle, type SpaceTheme } from '@/lib/space/themes';
 import {
-  CoverFocus, LearningEditor, OrderEditor, OriginalLink, RolesEditor, ServicesEditor, StoryEditor, TaglineEditor,
+  CoverFocus, CoverRecentEditor, LearningEditor, OfferIntroEditor, OrderEditor, OriginalLink, RolesEditor, ServicesEditor, StoryEditor, TaglineEditor,
   ValuesEditor, WorksEditor,
 } from '@/components/space/edit/EditKit';
 import NotMe from '@/components/space/tune/NotMe';
@@ -60,7 +60,7 @@ type Props = {
   /** AI 起稿和本人编辑合成后「现在显示的」（见 edits.ts）；还没有画像时为 null */
   eff: Effective | null;
   /** 只属于网站的内容：章节顺序、照片焦点、最近在读在听、一个生命故事 */
-  extras: { order: ChapterKey[]; cover: { x: number; y: number } | null; learning: LearningItem[]; story: string };
+  extras: { order: ChapterKey[]; cover: { x: number; y: number } | null; learning: LearningItem[]; story: string; offerIntro?: string; coverRecent?: { text: string; visible: boolean } };
   /** 编辑模式（只给本人）：每一块旁边出现编辑控件 */
   editing: boolean;
   /** 本人在调风格：每一块角上放「这不像我」 */
@@ -208,7 +208,6 @@ export default function SpaceSite({
   eff, extras, editing, tuning = false,
 }: Props) {
   const t = theme.tokens;
-  const supportFirst = extras.order[0] === 'offer';
   const draft = result?.draft ?? null;
   const name = node.name.trim();
   const { moment, create } = splitBeauty(node.beauty);
@@ -238,13 +237,26 @@ export default function SpaceSite({
   const interests = node.interests?.trim() || '';
   const interestLine = interests ? interestsSentence(interests) : null;
   const topics = (node.topics || []).flatMap(x => splitList(x));
+  // 引文也按原资料类别的权限核对，不能借「我看重的事」露出私密种子或经历。
+  const quotableNode = {
+    ...node,
+    doing: visible.path ? node.doing : '',
+    experience: visible.path ? node.experience : '',
+    interests: visible.knowing ? node.interests : '',
+    beauty: visible.knowing ? node.beauty : '',
+    topics: visible.knowing ? node.topics : [],
+    seed: visible.seed ? node.seed : '',
+    offer: visible.offer ? node.offer : '',
+    product: visible.offer ? node.product : '',
+    works: works.filter(w => ['service', 'activity'].includes(kindOf(w)) ? visible.offer : visible.path),
+  };
   // 起稿里的原话，按本人现在的资料再核对一遍：删掉的句子不再公开出现
   // （还没确认的 AI 条目整条不要；确认过、改过的条目留着，只去掉对不上的引用）
   const valuesMark = mark('values');
   const liveValues = (eff?.values ?? [])
-    .filter(v => valuesMark !== 'ai' || !v.quote || stillQuoted(node, v.quote))
-    .map(v => ({ text: v.text, quote: v.quote && stillQuoted(node, v.quote) ? { text: v.quote } : null }));
-  const band = bandSource(moment, supportFirst ? '' : create, sparse);
+    .filter(v => valuesMark !== 'ai' || !v.quote || stillQuoted(quotableNode, v.quote))
+    .map(v => ({ text: v.text, quote: v.quote && stillQuoted(quotableNode, v.quote) ? { text: v.quote } : null }));
+  const band = bandSource(moment, '', sparse);
   const showCreate = !!create && band?.kind !== 'create';
   const worksText = works.flatMap(w => [w.title, w.desc || '']);
   const shownOnPage = [
@@ -259,20 +271,18 @@ export default function SpaceSite({
   const learning = extras.learning;
   const story = extras.story.trim();
 
-  // ── 第二章：走过的路 ──
-  const merged = !supportFirst && mergeAboutChapters(sparse, extras.order);
+  // ── 关于我：经历与在意的事 ──
   const { creds, rest } = splitCredentials(node.experience || '');
   const extraRoles = roles.slice(2);
-  // 合章时没有第二章的大标题，也就不从经验里挑标题（挑走了就没地方放）
-  const picked = merged ? { title: null, body: rest.trim() } : pickPathTitle(rest);
-  const showNow = !tagline && mark('tagline') !== 'hidden' && !!now;
+  const picked = pickPathTitle(rest);
+  const showNow = visible.path && !tagline && mark('tagline') !== 'hidden' && !!now;
   const doingFold = doing && !sameIntroduction(doing, tagline) && (doingExpand || !showNow) ? fold(doing) : null;
   const plates = byKind('work');
   const elsewhere = byKind('content');
   // 薄章：这一章实际会出现的正文不够，挑出来的那句不放成大字，降为第一段
   const pathChars = [...(doingFold ? doing : '')].length + [...picked.body].length;
   const thin = pathChars < THIN && plates.length === 0;
-  const pathTitle = !merged && picked.title && !thin ? picked.title : null;
+  const pathTitle = picked.title && !thin ? picked.title : null;
   const pathBodyText = [picked.title && !pathTitle ? picked.title : '', picked.body].filter(Boolean).join('\n');
   const pathBody = pathBodyText ? fold(pathBodyText) : null;
 
@@ -294,10 +304,10 @@ export default function SpaceSite({
   const contactAction = slots.greet
     ? { href: '#greet', label: '打个招呼' }
     : shownContacts ? { href: '#connect', label: '联系我' } : null;
-  const worksFirst = extras.order[0] === 'path';
   const knowingTitle = '关于我';
-  const pathLabel = supportFirst ? '作品与生活' : worksFirst ? '作品与经历' : '走过的路';
-  const offerTitle = supportFirst ? '我能提供的支持' : '一起做点什么';
+  const pathLabel = '作品与生活';
+  const offerTitle = '如何支持到你';
+  const offerIntro = extras.offerIntro ?? '想和我一起做点什么？\n可以从这里开始。';
 
   // 哪几章会出现：按实际会渲染的内容算，没有内容的整章不渲染，章号按实际顺序连续编
   // 编辑模式下三章都出来：编辑控件要有地方放
@@ -305,17 +315,15 @@ export default function SpaceSite({
   const valuesHas = visible.knowing && (editing || !!(showCreate || values.length));
   const worksHas = visible.path && (editing || !!(plates.length || elsewhere.length));
   const lifeHas = visible.knowing && (editing || !!(interestLine || topics.length || band || learning.length));
-  const knowingHas = supportFirst ? experienceHas || valuesHas : visible.knowing
-    && (editing || !!(interestLine || topics.length || band || showCreate || values.length || learning.length));
-  const pathHas = supportFirst ? worksHas || lifeHas : visible.path
-    && (editing || !!(pathTitle || pathBody || doingFold || creds.length || extraRoles.length || plates.length || elsewhere.length));
+  const knowingHas = experienceHas || valuesHas;
+  const pathHas = worksHas || lifeHas;
   const offerShown = hasOffer || (marks && visible.offer);
   const chapters: { id: ChapterKey; title: string }[] = [];
   for (const k of extras.order) {
     if (k === 'knowing') {
-      if (merged ? knowingHas || pathHas : knowingHas) chapters.push({ id: 'knowing', title: knowingTitle });
+      if (knowingHas) chapters.push({ id: 'knowing', title: knowingTitle });
     } else if (k === 'path') {
-      if (!merged && pathHas) chapters.push({ id: 'path', title: pathLabel });
+      if (pathHas) chapters.push({ id: 'path', title: pathLabel });
     } else if (offerShown) {
       chapters.push({ id: 'offer', title: offerTitle });
     }
@@ -364,7 +372,7 @@ export default function SpaceSite({
     </figure>
   );
 
-  const valuesLead = values.length === 1 ? '有一件事，我一直很在意——' : '我在意的，大概是这几件事——';
+  const valuesLead = '我一直所看重的——';
 
   const afterBandEl = (showCreate || values.length > 0) ? (
     <>
@@ -413,13 +421,12 @@ export default function SpaceSite({
   const worksEl = plates.length > 0 ? (
         <div className="sp-block" id="works">
           <Note on={marks && classified}>分组由 AI 起稿 · 待你确认</Note>
-          <p className="sp-lead">我做过的一些东西——</p>
           <Folded items={plates} limit={3} render={w => <Plate key={w.id} w={w} />}
             wrap={(c) => <div className="sp-plates">{c}</div>} />
         </div>
   ) : null;
 
-  // ── 第二章的片段（合章时接在第一章后面） ──
+  // ── 经历与作品各自归入对应章节 ──
   const experienceEl = (
     <>
       {(creds.length > 0 || extraRoles.length > 0) && (
@@ -429,7 +436,7 @@ export default function SpaceSite({
       )}
       {doingFold && (
         <div className="sp-block">
-          <p className="sp-lead">展开说说我正在做的——</p>
+          <p className="sp-lead">正在做的</p>
           <p className="sp-p sp-first">{doingFold.head}</p>
           {doingFold.more && (
             <details className="sp-more"><summary>接着读 ↓</summary><p className="sp-p">{doingFold.more}</p></details>
@@ -438,7 +445,7 @@ export default function SpaceSite({
       )}
       {pathBody && (
         <div className="sp-block">
-          {(doingFold || merged) && <p className="sp-lead">一路走来——</p>}
+          {doingFold && <p className="sp-lead">一路走来——</p>}
           <p className={`sp-p ${doingFold ? '' : 'sp-first'}`}>{pathBody.head}</p>
           {pathBody.more && (
             <details className="sp-more"><summary>接着读 ↓</summary><p className="sp-p">{pathBody.more}</p></details>
@@ -453,7 +460,6 @@ export default function SpaceSite({
       {elsewhere.length > 0 && (
         <div className="sp-block">
           <Note on={marks && classified}>分组由 AI 起稿 · 待你确认</Note>
-          <p className="sp-lead">在别处，也能读到、听到我——</p>
           <Folded items={elsewhere} wrap={(c) => <ul className="sp-index">{c}</ul>} render={w => (
             <li key={w.id}>
               {w.url ? (
@@ -483,17 +489,8 @@ export default function SpaceSite({
     <WorksEditor memberId={memberId} mark={mark('works')} works={works.map(w => ({ id: w.id, title: w.title }))}
       split={Object.fromEntries(works.map(w => [w.id, kindOf(w)]))} />
   );
-  const pathBodyEl = <>
-    {worksFirst && worksEl}
-    {experienceEl}
-    {!worksFirst && worksEl}
-    {elsewhereEl}
-    {editing && <OriginalLink memberId={memberId} what="「正在做」「经历」" />}
-    {worksEditor}
-  </>;
-
-  // ══ 第一章：我这个人（认识层）══ 顺序：日常 → 那一幕（色块）→ 想守护的 → 我在意的 → 最近在读在听
-  const knowingChapter = supportFirst ? (
+  // ══ 关于我：经历、正在做的、想守护和看重的事 ══
+  const knowingChapter = (
     <section id="knowing" className="sp-ch">
       <div className="sp-col">
         <ChapterMark num={num('knowing')} title={knowingTitle}>
@@ -512,31 +509,10 @@ export default function SpaceSite({
         </>}
       </div>
     </section>
-  ) : (
-    <section id="knowing" className="sp-ch">
-            <div className="sp-col">
-              <ChapterMark num={num('knowing')} title={knowingTitle}>
-                <Vis on={marks} tone={audTone.knowing}>{audLabel.knowing}</Vis>
-                {tuning && <NotMe block="knowing" label={`「${knowingTitle}」`} />}
-              </ChapterMark>
-              {visible.knowing && interestsEl}
-              {editing && <OriginalLink memberId={memberId} what="「兴趣」「美的时刻」「想创造或守护的」" />}
-            </div>
-            {visible.knowing && bandEl}
-            {((visible.knowing && (afterBandEl || learningEl || editing)) || (merged && pathHas)) && (
-              <div className="sp-col">
-                {visible.knowing && afterBandEl}
-                {editing && <ValuesEditor memberId={memberId} mark={valuesMark} value={values} />}
-                {visible.knowing && learningEl}
-                {editing && <LearningEditor memberId={memberId} value={learning} />}
-                {merged && pathHas && pathBodyEl}
-              </div>
-            )}
-          </section>
   );
 
-  // ══ 第二章：走过的路（信任层）══
-  const pathChapter = supportFirst ? (
+  // ══ 作品与生活：精选内容、兴趣和最近在读听学 ══
+  const pathChapter = (
     <section id="path" className="sp-ch">
       <div className="sp-col">
         <ChapterMark num={num('path')} title={pathLabel}>
@@ -557,22 +533,9 @@ export default function SpaceSite({
         {editing && <LearningEditor memberId={memberId} value={learning} />}
       </div>}
     </section>
-  ) : (
-    <section id="path" className="sp-ch">
-            <div className="sp-col">
-              <ChapterMark num={num('path')} title={pathLabel}>
-                <Vis on={marks} tone={audTone.path}>{audLabel.path}</Vis>
-                {tuning && <NotMe block="path" label={`「${pathLabel}」`} />}
-              </ChapterMark>
-              {pathTitle
-                ? <p className="sp-head">{pathTitle}</p>
-                : !thin && <p className="sp-head">我是怎么走到这里的</p>}
-              {pathBodyEl}
-            </div>
-          </section>
   );
 
-  // ══ 第三章：一起做点什么（服务与活动，默认在中后部）══
+  // ══ 如何支持到你：服务与活动，默认最先展开 ══
   const offerChapter = (
     <section id="offer" className="sp-ch sp-offer-ch">
             <div className="sp-offer">
@@ -581,13 +544,11 @@ export default function SpaceSite({
                   <Vis on={marks} tone={audTone.offer}>{audLabel.offer}</Vis>
                   {tuning && <NotMe block="offer" label={`「${offerTitle}」`} />}
                 </ChapterMark>
-                <p className="sp-head">
-                  <span className="sp-line">想和我一起做点什么？</span><span className="sp-line">可以从这里开始。</span>
-                </p>
-                {contactAction && <>
-                  <p className="sp-dek">不确定哪一件适合你，可以先聊聊。</p>
+                <p className="sp-head">{offerIntro}</p>
+                {editing && <OfferIntroEditor memberId={memberId} value={offerIntro} />}
+                {contactAction && (
                   <a className="sp-btn sp-btn--quiet" href={contactAction.href}>{contactAction.label}</a>
-                </>}
+                )}
               </div>
               <div className="sp-offer-main">
                 {!hasOffer && (
@@ -660,7 +621,7 @@ export default function SpaceSite({
     <div className="sp" lang="zh-CN" style={style} data-theme={theme.id} data-edge={t.edge} data-cover={t.cover}
       data-photo={coverMode} data-align={t.coverAlign} data-lede={t.lede ? '' : undefined}
       data-sparse={sparse ? '' : undefined} data-marks={marks ? '' : undefined} data-bar={bar ? '' : undefined}
-      data-tuning={tuning ? '' : undefined} data-layout={supportFirst ? 'support' : undefined}>
+      data-tuning={tuning ? '' : undefined} data-editing={editing ? '' : undefined} data-layout="support">
 
       {/* ══ 封面（名片层）：照片在上（桌面在右），字在一张纸上 ══ */}
       <header className="sp-cover" id="top">
@@ -672,7 +633,7 @@ export default function SpaceSite({
         )}
         <div className="sp-cover-photo">
           {avatar && coverMode === 'photo' ? (
-            <Photo src={avatar} alt={`${name} 的照片`} sizes="(min-width: 1024px) 64vw, 100vw" eager />
+            <Photo src={avatar} alt={`${name} 的照片`} sizes="(min-width: 1024px) 60vw, 100vw" eager />
           ) : avatar && coverMode === 'stamp' ? (
             <span className="sp-stamp"><Photo src={avatar} alt={`${name} 的照片`} sizes="168px" eager /></span>
           ) : (
@@ -680,29 +641,40 @@ export default function SpaceSite({
           )}
         </div>
         <div className="sp-sheet">
-          {coverNote && !editing && <p className="sp-cover-note">{coverNote}</p>}
-          {editing && avatar && <CoverFocus memberId={memberId} src={`/_next/image?url=${encodeURIComponent(avatar)}&w=828&q=75`} focus={extras.cover} />}
-          <h1 className="sp-name">{name}</h1>
-          {tagline ? (
-            <p className="sp-tagline" data-long={[...tagline].length > 18 ? '' : undefined}><span className={aiCls('tagline')}>{tagline}</span></p>
-          ) : showNow ? (
-            <p className="sp-tagline" data-long="">{now}</p>
-          ) : keywords ? (
-            <p className="sp-tagline" data-long=""><span className="sp-ai">{keywords}</span></p>
-          ) : marks && mark('tagline') !== 'hidden' ? (
-            <p className="sp-tagline sp-placeholder">（一句话介绍还没写）</p>
-          ) : null}
+          <div className="sp-cover-main">
+            {coverNote && !editing && <p className="sp-cover-note">{coverNote}</p>}
+            {editing && avatar && <CoverFocus memberId={memberId} src={`/_next/image?url=${encodeURIComponent(avatar)}&w=828&q=75`} focus={extras.cover} />}
+            <h1 className="sp-name">{name}</h1>
+            {tagline ? (
+              <p className="sp-tagline" data-long={[...tagline].length > 18 ? '' : undefined}><span className={aiCls('tagline')}>{coverTaglineLines(tagline).map((line, i) => <span className="sp-tagline-line" key={i}>{line}</span>)}</span></p>
+            ) : showNow ? (
+              <p className="sp-tagline" data-long="">{now}</p>
+            ) : keywords ? (
+              <p className="sp-tagline" data-long=""><span className="sp-ai">{keywords}</span></p>
+            ) : marks && mark('tagline') !== 'hidden' ? (
+              <p className="sp-tagline sp-placeholder">（一句话介绍还没写）</p>
+            ) : null}
             {editing && <TaglineEditor memberId={memberId} mark={mark('tagline')} value={tagline} beautyText={[moment, create].filter(Boolean).join('\n\n')} />}
-          {(node.city || roles.length > 0) && (
-            <p className="sp-byline">
-              {node.city && <span className="sp-city">{node.city}</span>}
-              {roles.length > 0 && (
-                <span className={`sp-roles ${aiCls('roles') ?? ''}`}>{roles.slice(0, 2).map(r => <span key={r}>{r}</span>)}</span>
+            {(node.city || roles.length > 0) && (
+              <p className="sp-byline">
+                {node.city && <span className="sp-city">{node.city}</span>}
+                {roles.length > 0 && (
+                  <span className={`sp-roles ${aiCls('roles') ?? ''}`}>{roles.slice(0, 2).map(r => <span key={r}>{r}</span>)}</span>
+                )}
+              </p>
+            )}
+            {editing && <RolesEditor memberId={memberId} mark={mark('roles')} value={roles} />}
+            {editing && <OriginalLink memberId={memberId} what="「正在做」和城市" />}
+            {contactAction && <a className="sp-btn sp-cover-consult" href={contactAction.href}>咨询 <span aria-hidden>↗</span></a>}
+          </div>
+          {(editing || (extras.coverRecent?.visible && extras.coverRecent.text)) && (
+            <div className="sp-cover-foot">
+              {extras.coverRecent?.visible && extras.coverRecent.text && (
+                <p className="sp-cover-recent"><span>最近的一笔</span>{extras.coverRecent.text}</p>
               )}
-            </p>
+              {editing && <CoverRecentEditor memberId={memberId} value={extras.coverRecent ?? { text: '', visible: false }} />}
+            </div>
           )}
-          {editing && <RolesEditor memberId={memberId} mark={mark('roles')} value={roles} />}
-          {editing && <OriginalLink memberId={memberId} what="「正在做」和城市" />}
         </div>
       </header>
 
@@ -714,8 +686,6 @@ export default function SpaceSite({
             {chapters.map(c => <a key={c.id} href={`#${c.id}`}>{c.title}</a>)}
           </span>
         )}
-        <span className="sp-run-sp" />
-        {contactAction && <a className="sp-run-hi" href={contactAction.href}>{contactAction.label}</a>}
       </nav>
 
       <main className="sp-story">
@@ -727,7 +697,7 @@ export default function SpaceSite({
           <div className="sp-col"><OrderEditor memberId={memberId} order={extras.order} /></div>
         )}
 
-        {/* ══ 中间三章按本人定的顺序（默认：我这个人 → 走过的路 → 一起做点什么）══ */}
+        {/* ══ 三章按本人定的顺序，内容分组始终使用最新版 ══ */}
         {chapters.map(c => (
           <Fragment key={c.id}>
             {c.id === 'knowing' ? knowingChapter : c.id === 'path' ? pathChapter : offerChapter}

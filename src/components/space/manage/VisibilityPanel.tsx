@@ -46,7 +46,7 @@ export default function VisibilityPanel({ memberId, initial }: {
   }
 
   const groups: { title: string; hint: string; group: 'section' | 'contact' }[] = [
-    { title: '板块', hint: '看不到的板块，对那位访客来说整章不出现，页面上不会留空位。', group: 'section' },
+    { title: '内容类别', hint: '按内容类别设置谁能看到，同类内容可能出现在不同章节。没有可见内容的章节会自动收起。', group: 'section' },
     { title: '联系方式', hint: '看不到时，页面底部会告诉对方怎样才能看到（加入附近森林，或扫你的名片）。', group: 'contact' },
   ];
 

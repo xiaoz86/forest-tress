@@ -101,6 +101,8 @@ export default async function SpacePage({ memberId: rawId, searchParams: sp, via
     cover: rec.edits?.cover ?? null,
     learning: rec.edits?.learning ?? [],
     story: rec.edits?.story ?? '',
+    offerIntro: rec.edits?.offerIntro,
+    coverRecent: editing || rec.edits?.coverRecent?.visible ? rec.edits?.coverRecent : undefined,
   };
   const pending = eff?.pending.length ?? 0;
 

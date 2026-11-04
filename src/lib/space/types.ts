@@ -26,9 +26,9 @@ export const AUDIENCES: { value: Audience; label: string; hint: string }[] = [
 export type VisibilityKey = 'knowing' | 'path' | 'offer' | 'seed' | 'wechat' | 'email';
 
 export const VISIBILITY_ITEMS: { key: VisibilityKey; label: string; group: 'section' | 'contact' }[] = [
-  { key: 'knowing', label: '我这个人（兴趣、美的时刻、在意的事）', group: 'section' },
-  { key: 'path', label: '走过的路（经历、作品、在别处）', group: 'section' },
-  { key: 'offer', label: '一起做点什么（服务、活动）', group: 'section' },
+  { key: 'knowing', label: '兴趣与在意的事（含美的时刻、读听学）', group: 'section' },
+  { key: 'path', label: '经历与作品（含正在做的、在别处）', group: 'section' },
+  { key: 'offer', label: '支持与服务（含活动）', group: 'section' },
   { key: 'seed', label: '心里的种子', group: 'section' },
   { key: 'wechat', label: '微信', group: 'contact' },
   { key: 'email', label: '邮箱', group: 'contact' },
