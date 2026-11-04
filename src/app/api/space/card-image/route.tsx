@@ -19,8 +19,8 @@ const H = 1440;
 /**
  * GET /api/space/card-image?id=…[&kind=card|share][&download=1][&theme=…]
  *
- * 竖版图（v2 §9）：头像、名字、身份、一句话、正在做什么、二维码。配色和字体跟这个人网站当前的主题走。
- * 两种，只差二维码里的地址：
+ * 竖版图：头像、名字、身份、一句话、二维码。配色和字体跟这个人网站当前的主题走。
+ * 分享图保持简洁；当面递的名片另外保留正在做什么。
  * - kind=share（分享图）：二维码只放公开地址，不带口令——发朋友圈、发群用这张；
  * - kind=card（默认，当面递的名片）：二维码是 /c/<id>/<名片口令>，扫到的人算「扫过我名片」——只该当面给。
  * 两种都只给本人和管理员，也不让任何一层缓存（名片那张带口令；分享图没发布前也只有本人能看）。
@@ -52,11 +52,11 @@ export async function GET(request: NextRequest) {
   const nameSize = visualLen(name) <= 5 ? 112 : visualLen(name) <= 8 ? 88 : 66;
   const meta = [facts.city, ...facts.roles.slice(0, 3)].filter(Boolean).join(' · ');
   const tagline = facts.tagline ? clip(facts.tagline, 44) : '';
-  const now = facts.now ? clip(facts.now, 60) : '';
+  const now = kind === 'card' && facts.now ? clip(facts.now, 60) : '';
   const linkText = displayUrl(urls.shortUrl ?? urls.pageUrl.replace(/\/space\/.*$/, ''));
   const scanLine = '扫码看我的个人空间';
   const brand = '附近森林';
-  const nowLead = '最近在做——';
+  const nowLead = now ? '最近在做——' : '';
 
   const headFamily = familyFor(t.headFont);
   const bodyFamily = familyFor(t.bodyFont);
