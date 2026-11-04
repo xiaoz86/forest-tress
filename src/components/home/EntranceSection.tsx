@@ -26,13 +26,7 @@ export default function EntranceSection({ t }: { t: Dictionary['home']['entrance
               className="group flex flex-col justify-between rounded-[26px] border border-forest-deep/[0.10] bg-paper-soft p-9 no-underline transition-all hover:-translate-y-1 hover:border-forest-deep/20 hover:shadow-[0_18px_44px_rgba(42,59,47,0.07)] max-md:p-7"
             >
               <div>
-                <div
-                  className="font-normal text-[1.5rem] text-forest-mid"
-                                    aria-hidden="true"
-                >
-                  {e.icon}
-                </div>
-                <h3 className="mt-4 text-[1.2rem] font-medium text-forest-deep">{e.title}</h3>
+                <h3 className="text-[1.2rem] font-medium text-forest-deep">{e.title}</h3>
                 <p className="mt-3 text-[13.5px] leading-[1.85] text-ink-soft">{e.body}</p>
               </div>
               <span className="mt-8 inline-flex items-center gap-1.5 text-[13px] font-medium text-forest-mid">

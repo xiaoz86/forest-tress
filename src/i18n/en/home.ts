@@ -7,9 +7,6 @@ import type { home as zhHome } from '@/i18n/zh/home';
  * 定下来的译法：小径 path、声音 sound、陪伴营 companion program、
  * 主理人 host、正念 mindfulness、觉察 awareness，phil-coach 不翻。
  *
- * 装饰用的汉字符号（见 / 遇 / 生 / 息 / 伴 / 创）不翻：它们是 aria-hidden
- * 的图形，和导航里那套是同一套，跟着语言变反而认不出来了。
- *
  * hero 那三句和「有温度」的处理留给主理人定稿——见 handTranslated。
  */
 export const home: typeof zhHome = {
@@ -41,19 +38,16 @@ export const home: typeof zhHome = {
     items: [
       {
         index: '01 · BE SEEN',
-        symbol: '见',
         title: 'See each other',
         body: 'What we do, and what we truly need, shape how we express ourselves to the world.',
       },
       {
         index: '02 · MEET NEARBY',
-        symbol: '遇',
         title: 'Move toward each other',
         body: 'Through matching, exchange, and connection, we build lasting relationships for creating together.',
       },
       {
         index: '03 · GROW TOGETHER',
-        symbol: '生',
         title: 'Grow and create together',
         body: 'With people we enjoy, we nurture extraordinary possibilities and create something beautiful together.',
       },
@@ -64,25 +58,21 @@ export const home: typeof zhHome = {
     sectionLabel: 'Four ways in',
     items: [
       {
-        icon: '息',
         title: 'Listen',
         body: 'Start with mindfulness sounds, rest, and care for yourself. Attention comes back to now.',
         cta: 'Start listening',
       },
       {
-        icon: '伴',
         title: 'Inner Dialogue',
         body: 'phil-coach is a companion that remembers you. It helps you sort out what you feel, see the choices in front of you, and find the next step.',
         cta: 'Start a conversation',
       },
       {
-        icon: '创',
         title: 'Creators',
         body: 'Every creator here has a website of their own: who they are, what they are doing, and what you could do together.',
         cta: 'Meet the creators',
       },
       {
-        icon: '聚',
         title: 'Community',
         body: 'Events started by members, and everyone\'s Aha Moments: join one, or bring your own.',
         cta: 'Visit the community square',
