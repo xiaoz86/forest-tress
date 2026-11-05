@@ -413,10 +413,6 @@ export default function SharePanel({ memberId, origin, initial, pendingDrafts = 
       {/* 4. 名片：当面递的，带口令 */}
       <section className="shp-sec">
         <h3 className="shp-h">当面递的名片</h3>
-        <p className="shp-p">
-          当面给别人看、或者打印出来用。二维码里带着{you}的名片口令：扫码的人能看到{you}设为「森林成员和扫过我名片的人」的内容。
-        </p>
-        <p className="shp-warn" role="note">不要发到群里或朋友圈：看到这张图的人都能用它。要发到网上，用上面的分享图。</p>
         {picture('card', `${you}的名片`)}
         {saveActions('card', '下载名片')}
         <div className="shp-actions">
