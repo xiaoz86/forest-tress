@@ -43,7 +43,7 @@ function saveMine(memberId: string, serviceTitle: string, token: string) {
 }
 
 /**
- * 服务单每一行右侧的「预约这个 →」。渲染在 .sp-menu li 的 grid 里：
+ * 服务单每一行右侧的「预约这个」。渲染在 .sp-menu li 的 grid 里：
  * 按钮留在原位（.sp-menu-a 的位置），展开的表单用一个跨列的容器放在这一行下面。
  * 没有服务单、只有「可以提供」原话时，SpaceSite 用空标题调它：换一套「想约个时间」的文案。
  */
@@ -67,7 +67,7 @@ export default function BookButton({ memberId, serviceTitle, open, preview, view
     if (typeof t === 'string' && t) setMine(t);
   }, [memberId, serviceTitle]);
 
-  if (!open) return <a className="sp-menu-a" href="#connect">问问这个 →</a>;
+  if (!open) return <a className="sp-menu-a" href="#connect">问问这个</a>;
 
   const generic = !serviceTitle;
 
@@ -115,12 +115,12 @@ export default function BookButton({ memberId, serviceTitle, open, preview, view
         onClick={() => { setError(''); setPhase(phase === 'closed' ? 'form' : 'closed'); }}
         disabled={phase === 'done' || sending}
       >
-        {phase === 'done' ? '已送出 ✓' : expanded ? '收起' : generic ? '想约个时间 →' : '预约这个 →'}
+        {phase === 'done' ? '已送出 ✓' : expanded ? '收起' : generic ? '想约个时间' : '预约这个'}
       </button>
 
       {mine && phase === 'closed' && (
         <p className="bk-mine">
-          你之前约过{generic ? '' : '这一项'}：<a className="bk-mine-a" href={`/space/b/${mine}`}>查看我的预约 →</a>
+          你之前约过{generic ? '' : '这一项'}：<a className="bk-mine-a" href={`/space/b/${mine}`}>查看我的预约</a>
         </p>
       )}
 
@@ -133,7 +133,7 @@ export default function BookButton({ memberId, serviceTitle, open, preview, view
               {token && (
                 <>
                   <p className="bk-links">
-                    <a className="bk-link" href={`/space/b/${token}`}>查看我的预约 →</a>
+                    <a className="bk-link" href={`/space/b/${token}`}>查看我的预约</a>
                     <CopyLink className="bk-copy" path={`/space/b/${token}`} />
                   </p>
                   <p className="bk-hint">这个链接只给你：复制下来发给自己，之后回来能看到 TA 有没有回复。这台设备上回到这里，也能找到它。</p>

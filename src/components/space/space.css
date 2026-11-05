@@ -168,7 +168,7 @@ body { margin: 0; }
   font: 600 15px/1 var(--sp-body); text-decoration: none; white-space: nowrap;
 }
 .sp .sp-btn { color: var(--sp-accent-ink); }
-.sp .sp-cover-consult { margin-top: 24px; gap: 20px; background: var(--sp-sheet-ink); color: rgb(var(--sv)); }
+.sp .sp-cover-consult { margin-top: 24px; background: var(--sp-sheet-ink); color: rgb(var(--sv)); }
 /* 按钮圆角来自 --sp-btn-radius（themes.ts tokensToStyle，跟着主题和「圆角」旋钮走） */
 .sp-btn[aria-disabled='true'] { cursor: default; }
 .sp-go {

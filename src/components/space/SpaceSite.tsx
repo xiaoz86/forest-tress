@@ -117,7 +117,7 @@ function Folded<T>({ items, render, wrap, limit = SHOW }: {
     <>
       {wrap(items.slice(0, limit).map((x, i) => render(x, i)), 0)}
       {items.length > limit && (
-        <details className="sp-more"><summary>还有 {items.length - limit} 项 ↓</summary>
+        <details className="sp-more"><summary>还有 {items.length - limit} 项</summary>
           {wrap(items.slice(limit).map((x, i) => render(x, i + limit)), limit)}
         </details>
       )}
@@ -162,8 +162,8 @@ function Plate({ w }: { w: Work }) {
       <figcaption>
         <span className="sp-plate-t">{w.title}</span>
         {w.desc && <span className="sp-plate-d">{w.desc}</span>}
-        {w.url && <span className="sp-go-link">去看看 ↗</span>}
-        {peek && <span className="sp-go-link">去看看 ↗</span>}
+        {w.url && <span className="sp-go-link">去看看</span>}
+        {peek && <span className="sp-go-link">去看看</span>}
       </figcaption>
     </>
   );
@@ -187,7 +187,7 @@ function Entry({ w, action, image }: { w: Work; action: string; image?: boolean 
       <span className="sp-entry-t">{w.title}</span>
       {w.desc && <span className="sp-entry-d">{w.desc}</span>}
       {w.url && <span className="sp-go-link">{action}</span>}
-      {peekImage(w) && <span className="sp-go-link">去看看 ↗</span>}
+      {peekImage(w) && <span className="sp-go-link">去看看</span>}
     </>
   );
   const peek = peekImage(w);
@@ -408,7 +408,7 @@ export default function SpaceSite({
             <span className="sp-learn-k">{LEARNING_KIND_LABEL[it.kind]}</span>
             <span className="sp-learn-b">
               {it.url
-                ? <a href={it.url} target="_blank" rel="noreferrer noopener">{it.title} ↗</a>
+                ? <a href={it.url} target="_blank" rel="noreferrer noopener">{it.title}</a>
                 : <span className="sp-learn-t">{it.title}</span>}
               {it.note && <small>{it.note}</small>}
             </span>
@@ -439,7 +439,7 @@ export default function SpaceSite({
           <p className="sp-lead">正在做的</p>
           <p className="sp-p sp-first">{doingFold.head}</p>
           {doingFold.more && (
-            <details className="sp-more"><summary>接着读 ↓</summary><p className="sp-p">{doingFold.more}</p></details>
+            <details className="sp-more"><summary>接着读</summary><p className="sp-p">{doingFold.more}</p></details>
           )}
         </div>
       )}
@@ -448,7 +448,7 @@ export default function SpaceSite({
           {doingFold && <p className="sp-lead">一路走来——</p>}
           <p className={`sp-p ${doingFold ? '' : 'sp-first'}`}>{pathBody.head}</p>
           {pathBody.more && (
-            <details className="sp-more"><summary>接着读 ↓</summary><p className="sp-p">{pathBody.more}</p></details>
+            <details className="sp-more"><summary>接着读</summary><p className="sp-p">{pathBody.more}</p></details>
           )}
         </div>
       )}
@@ -465,13 +465,13 @@ export default function SpaceSite({
               {w.url ? (
                 <a href={w.url} target="_blank" rel="noreferrer noopener">
                   <span className="sp-index-t">{w.title}</span><span className="sp-dots" aria-hidden />
-                  <span className="sp-index-v">{linkVerb(w.title)} ↗</span>
+                  <span className="sp-index-v">{linkVerb(w.title)}</span>
                 </a>
               ) : peekImage(w) ? (
                 // 没有链接、只有一张海报（公众号、播客常这样）：点开看大图，微信里长按识别二维码
                 <WorkPeek src={peekImage(w)!} title={w.title} wechat={wechatName(w.title)}>
                   <span className="sp-index-t">{w.title}</span><span className="sp-dots" aria-hidden />
-                  <span className="sp-index-v">去看看 ↗</span>
+                  <span className="sp-index-v">去看看</span>
                 </WorkPeek>
               ) : (
                 <span className="sp-index-t">{w.title}</span>
@@ -574,11 +574,11 @@ export default function SpaceSite({
                             {s.desc && <p className="sp-menu-d">{s.desc}</p>}
                             {serviceMeta(s) && <p className="sp-menu-meta">{serviceMeta(s)}</p>}
                           </div>
-                          {slots.bookFor ? slots.bookFor(s.title) : contactAction ? <a className="sp-menu-a" href={contactAction.href}>问问这个 →</a> : null}
+                          {slots.bookFor ? slots.bookFor(s.title) : contactAction ? <a className="sp-menu-a" href={contactAction.href}>问问这个</a> : null}
                         </li>
                       )} />
                     {offerRaw.length > 0 && (
-                      <details className="sp-more sp-orig"><summary>读我自己写的原话 ↓</summary>
+                      <details className="sp-more sp-orig"><summary>读我自己写的原话</summary>
                         {offerRaw.map(x => <p key={x} className="sp-p">{x}</p>)}
                       </details>
                     )}
@@ -588,7 +588,7 @@ export default function SpaceSite({
                     <p className="sp-lead">我可以为你做的——</p>
                     {offerRaw.map(x => <p key={x} className="sp-p">{x}</p>)}
                     {(slots.bookFor || contactAction) && <div className="sp-book-any">
-                      {slots.bookFor ? slots.bookFor('') : <a className="sp-menu-a" href={contactAction!.href}>问问这个 →</a>}
+                      {slots.bookFor ? slots.bookFor('') : <a className="sp-menu-a" href={contactAction!.href}>问问这个</a>}
                     </div>}
                   </div>
                 ) : null}
@@ -597,7 +597,7 @@ export default function SpaceSite({
                   <div className="sp-block">
                     <Note on={marks && classified}>分组由 AI 起稿 · 待你确认</Note>
                     <p className="sp-lead">我也在长期做这些——</p>
-                    <Folded items={longTerm} render={w => <Entry key={w.id} w={w} action="看完整介绍 ↗" />}
+                    <Folded items={longTerm} render={w => <Entry key={w.id} w={w} action="看完整介绍" />}
                       wrap={(c) => <div className="sp-entries" data-line="accent">{c}</div>} />
                   </div>
                 )}
@@ -605,7 +605,7 @@ export default function SpaceSite({
                   <div className="sp-block">
                     <Note on={marks && classified}>分组由 AI 起稿 · 待你确认</Note>
                     <p className="sp-lead">{hasEvents ? '以前办过的——' : '我的活动——'}</p>
-                    <Folded items={activities} render={w => <Entry key={w.id} w={w} action="看活动介绍 ↗" image />}
+                    <Folded items={activities} render={w => <Entry key={w.id} w={w} action="看活动介绍" image />}
                       wrap={(c) => (
                         <div className="sp-entries sp-acts-grid" data-line="ink" data-one={activities.length === 1 ? '' : undefined}>{c}</div>
                       )} />
@@ -665,7 +665,7 @@ export default function SpaceSite({
             )}
             {editing && <RolesEditor memberId={memberId} mark={mark('roles')} value={roles} />}
             {editing && <OriginalLink memberId={memberId} what="「正在做」和城市" />}
-            {contactAction && <a className="sp-btn sp-cover-consult" href={contactAction.href}>咨询 <span aria-hidden>↗</span></a>}
+            {contactAction && <a className="sp-btn sp-cover-consult" href={contactAction.href}>咨询</a>}
           </div>
           {(editing || (extras.coverRecent?.visible && extras.coverRecent.text)) && (
             <div className="sp-cover-foot">
@@ -767,7 +767,7 @@ export default function SpaceSite({
           ) : contactHint ? (
             <p className="sp-end-small">{contactHint}<Link href="/#join">加入附近森林</Link></p>
           ) : !slots.greet ? (
-            <a className="sp-btn sp-btn--end" href={`/creators/${node.id}`}>去附近森林找我 ↗</a>
+            <a className="sp-btn sp-btn--end" href={`/creators/${node.id}`}>去附近森林找我</a>
           ) : null}
           <p className="sp-colophon">
             在 <a href={`/creators/${node.id}`}>附近森林</a> 生长
