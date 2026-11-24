@@ -27,6 +27,7 @@ export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', logi
   const [message, setMessage] = useState('');
   const [articleBody, setArticleBody] = useState('');
   const [preview, setPreview] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const isArticle = kind === 'article';
 
   if (!isLoggedIn) {
@@ -51,6 +52,7 @@ export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', logi
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (uploading || submitting) return;
     const form = event.currentTarget;
     const formData = new FormData(form);
     if (isArticle) {
@@ -130,7 +132,7 @@ export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', logi
           <>
             <div className="col-span-full">
               <ShareArticleFields copy={t.article} source={articleBody} onChange={setArticleBody}
-                preview={preview} onPreview={setPreview} />
+                preview={preview} onPreview={setPreview} uploading={uploading} onUploading={setUploading} submitting={submitting} />
             </div>
             <details className="col-span-full border-t border-forest-deep/10 pt-4">
               <summary className="cursor-pointer text-sm font-medium text-forest">{t.article.options}</summary>
@@ -144,7 +146,7 @@ export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', logi
       <div className="mt-7 flex flex-wrap items-center gap-4">
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || uploading}
           className="rounded-full bg-forest-deep px-6 py-3 text-sm font-medium text-white transition-opacity disabled:opacity-50"
         >
           {submitting ? t.submitting : t.submitCta}

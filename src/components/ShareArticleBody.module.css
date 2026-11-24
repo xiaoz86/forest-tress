@@ -40,7 +40,8 @@
 }
 .prose blockquote p + p { margin-block-start: 0.6em; }
 .prose hr { margin-block: 2em; border: 0; border-top: 1px solid var(--color-mist-muted); }
-.prose img { display: block; max-width: 100%; height: auto; margin: 1em auto; border-radius: 0.5rem; }
+.prose :is(img, video) { display: block; max-width: 100%; height: auto; margin: 1em auto; border-radius: 0.5rem; }
+.prose video { max-height: 70vh; background: var(--color-forest-dark); }
 .prose code { padding: 0.12em 0.3em; border-radius: 0.25em; background: var(--color-paper); font-size: 0.9em; }
 .prose pre {
   overflow-x: auto;
