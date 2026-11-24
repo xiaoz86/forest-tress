@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { dict } from '@/i18n';
 import type { Locale } from '@/lib/locale';
+import { ARTICLE_BODY_MAX_LENGTH } from '@/lib/shareArticle';
+import ShareArticleFields from './ShareArticleFields';
 
 type Props = {
   isLoggedIn: boolean;
@@ -23,6 +25,9 @@ export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', logi
   const t = useMemo(() => dict(locale).shares.submit, [locale]);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const [articleBody, setArticleBody] = useState('');
+  const [preview, setPreview] = useState(false);
+  const isArticle = kind === 'article';
 
   if (!isLoggedIn) {
     return (
@@ -48,6 +53,16 @@ export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', logi
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
+    if (isArticle) {
+      if (articleBody.length > ARTICLE_BODY_MAX_LENGTH) {
+        setMessage(t.article.tooLong);
+        return;
+      }
+      if (!articleBody.trim() && !(String(formData.get('href') || '').trim() && String(formData.get('summary') || '').trim())) {
+        setMessage(t.article.missing);
+        return;
+      }
+    }
     setSubmitting(true);
     setMessage('');
     try {
@@ -58,6 +73,8 @@ export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', logi
       if (!res.ok) throw new Error('submit-failed');
       setMessage(t.done);
       form.reset();
+      setArticleBody('');
+      setPreview(false);
     } catch {
       // 原来这里把接口回的错误码原样显示出来（submit-failed 之类）。
       // 投稿人看不懂那种字符串，统一换成一句人话。
@@ -67,45 +84,61 @@ export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', logi
     }
   };
 
+  const detailsFields = (
+    <>
+      <Field label={t.field.tags}>
+        <input name="tags" maxLength={120} placeholder={t.field.tagsPlaceholder} className={inputCls} />
+      </Field>
+      <Field label={t.field.question} className="col-span-2 max-md:col-span-1">
+        <input name="question" maxLength={120} className={inputCls} />
+      </Field>
+      <Field label={isArticle ? t.article.summary : t.field.summary} className="col-span-2 max-md:col-span-1">
+        <textarea name="summary" required={!isArticle} maxLength={260} className={`${inputCls} min-h-28 resize-y leading-relaxed`} />
+      </Field>
+      <Field label={t.field.note} className="col-span-2 max-md:col-span-1">
+        <textarea name="note" maxLength={220} className={`${inputCls} min-h-20 resize-y leading-relaxed`} />
+      </Field>
+      <Field label={t.field.href} className="col-span-2 max-md:col-span-1">
+        <input name="href" type="url" maxLength={900} className={inputCls} />
+      </Field>
+      <Field label={t.field.media}>
+        <input name="media" type="file" accept="video/mp4,video/quicktime,video/webm,image/*" className={fileInputCls} />
+      </Field>
+      <Field label={t.field.poster}>
+        <input name="poster" type="file" accept="image/*" className={fileInputCls} />
+      </Field>
+    </>
+  );
+
   return (
     <form
       onSubmit={submit}
-      className="rounded-lg border border-forest-deep/10 bg-white/72 p-7"
+      className="rounded-lg border border-forest-deep/10 bg-white/72 p-7 max-md:p-5"
     >
       <input type="hidden" name="kind" value={kind} />
       <div className="mb-3 text-[11px] font-medium tracking-[0.18em] text-coral uppercase">
         {t.eyebrow}
       </div>
-      <h2 className="text-2xl font-normal text-forest-deep">{t.title}</h2>
-      <p className="mt-4 text-sm leading-relaxed text-text-secondary">
-        {t.lede}
-      </p>
+      <h2 className="text-2xl font-normal text-forest-deep">{isArticle ? t.article.title : t.title}</h2>
+      {!isArticle && <p className="mt-4 text-sm leading-relaxed text-text-secondary">{t.lede}</p>}
 
       <div className="mt-7 grid grid-cols-2 gap-4 max-md:grid-cols-1">
-        <Field label={t.field.title}>
+        <Field label={t.field.title} className={isArticle ? 'col-span-full' : undefined}>
           <input name="title" required maxLength={64} className={inputCls} />
         </Field>
-        <Field label={t.field.tags}>
-          <input name="tags" maxLength={120} placeholder={t.field.tagsPlaceholder} className={inputCls} />
-        </Field>
-        <Field label={t.field.question} className="col-span-2 max-md:col-span-1">
-          <input name="question" maxLength={120} className={inputCls} />
-        </Field>
-        <Field label={t.field.summary} className="col-span-2 max-md:col-span-1">
-          <textarea name="summary" required maxLength={260} className={`${inputCls} min-h-28 resize-y leading-relaxed`} />
-        </Field>
-        <Field label={t.field.note} className="col-span-2 max-md:col-span-1">
-          <textarea name="note" maxLength={220} className={`${inputCls} min-h-20 resize-y leading-relaxed`} />
-        </Field>
-        <Field label={t.field.href} className="col-span-2 max-md:col-span-1">
-          <input name="href" type="url" maxLength={900} className={inputCls} />
-        </Field>
-        <Field label={t.field.media}>
-          <input name="media" type="file" accept="video/mp4,video/quicktime,video/webm,image/*" className={fileInputCls} />
-        </Field>
-        <Field label={t.field.poster}>
-          <input name="poster" type="file" accept="image/*" className={fileInputCls} />
-        </Field>
+        {isArticle ? (
+          <>
+            <div className="col-span-full">
+              <ShareArticleFields copy={t.article} source={articleBody} onChange={setArticleBody}
+                preview={preview} onPreview={setPreview} />
+            </div>
+            <details className="col-span-full border-t border-forest-deep/10 pt-4">
+              <summary className="cursor-pointer text-sm font-medium text-forest">{t.article.options}</summary>
+              <p className="mt-3 text-sm text-ink-soft">{t.article.external}</p>
+              <div className="mt-4 grid grid-cols-2 gap-4 max-md:grid-cols-1">{detailsFields}</div>
+            </details>
+          </>
+        ) : detailsFields}
       </div>
 
       <div className="mt-7 flex flex-wrap items-center gap-4">
@@ -117,7 +150,7 @@ export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', logi
           {submitting ? t.submitting : t.submitCta}
         </button>
         {message && (
-          <span className="text-sm leading-relaxed text-coral">{message}</span>
+          <span role="status" className="text-sm leading-relaxed text-ink-soft">{message}</span>
         )}
       </div>
     </form>

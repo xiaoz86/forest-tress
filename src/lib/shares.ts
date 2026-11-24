@@ -14,6 +14,7 @@ export type ShareEntry = {
   badgeLabel?: string;
   question: string;
   summary: string;
+  articleBody?: string;
   note: string;
   tags: string[];
   mediaKind: ShareMediaKind;
@@ -139,6 +140,8 @@ export function normalizeShareContent(input: unknown): ShareContent {
     const author = cleanText(r.author, fallbackShare.author, 48);
     const authorLabel = cleanText(r.authorLabel, fallbackShare.authorLabel, 32);
     const badgeLabel = cleanText(r.badgeLabel, `${author} · ${authorLabel}`, 64);
+    // Keep the Markdown source verbatim: leading indentation and trailing spaces can be meaningful.
+    const articleBody = typeof r.articleBody === 'string' && r.articleBody.trim() ? r.articleBody : undefined;
     shares.push({
       id,
       title: cleanText(r.title, fallbackShare.title, 64),
@@ -146,9 +149,10 @@ export function normalizeShareContent(input: unknown): ShareContent {
       author,
       authorLabel,
       badgeLabel,
-      question: cleanText(r.question, fallbackShare.question, 120),
-      summary: cleanText(r.summary, fallbackShare.summary, 260),
-      note: cleanText(r.note, fallbackShare.note, 220),
+      question: cleanText(r.question, articleBody ? '' : fallbackShare.question, 120),
+      summary: cleanText(r.summary, articleBody ? '' : fallbackShare.summary, 260),
+      note: cleanText(r.note, articleBody ? '' : fallbackShare.note, 220),
+      ...(articleBody ? { articleBody } : {}),
       tags: cleanTags(r.tags, fallbackShare.tags),
       mediaKind,
       ...(cleanUrl(r.mediaUrl) ? { mediaUrl: cleanUrl(r.mediaUrl) } : {}),
@@ -159,7 +163,6 @@ export function normalizeShareContent(input: unknown): ShareContent {
       ...(ownerId ? { ownerId } : {}),
       ...(submittedAt ? { submittedAt } : {}),
     });
-    if (shares.length >= 36) break;
   }
 
   if (shares.length === 0) shares.push(...fallback.shares);

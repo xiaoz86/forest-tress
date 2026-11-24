@@ -1,0 +1,55 @@
+.prose {
+  min-width: 0;
+  max-width: 44rem;
+  margin-inline: auto;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: clamp(1rem, 0.96rem + 0.2vw, 1.1rem);
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+
+.prose > * + * { margin-block-start: 1.15em; }
+.prose :is(h1, h2, h3, h4, h5, h6) {
+  margin-block: 1.8em 0.5em;
+  font-family: var(--font-display);
+  color: var(--color-forest-deep);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+}
+.prose h1 { font-size: 1.7em; }
+.prose h2 { font-size: 1.4em; }
+.prose h3 { font-size: 1.18em; }
+.prose > :first-child { margin-block-start: 0; }
+.prose :is(h1, h2, h3, h4, h5, h6) + * { margin-block-start: 0; }
+.prose strong { font-weight: 600; }
+.prose a { color: var(--color-forest); text-decoration: underline; text-underline-offset: 0.2em; }
+.prose ul { list-style: disc; }
+.prose ol { list-style: decimal; }
+.prose :is(ol, ul) { padding-inline-start: 1.5em; }
+.prose li + li { margin-block-start: 0.3em; }
+.prose li:has(> input[type='checkbox']) { list-style: none; }
+.prose input[type='checkbox'] { accent-color: var(--color-forest); }
+.prose blockquote {
+  border-inline-start: 3px solid var(--color-sage-muted);
+  padding-inline-start: 1.1em;
+  color: var(--color-ink-soft);
+  font-family: var(--font-book);
+  font-size: 1.06em;
+}
+.prose blockquote p + p { margin-block-start: 0.6em; }
+.prose hr { margin-block: 2em; border: 0; border-top: 1px solid var(--color-mist-muted); }
+.prose img { display: block; max-width: 100%; height: auto; margin: 1em auto; border-radius: 0.5rem; }
+.prose code { padding: 0.12em 0.3em; border-radius: 0.25em; background: var(--color-paper); font-size: 0.9em; }
+.prose pre {
+  overflow-x: auto;
+  padding: 1em;
+  border-radius: 0.5rem;
+  background: var(--color-paper);
+  line-height: 1.6;
+}
+.prose pre code { padding: 0; background: none; }
+.prose table { display: block; overflow-x: auto; border-collapse: collapse; font-size: 0.95em; }
+.prose :is(th, td) { min-width: 5em; padding: 0.5em 0.8em; border: 1px solid var(--color-mist-muted); }
+.prose th { background: var(--color-paper-soft); font-weight: 600; }

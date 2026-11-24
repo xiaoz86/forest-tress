@@ -49,7 +49,7 @@ const one = (v: string | string[] | undefined) => (typeof v === 'string' ? v : u
  * 社区广场（原「个体创造 / 林间分享」）。两个标签：
  * - 发起吧：各个个人空间里正在报名的活动（lib/space/square.ts）。点一条进到发起人空间里的那场活动报名
  * - Aha Moment：成员投稿、创始人团队审核过的作品 / 产品 / 体验 / 灵感片段（原来的林间分享）
- * 右上「去创作」：Aha! 和写文章都落到同一个投稿表单（各给一句提示）；发起活动去自己空间的「活动与报名」。
+ * 右上「去创作」：Aha! 和写文章都落到同一个投稿入口，文章提供 Markdown 写作和预览；发起活动去自己空间的「活动与报名」。
  */
 export default async function SharesPage({ searchParams }: Props) {
   const sp = await searchParams;
@@ -166,7 +166,7 @@ export default async function SharesPage({ searchParams }: Props) {
                 <p className="mb-4 rounded-xl bg-[#f3f1ea] px-4 py-3 text-[14px] leading-[1.8] text-forest-deep">
                   {kind === 'article' ? q.hintArticle : q.hintAha}
                 </p>
-                <ShareSubmitForm isLoggedIn={!!memberId} locale={locale} kind={kind} loginHref={loginBack} />
+                <ShareSubmitForm key={kind} isLoggedIn={!!memberId} locale={locale} kind={kind} loginHref={loginBack} />
               </section>
             </>
           )}
@@ -256,7 +256,7 @@ function EventRow({ e, q, en }: { e: SquareEvent; q: ReturnType<typeof dict>['sh
  */
 function ShareCard({ share, locale }: { share: ShareEntry; locale: Locale }) {
   const inner = (
-    <article className="group overflow-hidden rounded-lg border border-forest-deep/10 bg-white/72 shadow-[0_14px_50px_rgba(26,46,26,0.06)]">
+    <article className="group relative overflow-hidden rounded-lg border border-forest-deep/10 bg-white/72 shadow-[0_14px_50px_rgba(26,46,26,0.06)]">
       <ShareMedia share={share} locale={locale} />
       <div className="p-6">
         <div className="mb-4 flex items-center gap-3 text-[11px] tracking-[0.16em] text-coral uppercase">
@@ -264,7 +264,11 @@ function ShareCard({ share, locale }: { share: ShareEntry; locale: Locale }) {
           {tr(share.kicker, locale)}
         </div>
         <h2 className="text-[1.35rem] font-normal leading-[1.45] text-forest-deep">
-          {tr(share.title, locale)}
+          {share.articleBody ? (
+            <Link href={`/shares/${encodeURIComponent(share.id)}`} className="text-inherit underline-offset-4 after:absolute after:inset-0 after:rounded-lg hover:underline focus-visible:underline focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-forest">
+              {tr(share.title, locale)}
+            </Link>
+          ) : tr(share.title, locale)}
         </h2>
         <p className="mt-3 text-[13.5px] leading-[1.85] text-text-secondary">
           {tr(share.summary, locale)}
@@ -283,7 +287,7 @@ function ShareCard({ share, locale }: { share: ShareEntry; locale: Locale }) {
     </article>
   );
 
-  if (!share.href) return inner;
+  if (share.articleBody || !share.href) return inner;
   return (
     <a href={share.href} target="_blank" rel="noreferrer" className="block no-underline">
       {inner}
@@ -298,7 +302,7 @@ function ShareMedia({ share, locale }: { share: ShareEntry; locale: Locale }) {
         controls
         preload="metadata"
         poster={share.posterUrl || undefined}
-        className="aspect-video w-full object-cover bg-[#173018]"
+        className={`aspect-video w-full object-cover bg-[#173018] ${share.articleBody ? 'relative z-[1]' : ''}`}
       >
         <source src={share.mediaUrl} />
       </video>

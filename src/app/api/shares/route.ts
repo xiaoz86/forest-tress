@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminId } from '@/lib/admin';
 import { getAuthenticatedMemberId } from '@/lib/session';
+import { ARTICLE_BODY_MAX_LENGTH } from '@/lib/shareArticle';
 import {
   DEFAULT_SHARE_CONTENT,
   SHARE_CONTENT_ID,
@@ -50,6 +51,21 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'bad-json' }, { status: 400 });
   }
 
+  const shares = body && typeof body === 'object' && 'shares' in body ? body.shares : undefined;
+  if (!Array.isArray(shares)) return NextResponse.json({ error: 'invalid-shares' }, { status: 400 });
+  for (const entry of shares) {
+    if (entry && typeof entry === 'object' && 'articleBody' in entry) {
+      if (typeof entry.articleBody !== 'string') {
+        return NextResponse.json({ error: 'invalid-article-body' }, { status: 400 });
+      }
+      if (entry.articleBody.length > ARTICLE_BODY_MAX_LENGTH) {
+        return NextResponse.json({ error: 'article-body-too-long' }, { status: 400 });
+      }
+      if (!entry.articleBody.trim()) {
+        return NextResponse.json({ error: 'missing-article-body' }, { status: 400 });
+      }
+    }
+  }
   const content = normalizeShareContent(body);
   const sb = createClient(supabaseUrl, serviceKey);
   const { error } = await sb

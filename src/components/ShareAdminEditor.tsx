@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { ARTICLE_BODY_MAX_LENGTH } from '@/lib/shareArticle';
 import type { ShareContent, ShareEntry, ShareMediaKind, ShareStatus } from '@/lib/shares';
 
 type Props = {
@@ -89,6 +90,13 @@ export default function ShareAdminEditor({ initialContent }: Props) {
   };
 
   const persistContent = async (nextContent: ShareContent) => {
+    for (const share of nextContent.shares) {
+      if (share.articleBody === undefined) continue;
+      if (!share.articleBody.trim()) throw new Error(`《${share.title}》的正文不能为空。`);
+      if (share.articleBody.length > ARTICLE_BODY_MAX_LENGTH) {
+        throw new Error(`《${share.title}》的正文超过 ${ARTICLE_BODY_MAX_LENGTH.toLocaleString('zh-CN')} 字，请缩短后保存。`);
+      }
+    }
     const res = await fetch('/api/shares', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -225,7 +233,7 @@ export default function ShareAdminEditor({ initialContent }: Props) {
             <div className="text-[11px] font-medium tracking-[0.18em] text-coral-soft uppercase">
               分享条目
             </div>
-            <h2 className="mt-2 text-xl font-normal text-white">视频、图片、海报</h2>
+            <h2 className="mt-2 text-xl font-normal text-white">文章、视频、图片、海报</h2>
           </div>
           <button type="button" onClick={addShare} className={ghostBtnCls}>
             添加分享
@@ -287,6 +295,15 @@ export default function ShareAdminEditor({ initialContent }: Props) {
                     className={`${inputCls} min-h-24 resize-y leading-relaxed`}
                   />
                 </Field>
+                {share.articleBody !== undefined && (
+                  <Field label="文章正文（Markdown）" className="col-span-2 max-md:col-span-1">
+                    <textarea
+                      value={share.articleBody}
+                      onChange={e => updateShare(share.id, { articleBody: e.target.value })}
+                      className={`${inputCls} min-h-60 resize-y leading-loose`}
+                    />
+                  </Field>
+                )}
                 <Field label="补充一句" className="col-span-2 max-md:col-span-1">
                   <textarea
                     value={share.note}

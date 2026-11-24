@@ -2,6 +2,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { notifyShareSubmission } from '@/lib/notify';
 import { getAuthenticatedMemberId } from '@/lib/session';
+import { ARTICLE_BODY_MAX_LENGTH } from '@/lib/shareArticle';
+import { articleExcerpt } from '@/lib/shareArticleMarkdown';
 import {
   DEFAULT_SHARE_CONTENT,
   SHARE_CONTENT_ID,
@@ -113,21 +115,34 @@ export async function POST(request: NextRequest) {
 
   const title = trim(form, 'title', 64);
   const question = trim(form, 'question', 120);
-  const summary = trim(form, 'summary', 260);
+  const suppliedSummary = trim(form, 'summary', 260);
   const note = trim(form, 'note', 220);
   const href = trim(form, 'href', 900);
   const tags = tagsFrom(trim(form, 'tags', 120));
   // 从「去创作」的哪一项进来：写文章 / Aha!。写进卡片上方那行小字，审核时看得出是哪一种（主理人可以改）
   const kind = trim(form, 'kind', 12) === 'article' ? 'article' : 'aha';
+  const submittedBody = kind === 'article' ? form.get('articleBody') : null;
+  if (submittedBody !== null && typeof submittedBody !== 'string') {
+    return NextResponse.json({ error: 'invalid-form' }, { status: 400 });
+  }
+  // Multipart forms send CRLF for textarea newlines. Use the same LF as the editor's character count.
+  const body = submittedBody?.replace(/\r\n/g, '\n') ?? null;
+  if (body && body.length > ARTICLE_BODY_MAX_LENGTH) {
+    return NextResponse.json({ error: 'article-body-too-long' }, { status: 400 });
+  }
+  const articleBody = body?.trim() ? body : undefined;
   const media = form.get('media');
   const poster = form.get('poster');
 
-  if (!title || !summary) {
+  // Older article forms submitted a short description and an optional external link.
+  const missingArticleContent = body !== null && !articleBody && !href;
+  if (!title || (!articleBody && !suppliedSummary) || missingArticleContent) {
     return NextResponse.json({ error: 'missing-required-fields' }, { status: 400 });
   }
   if (href && !/^https?:\/\//i.test(href)) {
     return NextResponse.json({ error: 'bad-url' }, { status: 400 });
   }
+  const summary = suppliedSummary || (articleBody ? articleExcerpt(articleBody) : '');
 
   const sb = createClient(supabaseUrl, serviceKey);
   const { data: node, error: nodeErr } = await sb
@@ -159,22 +174,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: posterResult.error }, { status: 400 });
   }
 
-  const { data: existing } = await sb
+  const { data: existing, error: readError } = await sb
     .from('share_content')
     .select('payload')
     .eq('id', SHARE_CONTENT_ID)
     .maybeSingle();
+  if (readError) return NextResponse.json({ error: 'db-read-failed' }, { status: 500 });
   const content = normalizeShareContent(existing?.payload || DEFAULT_SHARE_CONTENT);
   const member = node as NodeCard;
+  const authorLabel = articleBody ? '文章' : '待审核';
   const share: ShareEntry = {
     id: shareId,
     title,
     kicker: `${member.name || '一位超级个体'}的${kind === 'article' ? '文章' : ' Aha'}`,
     author: member.name || '有温度的超级个体',
-    authorLabel: '待审核',
-    badgeLabel: `${member.name || '有温度的超级个体'} · 待审核`,
+    authorLabel,
+    badgeLabel: `${member.name || '有温度的超级个体'} · ${authorLabel}`,
     question,
     summary,
+    ...(articleBody ? { articleBody } : {}),
     note,
     tags: tags.length ? tags : ['分享'],
     mediaKind: mediaResult.mediaKind || 'poster',

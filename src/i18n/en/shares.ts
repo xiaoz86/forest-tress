@@ -31,7 +31,7 @@ export const shares: typeof zhShares = {
     emptyEventsHint: 'Members who have published their website can start events there, and they will show up here.',
     emptyAha: 'No Aha Moments yet. The first one might be yours.',
     hintAha: 'Share an Aha: a piece of work, a product, an experience, or a spark of insight. The founding team reviews it before it goes public.',
-    hintArticle: 'Write an article: put the title and summary here, and link to the full text (WeChat, blog, Xiaohongshu). The founding team reviews it before it goes public.',
+    hintArticle: 'Add a title and write your article. The founding team will review it before publication.',
   },
 
   submitCta: 'Share something',
@@ -48,6 +48,21 @@ export const shares: typeof zhShares = {
 
     title: 'Add your piece',
     lede: 'It can be work, a product, an event, or just an experience. It goes to review first—nothing is published straight away.',
+
+    article: {
+      title: 'Write an article',
+      body: 'Article body · Markdown',
+      view: 'Article view',
+      write: 'Write',
+      preview: 'Preview',
+      placeholder: 'Write or paste your Markdown here.',
+      emptyPreview: 'Write something to see how your article will look.',
+      tooLong: 'Your article is over the limit. Shorten it before submitting.',
+      options: 'Summary, tags, links and attachments (optional)',
+      summary: 'Summary (leave blank to use an excerpt)',
+      missing: 'Write the article, or add a summary and a link to the original below.',
+      external: 'You can also share an existing article by adding a summary and its link.',
+    },
 
     field: {
       title: 'Title',

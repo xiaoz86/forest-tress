@@ -36,7 +36,7 @@ export const shares = {
     emptyEventsHint: '发布了个人网站空间的成员，在自己的空间里发起活动，这里就会出现。',
     emptyAha: '还没有 Aha Moment。第一条也许就是你的。',
     hintAha: '分享一个 Aha：一个作品、产品、体验，或者一闪而过的灵感。提交后由创始人团队看过再公开。',
-    hintArticle: '写一篇文章：标题和摘要写在这里，正文可以放外部链接（公众号、博客、小红书）。提交后由创始人团队看过再公开。',
+    hintArticle: '只需写下标题和正文。提交后，创始人团队会先审核。',
   },
 
   submitCta: '带来我的分享',
@@ -55,6 +55,21 @@ export const shares = {
     // 登录之后
     title: '把你的片段放进来',
     lede: '可以是作品、产品、活动，也可以是一段体验。它会先进入审核，不会立刻公开。',
+
+    article: {
+      title: '写文章',
+      body: '正文 · Markdown',
+      view: '正文显示方式',
+      write: '写作',
+      preview: '预览',
+      placeholder: '在这里写下或粘贴 Markdown 正文。',
+      emptyPreview: '写下正文后，就能在这里查看排版。',
+      tooLong: '正文超出字数上限，请缩短后再提交。',
+      options: '摘要、标签、外链与附件（可选）',
+      summary: '摘要（留空将从正文摘取）',
+      missing: '请写下正文，或在下方填写摘要和文章链接。',
+      external: '分享已发表的文章，也可以只填摘要和外部链接。',
+    },
 
     field: {
       title: '标题',
