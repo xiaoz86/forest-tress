@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import Nav from '@/components/Nav';
 import ShareArticleBody from '@/components/ShareArticleBody';
+import ShareEvent from '@/components/space/interact/ShareEvent';
 import { dict } from '@/i18n';
 import { tr } from '@/lib/contentTranslate';
 import { getLocale } from '@/lib/locale';
+import { getSiteOrigin } from '@/lib/notify';
 import { fetchShareContent, getPublishedShares } from '@/lib/shares';
 
 type Props = { params: Promise<{ id: string }> };
@@ -15,19 +17,30 @@ type Props = { params: Promise<{ id: string }> };
 const publishedArticle = cache(async (id: string) => {
   const article = getPublishedShares(await fetchShareContent()).find(share => share.id === id);
   if (!article?.articleBody) notFound();
-  return { ...article, articleBody: article.articleBody };
+  const url = `${getSiteOrigin()}/shares/${encodeURIComponent(article.id)}`;
+  const cover = article.mediaKind === 'video' ? article.posterUrl : article.mediaUrl || article.posterUrl;
+  return { ...article, articleBody: article.articleBody, url, cover };
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const [article, locale] = await Promise.all([publishedArticle(id), getLocale()]);
-  return { title: tr(article.title, locale), description: tr(article.summary, locale) };
+  const title = tr(article.title, locale);
+  const description = tr(article.summary, locale);
+  return {
+    title, description, alternates: { canonical: article.url },
+    openGraph: {
+      type: 'article', url: article.url, title, description,
+      siteName: locale === 'en' ? 'Nearby Forest' : '附近森林',
+      ...(article.cover && { images: [{ url: article.cover, alt: title }] }),
+    },
+  };
 }
 
 export default async function ShareArticlePage({ params }: Props) {
   const { id } = await params;
   const [article, locale] = await Promise.all([publishedArticle(id), getLocale()]);
-  const cover = article.mediaKind === 'video' ? article.posterUrl : article.mediaUrl || article.posterUrl;
+  const { cover } = article;
   return (
     <>
       <Nav />
@@ -40,7 +53,10 @@ export default async function ShareArticlePage({ params }: Props) {
             <h1 className="mb-4 text-[clamp(1.9rem,4vw,2.8rem)] leading-[1.28] font-medium break-words text-forest-deep">
               {tr(article.title, locale)}
             </h1>
-            <p className="text-sm text-ink-soft">{tr(article.author, locale)}</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="min-w-0 break-words text-sm text-ink-soft">{tr(article.author, locale)}</p>
+              <ShareEvent path={article.url} title={tr(article.title, locale)} text={tr(article.summary, locale)} locale={locale} />
+            </div>
           </header>
           {article.mediaKind === 'video' && article.mediaUrl ? (
             <video controls preload="metadata" poster={cover} src={article.mediaUrl} className="mb-8 max-h-[65vh] w-full rounded-xl bg-forest-dark" />

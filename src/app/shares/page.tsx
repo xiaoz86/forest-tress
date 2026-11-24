@@ -8,7 +8,8 @@ import { tr } from '@/lib/contentTranslate';
 import { getLocale, type Locale } from '@/lib/locale';
 import ShareSubmitForm from '@/components/ShareSubmitForm';
 import CreateMenu from '@/components/square/CreateMenu';
-import ShareEvent, { SHARE_EN, SHARE_ZH } from '@/components/space/interact/ShareEvent';
+import ShareEvent from '@/components/space/interact/ShareEvent';
+import { getSiteOrigin } from '@/lib/notify';
 import { isAdminId } from '@/lib/admin';
 import { getAuthenticatedMemberId } from '@/lib/session';
 import { fetchShareContent, getPublishedShares, getShareBadgeLabel, type ShareEntry } from '@/lib/shares';
@@ -240,7 +241,7 @@ function EventRow({ e, q, en }: { e: SquareEvent; q: ReturnType<typeof dict>['sh
               path={eventSharePath(e.host.href, e.id)}
               title={e.title}
               text={eventShareText(e, hostName, en)}
-              copy={en ? SHARE_EN : SHARE_ZH}
+              locale={en ? 'en' : 'zh'}
             />
           </div>
         </div>
@@ -255,7 +256,10 @@ function EventRow({ e, q, en }: { e: SquareEvent; q: ReturnType<typeof dict>['sh
  * 所以后台新加了分享之后要重跑一次 scripts/translate-content.mjs。
  */
 function ShareCard({ share, locale }: { share: ShareEntry; locale: Locale }) {
-  const inner = (
+  const path = share.articleBody ? `/shares/${encodeURIComponent(share.id)}` : share.href;
+  const title = tr(share.title, locale);
+  const summary = tr(share.summary, locale);
+  return (
     <article className="group relative overflow-hidden rounded-lg border border-forest-deep/10 bg-white/72 shadow-[0_14px_50px_rgba(26,46,26,0.06)]">
       <ShareMedia share={share} locale={locale} />
       <div className="p-6">
@@ -264,34 +268,32 @@ function ShareCard({ share, locale }: { share: ShareEntry; locale: Locale }) {
           {tr(share.kicker, locale)}
         </div>
         <h2 className="text-[1.35rem] font-normal leading-[1.45] text-forest-deep">
-          {share.articleBody ? (
-            <Link href={`/shares/${encodeURIComponent(share.id)}`} className="text-inherit underline-offset-4 after:absolute after:inset-0 after:rounded-lg hover:underline focus-visible:underline focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-forest">
-              {tr(share.title, locale)}
+          {path ? (
+            <Link href={path} target={share.articleBody ? undefined : '_blank'} rel={share.articleBody ? undefined : 'noreferrer'}
+              className="text-inherit underline-offset-4 after:absolute after:inset-0 after:rounded-lg hover:underline focus-visible:underline focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-forest">
+              {title}
             </Link>
-          ) : tr(share.title, locale)}
+          ) : title}
         </h2>
         <p className="mt-3 text-[13.5px] leading-[1.85] text-text-secondary">
-          {tr(share.summary, locale)}
+          {summary}
         </p>
         <div className="mt-5 text-[12px] text-text-light">
           {getShareBadgeLabel(share, locale)}
         </div>
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap items-center gap-2">
           {share.tags.map(tag => (
             <span key={tag} className="rounded-full border border-forest-deep/10 px-3 py-1 text-[12px] text-forest-deep/55">
               {tr(tag, locale)}
             </span>
           ))}
+          {path && (
+            <ShareEvent path={share.articleBody ? getSiteOrigin() + path : path}
+              title={title} text={summary} locale={locale} />
+          )}
         </div>
       </div>
     </article>
-  );
-
-  if (share.articleBody || !share.href) return inner;
-  return (
-    <a href={share.href} target="_blank" rel="noreferrer" className="block no-underline">
-      {inner}
-    </a>
   );
 }
 
@@ -302,7 +304,7 @@ function ShareMedia({ share, locale }: { share: ShareEntry; locale: Locale }) {
         controls
         preload="metadata"
         poster={share.posterUrl || undefined}
-        className={`aspect-video w-full object-cover bg-[#173018] ${share.articleBody ? 'relative z-[1]' : ''}`}
+        className={`aspect-video w-full object-cover bg-[#173018] ${share.articleBody || share.href ? 'relative z-[1]' : ''}`}
       >
         <source src={share.mediaUrl} />
       </video>

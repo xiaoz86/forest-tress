@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { copyText } from '@/lib/clipboard';
+import type { Locale } from '@/lib/locale';
 
 /**
  * 分享一场活动（和林间探索里「分享一支影片」同一套做法）：
@@ -39,12 +40,13 @@ export const SHARE_EN: ShareCopy = {
   label: title => `Share “${title}”`,
 };
 
-export default function ShareEvent({ path, title, text, variant = 'site', copy = SHARE_ZH, className }: {
+export default function ShareEvent({ path, title, text, variant = 'site', locale, copy = locale === 'en' ? SHARE_EN : SHARE_ZH, className }: {
   /** 站内路径（会补上当前域名）或完整地址 */
   path: string;
   title: string;
   text?: string;
   variant?: 'space' | 'site';
+  locale?: Locale;
   copy?: ShareCopy;
   className?: string;
 }) {
