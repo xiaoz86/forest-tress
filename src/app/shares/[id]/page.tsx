@@ -49,21 +49,24 @@ export default async function ShareArticlePage({ params }: Props) {
           <Link href="/shares?tab=aha" className="text-sm text-forest underline-offset-4 hover:underline">
             {dict(locale).shares.square.eyebrow}
           </Link>
-          <header className="mt-7 mb-9 border-b border-mist-muted pb-6">
-            <h1 className="mb-4 text-[clamp(1.9rem,4vw,2.8rem)] leading-[1.28] font-medium break-words text-forest-deep">
-              {tr(article.title, locale)}
-            </h1>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="min-w-0 break-words text-sm text-ink-soft">{tr(article.author, locale)}</p>
-              <ShareEvent path={article.url} title={tr(article.title, locale)} text={tr(article.summary, locale)} locale={locale} />
-            </div>
-          </header>
-          {article.mediaKind === 'video' && article.mediaUrl ? (
-            <video controls preload="metadata" poster={cover} src={article.mediaUrl} className="mb-8 max-h-[65vh] w-full rounded-xl bg-forest-dark" />
-          ) : cover && (
-            <img src={cover} alt="" className="mx-auto mb-8 max-h-[65vh] max-w-full rounded-xl object-contain" />
-          )}
-          <ShareArticleBody source={article.articleBody} />
+          <div className="mt-7">
+            <ShareArticleBody source={article.articleBody} theme={article.articleTheme}>
+              <header className="mb-9 border-b border-mist-muted pb-6">
+                <h1 data-article-title className="mb-4 text-[clamp(1.9rem,4vw,2.8rem)] leading-[1.28] font-medium break-words text-forest-deep">
+                  {tr(article.title, locale)}
+                </h1>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="min-w-0 break-words text-sm text-ink-soft">{tr(article.author, locale)}</p>
+                  <ShareEvent path={article.url} title={tr(article.title, locale)} text={tr(article.summary, locale)} locale={locale} />
+                </div>
+              </header>
+              {article.mediaKind === 'video' && article.mediaUrl ? (
+                <video controls preload="metadata" poster={cover} src={article.mediaUrl} className="mb-8 max-h-[65vh] w-full rounded-xl bg-forest-dark" />
+              ) : cover && (
+                <img src={cover} alt="" className="mx-auto mb-8 max-h-[65vh] max-w-full rounded-xl object-contain" />
+              )}
+            </ShareArticleBody>
+          </div>
           {article.href && (
             <footer className="mt-10 border-t border-mist-muted pt-5">
               <a href={article.href} className="text-sm text-forest underline underline-offset-4">

@@ -52,6 +52,9 @@ export const shares: typeof zhShares = {
     article: {
       title: 'Write an article',
       body: 'Article body · Markdown',
+      theme: 'Article theme',
+      themeDefault: 'Default',
+      themeForest: 'Nearby Forest',
       view: 'Article view',
       insertImage: 'Insert image',
       insertVideo: 'Insert video',

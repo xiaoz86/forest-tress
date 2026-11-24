@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useId, useRef, useState } from 'react';
 import type { dict } from '@/i18n';
-import { ARTICLE_BODY_MAX_LENGTH } from '@/lib/shareArticle';
+import { ARTICLE_BODY_MAX_LENGTH, type ShareArticleTheme } from '@/lib/shareArticle';
 import { ARTICLE_IMAGE_ACCEPT, ARTICLE_VIDEO_ACCEPT } from '@/lib/shareArticleMedia';
 import { uploadArticleMedia } from '@/lib/uploadArticleMedia';
 
@@ -12,6 +12,9 @@ type Copy = ReturnType<typeof dict>['shares']['submit']['article'];
 
 type Props = {
   copy: Copy;
+  title: string;
+  theme: ShareArticleTheme;
+  onTheme: (theme: ShareArticleTheme) => void;
   source: string;
   onChange: (source: string) => void;
   preview: boolean;
@@ -21,7 +24,7 @@ type Props = {
   submitting: boolean;
 };
 
-export default function ShareArticleFields({ copy, source, onChange, preview, onPreview, uploading, onUploading, submitting }: Props) {
+export default function ShareArticleFields({ copy, title, theme, onTheme, source, onChange, preview, onPreview, uploading, onUploading, submitting }: Props) {
   const id = useId();
   const editor = useRef<HTMLTextAreaElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
@@ -69,7 +72,18 @@ export default function ShareArticleFields({ copy, source, onChange, preview, on
   return (
     <div className="min-w-0">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <label htmlFor={id} className="text-sm font-medium text-forest-deep">{copy.body}</label>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <label htmlFor={id} className="text-sm font-medium text-forest-deep">{copy.body}</label>
+          <label className="inline-flex items-center gap-2 text-sm text-ink-soft">
+            {copy.theme}
+            <select name="articleTheme" value={theme} disabled={submitting}
+              onChange={event => onTheme(event.target.value === 'forest' ? 'forest' : 'default')}
+              className="min-h-9 rounded-lg border border-forest-deep/15 bg-paper-soft px-2 text-forest-deep focus-visible:outline-forest">
+              <option value="default">{copy.themeDefault}</option>
+              <option value="forest">{copy.themeForest}</option>
+            </select>
+          </label>
+        </div>
         <div role="group" aria-label={copy.view} className="flex gap-1 rounded-full border border-forest-deep/10 bg-paper-soft p-1">
           {([false, true] as const).map(value => (
             <button key={String(value)} type="button" aria-pressed={preview === value} disabled={uploading || submitting}
@@ -107,10 +121,14 @@ export default function ShareArticleFields({ copy, source, onChange, preview, on
         placeholder={copy.placeholder}
         className="min-h-80 w-full resize-y rounded-xl border border-forest-deep/15 bg-paper-soft px-5 py-5 font-sans text-base leading-[1.9] text-ink outline-none placeholder:text-ink-soft/75 focus:border-forest max-md:px-4" />
       {preview && (
-        <div className="min-h-80 rounded-xl border border-forest-deep/15 bg-paper-soft px-5 py-5 max-md:px-4">
+        <div className={theme === 'forest' ? 'min-h-80' : 'min-h-80 rounded-xl border border-forest-deep/15 bg-paper-soft px-5 py-5 max-md:px-4'}>
           {overLimit ? <p className="text-sm text-ink-soft">{copy.tooLong}</p>
-            : source.trim() ? <ArticleBody source={source} />
-            : <p className="text-sm text-ink-soft">{copy.emptyPreview}</p>}
+            : <ArticleBody source={source} theme={theme}>
+                {theme === 'forest' && title.trim() && (
+                  <header className="mb-9 border-b border-mist-muted pb-6"><h2 data-article-title>{title}</h2></header>
+                )}
+                {!source.trim() && <p className="text-sm text-ink-soft">{copy.emptyPreview}</p>}
+              </ArticleBody>}
         </div>
       )}
       <div id={`${id}-count`} className={`mt-1 text-right text-xs tabular-nums ${overLimit ? 'text-[#98452c]' : 'text-ink-soft'}`}>

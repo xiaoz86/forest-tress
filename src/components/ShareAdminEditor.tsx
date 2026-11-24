@@ -2,12 +2,15 @@
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import { ARTICLE_BODY_MAX_LENGTH } from '@/lib/shareArticle';
 import type { ShareContent, ShareEntry, ShareMediaKind, ShareStatus } from '@/lib/shares';
 
 type Props = {
   initialContent: ShareContent;
 };
+
+const ShareArticleBody = dynamic(() => import('@/components/ShareArticleBody'));
 
 const MEDIA_OPTIONS: { value: ShareMediaKind; label: string }[] = [
   { value: 'video', label: '视频' },
@@ -30,6 +33,7 @@ export default function ShareAdminEditor({ initialContent }: Props) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState('');
   const [message, setMessage] = useState('');
+  const [previewId, setPreviewId] = useState('');
   const sortedShares = [...content.shares].sort((a, b) => {
     if (a.status === 'pending' && b.status !== 'pending') return -1;
     if (a.status !== 'pending' && b.status === 'pending') return 1;
@@ -296,13 +300,25 @@ export default function ShareAdminEditor({ initialContent }: Props) {
                   />
                 </Field>
                 {share.articleBody !== undefined && (
-                  <Field label="文章正文（Markdown）" className="col-span-2 max-md:col-span-1">
-                    <textarea
-                      value={share.articleBody}
-                      onChange={e => updateShare(share.id, { articleBody: e.target.value })}
-                      className={`${inputCls} min-h-60 resize-y leading-loose`}
-                    />
-                  </Field>
+                  <div className="col-span-2 max-md:col-span-1">
+                    <Field label="文章正文（Markdown）">
+                      <textarea
+                        value={share.articleBody}
+                        onChange={e => updateShare(share.id, { articleBody: e.target.value })}
+                        className={`${inputCls} min-h-60 resize-y leading-loose`}
+                      />
+                    </Field>
+                    <button type="button" aria-expanded={previewId === share.id}
+                      onClick={() => setPreviewId(previewId === share.id ? '' : share.id)}
+                      className="mt-2 min-h-9 text-sm text-white/75 hover:text-white">
+                      {previewId === share.id ? '收起预览' : '预览正文'} · {share.articleTheme === 'forest' ? '附近森林' : '默认主题'}
+                    </button>
+                    {previewId === share.id && (
+                      <div className="mt-2 rounded-lg bg-paper-soft p-4">
+                        <ShareArticleBody source={share.articleBody} theme={share.articleTheme} />
+                      </div>
+                    )}
+                  </div>
                 )}
                 <Field label="补充一句" className="col-span-2 max-md:col-span-1">
                   <textarea

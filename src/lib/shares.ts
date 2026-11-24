@@ -15,6 +15,7 @@ export type ShareEntry = {
   question: string;
   summary: string;
   articleBody?: string;
+  articleTheme?: 'forest';
   note: string;
   tags: string[];
   mediaKind: ShareMediaKind;
@@ -153,6 +154,7 @@ export function normalizeShareContent(input: unknown): ShareContent {
       summary: cleanText(r.summary, articleBody ? '' : fallbackShare.summary, 260),
       note: cleanText(r.note, articleBody ? '' : fallbackShare.note, 220),
       ...(articleBody ? { articleBody } : {}),
+      ...(articleBody && r.articleTheme === 'forest' ? { articleTheme: 'forest' as const } : {}),
       tags: cleanTags(r.tags, fallbackShare.tags),
       mediaKind,
       ...(cleanUrl(r.mediaUrl) ? { mediaUrl: cleanUrl(r.mediaUrl) } : {}),

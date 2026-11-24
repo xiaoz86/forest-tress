@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { dict } from '@/i18n';
 import type { Locale } from '@/lib/locale';
-import { ARTICLE_BODY_MAX_LENGTH } from '@/lib/shareArticle';
+import { ARTICLE_BODY_MAX_LENGTH, type ShareArticleTheme } from '@/lib/shareArticle';
 import ShareArticleFields from './ShareArticleFields';
 
 type Props = {
@@ -26,6 +26,8 @@ export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', logi
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [articleBody, setArticleBody] = useState('');
+  const [articleTheme, setArticleTheme] = useState<ShareArticleTheme>('default');
+  const [articleTitle, setArticleTitle] = useState('');
   const [preview, setPreview] = useState(false);
   const [uploading, setUploading] = useState(false);
   const isArticle = kind === 'article';
@@ -76,6 +78,8 @@ export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', logi
       setMessage(t.done);
       form.reset();
       setArticleBody('');
+      setArticleTheme('default');
+      setArticleTitle('');
       setPreview(false);
     } catch {
       // 原来这里把接口回的错误码原样显示出来（submit-failed 之类）。
@@ -126,12 +130,14 @@ export default function ShareSubmitForm({ isLoggedIn, locale, kind = 'aha', logi
 
       <div className="mt-7 grid grid-cols-2 gap-4 max-md:grid-cols-1">
         <Field label={t.field.title} className={isArticle ? 'col-span-full' : undefined}>
-          <input name="title" required maxLength={64} className={inputCls} />
+          <input name="title" required maxLength={64} className={inputCls}
+            onChange={isArticle ? event => setArticleTitle(event.target.value) : undefined} />
         </Field>
         {isArticle ? (
           <>
             <div className="col-span-full">
-              <ShareArticleFields copy={t.article} source={articleBody} onChange={setArticleBody}
+              <ShareArticleFields copy={t.article} title={articleTitle} theme={articleTheme} onTheme={setArticleTheme}
+                source={articleBody} onChange={setArticleBody}
                 preview={preview} onPreview={setPreview} uploading={uploading} onUploading={setUploading} submitting={submitting} />
             </div>
             <details className="col-span-full border-t border-forest-deep/10 pt-4">

@@ -59,6 +59,9 @@ export const shares = {
     article: {
       title: '写文章',
       body: '正文 · Markdown',
+      theme: '文章主题',
+      themeDefault: '默认',
+      themeForest: '附近森林',
       view: '正文显示方式',
       insertImage: '插入图片',
       insertVideo: '插入视频',

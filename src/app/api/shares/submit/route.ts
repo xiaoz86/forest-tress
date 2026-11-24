@@ -193,6 +193,7 @@ export async function POST(request: NextRequest) {
     question,
     summary,
     ...(articleBody ? { articleBody } : {}),
+    ...(articleBody && form.get('articleTheme') === 'forest' ? { articleTheme: 'forest' as const } : {}),
     note,
     tags: tags.length ? tags : ['分享'],
     mediaKind: mediaResult.mediaKind || 'poster',
